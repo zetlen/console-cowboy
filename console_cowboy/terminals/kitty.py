@@ -133,6 +133,9 @@ class KittyAdapter(TerminalAdapter):
             elif key == "italic_font":
                 if value.lower() != "auto":
                     font.italic_font = value
+            elif key == "bold_italic_font":
+                if value.lower() != "auto":
+                    font.bold_italic_font = value
             elif key == "adjust_line_height":
                 try:
                     # Can be percentage (e.g., "110%") or absolute
@@ -144,6 +147,23 @@ class KittyAdapter(TerminalAdapter):
                     ctec.add_warning(f"Invalid adjust_line_height: {value}")
             elif key == "disable_ligatures":
                 font.ligatures = value.lower() == "never"
+            elif key == "symbol_map":
+                # Format: U+E0A0-U+E0A3,U+E0B0-U+E0B3 Symbols Nerd Font
+                # Parse unicode range and font name
+                parts = value.split(None, 1)
+                if len(parts) == 2:
+                    unicode_range, font_name = parts
+                    if font.symbol_map is None:
+                        font.symbol_map = {}
+                    font.symbol_map[unicode_range] = font_name
+            elif key == "box_drawing_scale":
+                try:
+                    # Kitty uses 4 values, we store just the first as a representative
+                    parts = value.split(",")
+                    if parts:
+                        font.box_drawing_scale = float(parts[0].strip())
+                except ValueError:
+                    ctec.add_warning(f"Invalid box_drawing_scale: {value}")
 
             # Parse cursor settings
             elif key == "cursor_shape":
@@ -272,7 +292,7 @@ class KittyAdapter(TerminalAdapter):
             for f in ["foreground", "background", "black"]
         ):
             ctec.color_scheme = scheme
-        if font.family or font.size:
+        if font.family or font.size or font.symbol_map or font.ligatures is not None:
             ctec.font = font
         if cursor.style or cursor.blink is not None:
             ctec.cursor = cursor
@@ -309,11 +329,22 @@ class KittyAdapter(TerminalAdapter):
                 lines.append(f"bold_font {ctec.font.bold_font}")
             if ctec.font.italic_font:
                 lines.append(f"italic_font {ctec.font.italic_font}")
+            if ctec.font.bold_italic_font:
+                lines.append(f"bold_italic_font {ctec.font.bold_italic_font}")
             if ctec.font.line_height and ctec.font.line_height != 1.0:
                 lines.append(f"adjust_line_height {int(ctec.font.line_height * 100)}%")
             if ctec.font.ligatures is not None:
-                val = "never" if not ctec.font.ligatures else "always"
+                # disable_ligatures=never means ligatures are ON
+                # disable_ligatures=always means ligatures are OFF
+                val = "never" if ctec.font.ligatures else "always"
                 lines.append(f"disable_ligatures {val}")
+            if ctec.font.symbol_map:
+                for unicode_range, font_name in ctec.font.symbol_map.items():
+                    lines.append(f"symbol_map {unicode_range} {font_name}")
+            if ctec.font.box_drawing_scale is not None:
+                # Kitty expects 4 values, use the same value for all
+                scale = ctec.font.box_drawing_scale
+                lines.append(f"box_drawing_scale {scale}, {scale}, {scale}, {scale}")
             lines.append("")
 
         # Export cursor settings

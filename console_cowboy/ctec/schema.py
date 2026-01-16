@@ -26,6 +26,80 @@ class BellMode(Enum):
     VISUAL = "visual"
 
 
+class FontWeight(Enum):
+    """Standard font weights (CSS-style numeric values)."""
+
+    THIN = 100
+    EXTRA_LIGHT = 200
+    LIGHT = 300
+    REGULAR = 400
+    MEDIUM = 500
+    SEMI_BOLD = 600
+    BOLD = 700
+    EXTRA_BOLD = 800
+    BLACK = 900
+
+    @classmethod
+    def from_string(cls, name: str) -> "FontWeight":
+        """Convert a weight name string to FontWeight."""
+        # Try numeric lookup first
+        try:
+            numeric = int(name)
+            for member in cls:
+                if member.value == numeric:
+                    return member
+            raise ValueError(f"Unknown numeric weight: {name}")
+        except ValueError:
+            pass
+
+        name_map = {
+            "thin": cls.THIN,
+            "extralight": cls.EXTRA_LIGHT,
+            "extra-light": cls.EXTRA_LIGHT,
+            "ultralight": cls.EXTRA_LIGHT,
+            "light": cls.LIGHT,
+            "regular": cls.REGULAR,
+            "normal": cls.REGULAR,
+            "medium": cls.MEDIUM,
+            "semibold": cls.SEMI_BOLD,
+            "semi-bold": cls.SEMI_BOLD,
+            "demibold": cls.SEMI_BOLD,
+            "bold": cls.BOLD,
+            "extrabold": cls.EXTRA_BOLD,
+            "extra-bold": cls.EXTRA_BOLD,
+            "ultrabold": cls.EXTRA_BOLD,
+            "black": cls.BLACK,
+            "heavy": cls.BLACK,
+        }
+        result = name_map.get(name.lower().replace(" ", ""))
+        if result is None:
+            raise ValueError(f"Unknown font weight: {name}")
+        return result
+
+    def to_string(self) -> str:
+        """Convert to human-readable weight name."""
+        name_map = {
+            FontWeight.THIN: "Thin",
+            FontWeight.EXTRA_LIGHT: "ExtraLight",
+            FontWeight.LIGHT: "Light",
+            FontWeight.REGULAR: "Regular",
+            FontWeight.MEDIUM: "Medium",
+            FontWeight.SEMI_BOLD: "SemiBold",
+            FontWeight.BOLD: "Bold",
+            FontWeight.EXTRA_BOLD: "ExtraBold",
+            FontWeight.BLACK: "Black",
+        }
+        return name_map.get(self, "Regular")
+
+
+class FontStyle(Enum):
+    """Font style variants."""
+
+    NORMAL = "normal"
+    ITALIC = "italic"
+    OBLIQUE = "oblique"
+
+
 @dataclass
 class Color:
     """
@@ -207,49 +281,127 @@ class FontConfig:
     """
     Font configuration for the terminal.
 
+    Design Principles:
+    - Store friendly names as the canonical format (most human-readable)
+    - Resolve to PostScript names on export when needed (iTerm2)
+    - Preserve original names in _source_names for lossless round-trips
+
     Attributes:
-        family: Font family name (e.g., 'JetBrains Mono', 'Fira Code')
+        family: Primary font family name (friendly format, e.g., 'JetBrains Mono')
         size: Font size in points
         line_height: Line height multiplier (1.0 = normal)
+        cell_width: Character cell width multiplier (1.0 = normal)
+        weight: Font weight for normal text (Regular, Bold, etc.)
+        style: Font style for normal text (Normal, Italic, Oblique)
         bold_font: Optional separate font family for bold text
         italic_font: Optional separate font family for italic text
+        bold_italic_font: Optional separate font family for bold italic text
         ligatures: Whether to enable font ligatures
+        anti_aliasing: Whether to enable anti-aliasing (macOS/iTerm2 specific)
+        fallback_fonts: List of fallback font families in priority order
+        symbol_map: Map of unicode ranges to font families (e.g., for Nerd Fonts)
+                    Format: {"U+E000-U+F8FF": "Symbols Nerd Font"}
+        draw_powerline_glyphs: Use built-in Powerline glyph rendering (iTerm2)
+        box_drawing_scale: Scale factor for box drawing characters
+        _source_names: Original font names from source terminal (for round-trip)
     """
 
     family: Optional[str] = None
     size: Optional[float] = None
     line_height: Optional[float] = None
+    cell_width: Optional[float] = None
+    weight: Optional[FontWeight] = None
+    style: Optional[FontStyle] = None
     bold_font: Optional[str] = None
     italic_font: Optional[str] = None
+    bold_italic_font: Optional[str] = None
     ligatures: Optional[bool] = None
+    anti_aliasing: Optional[bool] = None
+    fallback_fonts: Optional[list[str]] = None
+    symbol_map: Optional[dict[str, str]] = None
+    draw_powerline_glyphs: Optional[bool] = None
+    box_drawing_scale: Optional[float] = None
+    # Internal: preserve original names for lossless round-trips
+    _source_names: Optional[dict[str, str]] = field(default=None, repr=False)
 
     def to_dict(self) -> dict:
         """Convert to dictionary representation."""
         result = {}
+        # Simple fields
         for field_name in [
             "family",
             "size",
             "line_height",
+            "cell_width",
             "bold_font",
             "italic_font",
+            "bold_italic_font",
             "ligatures",
+            "anti_aliasing",
+            "draw_powerline_glyphs",
+            "box_drawing_scale",
         ]:
             value = getattr(self, field_name)
             if value is not None:
                 result[field_name] = value
+        # Enum fields - use string names for readability
+        if self.weight is not None:
+            result["weight"] = self.weight.to_string().lower()
+        if self.style is not None:
+            result["style"] = self.style.value
+        # List fields
+        if self.fallback_fonts:
+            result["fallback_fonts"] = self.fallback_fonts
+        # Dict fields
+        if self.symbol_map:
+            result["symbol_map"] = self.symbol_map
+        # Source names for round-trip (only if present)
+        if self._source_names:
+            result["_source_names"] = self._source_names
         return result
 
     @classmethod
     def from_dict(cls, data: dict) -> "FontConfig":
         """Create a FontConfig from a dictionary."""
+        weight = None
+        if "weight" in data:
+            # Support both string names and numeric values
+            weight_val = data["weight"]
+            if isinstance(weight_val, int):
+                weight = FontWeight(weight_val)
+            else:
+                weight = FontWeight.from_string(str(weight_val))
+
         return cls(
             family=data.get("family"),
             size=data.get("size"),
             line_height=data.get("line_height"),
+            cell_width=data.get("cell_width"),
+            weight=weight,
+            style=FontStyle(data["style"]) if "style" in data else None,
             bold_font=data.get("bold_font"),
             italic_font=data.get("italic_font"),
+            bold_italic_font=data.get("bold_italic_font"),
             ligatures=data.get("ligatures"),
+            anti_aliasing=data.get("anti_aliasing"),
+            fallback_fonts=data.get("fallback_fonts"),
+            symbol_map=data.get("symbol_map"),
+            draw_powerline_glyphs=data.get("draw_powerline_glyphs"),
+            box_drawing_scale=data.get("box_drawing_scale"),
+            _source_names=data.get("_source_names"),
         )
+
+    def set_source_name(self, terminal: str, name: str) -> None:
+        """Store the original font name from a specific terminal for round-trip."""
+        if self._source_names is None:
+            self._source_names = {}
+        self._source_names[terminal] = name
+
+    def get_source_name(self, terminal: str) -> Optional[str]:
+        """Get the original font name for a specific terminal."""
+        if self._source_names is None:
+            return None
+        return self._source_names.get(terminal)
 
 
 @dataclass

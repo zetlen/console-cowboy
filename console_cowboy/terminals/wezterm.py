@@ -20,6 +20,7 @@ from console_cowboy.ctec.schema import (
     CursorConfig,
     CursorStyle,
     FontConfig,
+    FontWeight,
     KeyBinding,
     ScrollConfig,
     WindowConfig,
@@ -59,19 +60,63 @@ class WeztermAdapter(TerminalAdapter):
 
     @classmethod
     def _extract_lua_value(cls, content: str, key: str) -> Optional[str]:
-        """Extract a simple value from Lua config (config.key = value)."""
-        # Match patterns like: config.font_size = 12
-        pattern = rf'config\.{re.escape(key)}\s*=\s*([^\n,}}]+)'
+        """Extract a simple value from Lua config (config.key = value).
+
+        Handles nested braces for function calls like wezterm.font_with_fallback({...}).
+        """
+        # First, find the start of the assignment
+        pattern = rf'config\.{re.escape(key)}\s*='
         match = re.search(pattern, content)
-        if match:
-            value = match.group(1).strip()
-            # Remove quotes if present
-            if (value.startswith('"') and value.endswith('"')) or (
-                value.startswith("'") and value.endswith("'")
-            ):
-                value = value[1:-1]
-            return value
-        return None
+        if not match:
+            return None
+
+        start = match.end()
+
+        # Skip whitespace
+        while start < len(content) and content[start] in ' \t':
+            start += 1
+
+        # If the value starts with wezterm. (a function call), extract until balanced parens
+        if content[start:].startswith('wezterm.'):
+            # Find opening paren
+            paren_start = content.find('(', start)
+            if paren_start == -1:
+                # No paren, extract until newline
+                end = content.find('\n', start)
+                return content[start:end].strip() if end != -1 else content[start:].strip()
+
+            # Find matching closing paren, accounting for nested parens and braces
+            depth_paren = 0
+            depth_brace = 0
+            i = paren_start
+            while i < len(content):
+                c = content[i]
+                if c == '(':
+                    depth_paren += 1
+                elif c == ')':
+                    depth_paren -= 1
+                    if depth_paren == 0:
+                        return content[start:i + 1].strip()
+                elif c == '{':
+                    depth_brace += 1
+                elif c == '}':
+                    depth_brace -= 1
+                i += 1
+            # Didn't find matching paren
+            return None
+
+        # Otherwise, extract simple value until newline or comma
+        end = start
+        while end < len(content) and content[end] not in '\n,':
+            end += 1
+
+        value = content[start:end].strip()
+        # Remove quotes if present
+        if (value.startswith('"') and value.endswith('"')) or (
+            value.startswith("'") and value.endswith("'")
+        ):
+            value = value[1:-1]
+        return value
 
     @classmethod
     def _extract_lua_table(cls, content: str, key: str) -> Optional[str]:
@@ -190,10 +235,50 @@ class WeztermAdapter(TerminalAdapter):
         font = FontConfig()
         font_family = cls._extract_lua_value(content, "font")
         if font_family:
-            # Extract font family from wezterm.font("Family")
-            family_match = re.search(r'wezterm\.font\s*\(\s*["\']([^"\']+)["\']', font_family)
-            if family_match:
-                font.family = family_match.group(1)
+            # Check for wezterm.font_with_fallback first
+            fallback_match = re.search(
+                r'wezterm\.font_with_fallback\s*\(\s*\{(.+?)\}\s*\)', font_family, re.DOTALL
+            )
+            if fallback_match:
+                # Parse fallback fonts list - handles both table and string entries
+                fonts_str = fallback_match.group(1)
+
+                # Check for table entry with weight: { family = "Name", weight = "Bold" }
+                table_match = re.search(
+                    r'\{\s*family\s*=\s*["\']([^"\']+)["\']\s*,\s*weight\s*=\s*["\']?(\w+)["\']?\s*\}',
+                    fonts_str
+                )
+                if table_match:
+                    font.family = table_match.group(1)
+                    try:
+                        font.weight = FontWeight.from_string(table_match.group(2))
+                    except (ValueError, KeyError):
+                        ctec.add_warning(f"Unknown font weight: {table_match.group(2)}")
+                    # Get remaining fallback fonts (simple strings)
+                    remaining = fonts_str[table_match.end():]
+                    fallbacks = re.findall(r'["\']([^"\']+)["\']', remaining)
+                    if fallbacks:
+                        font.fallback_fonts = fallbacks
+                else:
+                    # Simple string entries
+                    font_entries = re.findall(r'["\']([^"\']+)["\']', fonts_str)
+                    if font_entries:
+                        font.family = font_entries[0]
+                        if len(font_entries) > 1:
+                            font.fallback_fonts = font_entries[1:]
+            else:
+                # Extract font family from wezterm.font("Family", {options})
+                family_match = re.search(r'wezterm\.font\s*\(\s*["\']([^"\']+)["\']', font_family)
+                if family_match:
+                    font.family = family_match.group(1)
+                    # Check for weight parameter
+                    weight_match = re.search(r'weight\s*=\s*["\']?(\w+)["\']?', font_family)
+                    if weight_match:
+                        weight_str = weight_match.group(1)
+                        try:
+                            font.weight = FontWeight.from_string(weight_str)
+                        except (ValueError, KeyError):
+                            ctec.add_warning(f"Unknown font weight: {weight_str}")
 
         font_size = cls._extract_lua_value(content, "font_size")
         if font_size:
@@ -401,10 +486,22 @@ class WeztermAdapter(TerminalAdapter):
                 font_family = ctec.font.family
                 # Convert PostScript names to friendly names for Wezterm
                 if is_postscript_name(font_family):
-                    friendly_name = postscript_to_friendly(font_family)
-                    lines.append(f'config.font = wezterm.font("{friendly_name}")')
-                    if friendly_name != font_family:
-                        lines.append(f'-- Note: Converted from PostScript name "{font_family}"')
+                    font_family = postscript_to_friendly(font_family)
+
+                # Determine if we need fallback fonts
+                if ctec.font.fallback_fonts:
+                    # WezTerm supports weight in font_with_fallback via table syntax
+                    if ctec.font.weight:
+                        weight_name = ctec.font.weight.to_string()
+                        primary = f'{{ family = "{font_family}", weight = "{weight_name}" }}'
+                    else:
+                        primary = f'"{font_family}"'
+                    fallbacks_str = ", ".join(f'"{f}"' for f in ctec.font.fallback_fonts)
+                    lines.append(f"config.font = wezterm.font_with_fallback({{ {primary}, {fallbacks_str} }})")
+                elif ctec.font.weight:
+                    # Use font with weight parameter
+                    weight_name = ctec.font.weight.to_string()
+                    lines.append(f'config.font = wezterm.font("{font_family}", {{weight="{weight_name}"}})')
                 else:
                     lines.append(f'config.font = wezterm.font("{font_family}")')
             if ctec.font.size:
