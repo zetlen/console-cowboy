@@ -16,6 +16,8 @@ from console_cowboy.ctec.schema import (
     CursorStyle,
     FontConfig,
     KeyBinding,
+    QuickTerminalConfig,
+    QuickTerminalPosition,
     ScrollConfig,
     WindowConfig,
 )
@@ -76,6 +78,19 @@ class KittyAdapter(TerminalAdapter):
 
     COLOR_KEY_REVERSE_MAP = {v: k for k, v in COLOR_KEY_MAP.items()}
 
+    # Kitty quick-access-terminal edge mapping (kitten feature in 0.42+)
+    # The quick-access-terminal kitten uses a separate config file but we support
+    # parsing/exporting these settings for cross-terminal compatibility
+    QUICK_TERMINAL_EDGE_MAP = {
+        "top": QuickTerminalPosition.TOP,
+        "bottom": QuickTerminalPosition.BOTTOM,
+        "left": QuickTerminalPosition.LEFT,
+        "right": QuickTerminalPosition.RIGHT,
+        "background": QuickTerminalPosition.BACKGROUND,
+    }
+
+    QUICK_TERMINAL_EDGE_REVERSE_MAP = {v: k for k, v in QUICK_TERMINAL_EDGE_MAP.items()}
+
     @classmethod
     def parse(
         cls,
@@ -90,6 +105,7 @@ class KittyAdapter(TerminalAdapter):
         cursor = CursorConfig()
         window = WindowConfig()
         behavior = BehaviorConfig()
+        quick_terminal = QuickTerminalConfig()
 
         if content is None:
             path = Path(source)
@@ -283,6 +299,20 @@ class KittyAdapter(TerminalAdapter):
                         KeyBinding(action=action, key=actual_key, mods=mods)
                     )
 
+            # Parse quick-access-terminal kitten settings (Kitty 0.42+)
+            # These are typically in quick-access-terminal.conf but we support
+            # them in main config for cross-terminal compatibility
+            elif key == "edge":
+                quick_terminal.enabled = True
+                quick_terminal.position = cls.QUICK_TERMINAL_EDGE_MAP.get(
+                    value.lower(), QuickTerminalPosition.TOP
+                )
+            elif key == "hide_on_focus_loss":
+                quick_terminal.enabled = True
+                quick_terminal.hide_on_focus_loss = value.lower() == "yes"
+            # Note: background_opacity in quick terminal context overrides
+            # the main window opacity for the quick terminal window only
+
             # Store unrecognized settings
             else:
                 ctec.add_terminal_specific("kitty", key, value)
@@ -301,6 +331,8 @@ class KittyAdapter(TerminalAdapter):
             ctec.window = window
         if behavior.shell or behavior.scrollback_lines or behavior.bell_mode:
             ctec.behavior = behavior
+        if quick_terminal.enabled:
+            ctec.quick_terminal = quick_terminal
 
         return ctec
 
@@ -430,6 +462,25 @@ class KittyAdapter(TerminalAdapter):
                 else:
                     keys = kb.key
                 lines.append(f"map {keys} {kb.action}")
+            lines.append("")
+
+        # Export quick-access-terminal settings (Kitty 0.42+ kitten)
+        # Note: These settings are typically placed in quick-access-terminal.conf
+        # but we include them here for completeness and cross-terminal compatibility
+        if ctec.quick_terminal and ctec.quick_terminal.enabled:
+            lines.append(
+                "# Quick-access-terminal settings (for quick-access-terminal.conf)"
+            )
+            if ctec.quick_terminal.position is not None:
+                edge = cls.QUICK_TERMINAL_EDGE_REVERSE_MAP.get(
+                    ctec.quick_terminal.position, "top"
+                )
+                lines.append(f"edge {edge}")
+            if ctec.quick_terminal.hide_on_focus_loss is not None:
+                val = "yes" if ctec.quick_terminal.hide_on_focus_loss else "no"
+                lines.append(f"hide_on_focus_loss {val}")
+            if ctec.quick_terminal.opacity is not None:
+                lines.append(f"background_opacity {ctec.quick_terminal.opacity}")
             lines.append("")
 
         # Restore terminal-specific settings
