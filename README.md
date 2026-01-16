@@ -19,13 +19,22 @@ Console Cowboy is a CLI tool for making terminal configurations portable across 
   - Kitty
   - Wezterm
   - Terminal.app (macOS)
-- **Multiple Output Formats**: CTEC files can be stored as TOML (default), JSON, or YAML
+  - VS Code (integrated terminal)
+- **iTerm2-Color-Schemes Compatible**: Color schemes use the same YAML format as the popular [iTerm2-Color-Schemes](https://github.com/mbadolato/iTerm2-Color-Schemes) project
+- **Quick Terminal Support**: Migrate quake-style dropdown terminal settings between iTerm2, Ghostty, and Kitty
+- **Output Formats**: CTEC files can be stored as YAML (default) or JSON
 - **Incompatibility Reporting**: Clearly reports which settings cannot be converted between terminals
 - **Terminal-Specific Settings**: Preserves terminal-specific settings that don't have equivalents in other terminals
 
 ## Installation
 
-Install using `pip`:
+Install using `uv` (recommended):
+
+```bash
+uv tool install console-cowboy
+```
+
+Or with `pip`:
 
 ```bash
 pip install console-cowboy
@@ -42,11 +51,11 @@ pipx install console-cowboy
 ### Export your current terminal config
 
 ```bash
-# Export Ghostty config to CTEC format
-console-cowboy export ghostty -o my-config.toml
+# Export Ghostty config to CTEC format (YAML by default)
+console-cowboy export ghostty -o my-config.yaml
 
 # Export iTerm2 config
-console-cowboy export iterm2 -o my-config.toml
+console-cowboy export iterm2 -o my-config.yaml
 
 # Export to JSON format
 console-cowboy export kitty -o my-config.json -f json
@@ -56,13 +65,13 @@ console-cowboy export kitty -o my-config.json -f json
 
 ```bash
 # Import CTEC config into Alacritty format
-console-cowboy import my-config.toml -t alacritty -o ~/.config/alacritty/alacritty.toml
+console-cowboy import my-config.yaml -t alacritty -o ~/.config/alacritty/alacritty.toml
 
 # Import into Wezterm
-console-cowboy import my-config.toml -t wezterm -o ~/.wezterm.lua
+console-cowboy import my-config.yaml -t wezterm -o ~/.wezterm.lua
 
 # Preview output without saving
-console-cowboy import my-config.toml -t ghostty
+console-cowboy import my-config.yaml -t ghostty
 ```
 
 ### Convert directly between terminals
@@ -82,14 +91,15 @@ console-cowboy convert ~/Library/Preferences/com.googlecode.iterm2.plist -f iter
 Export a terminal's configuration to CTEC format.
 
 ```bash
-console-cowboy export TERMINAL [-i INPUT] [-o OUTPUT] [-f FORMAT] [-q]
+console-cowboy export TERMINAL [-i INPUT] [-o OUTPUT] [-f FORMAT] [-p PROFILE] [-q]
 ```
 
 Options:
-- `TERMINAL`: Source terminal (iterm2, ghostty, alacritty, kitty, wezterm)
+- `TERMINAL`: Source terminal (iterm2, ghostty, alacritty, kitty, wezterm, vscode, terminal_app)
 - `-i, --input`: Input config file (defaults to terminal's standard location)
 - `-o, --output`: Output file (defaults to stdout)
-- `-f, --format`: Output format: toml, json, yaml (default: toml)
+- `-f, --format`: Output format: yaml, json (default: yaml)
+- `-p, --profile`: Profile name to export (iTerm2 and Terminal.app only)
 - `-q, --quiet`: Suppress warnings and informational output
 
 ### `import`
@@ -101,7 +111,7 @@ console-cowboy import INPUT_FILE -t TERMINAL [-o OUTPUT] [-f FORMAT] [-q]
 ```
 
 Options:
-- `INPUT_FILE`: Path to CTEC configuration file
+- `INPUT_FILE`: Path to CTEC configuration file (.yaml or .json)
 - `-t, --terminal`: Target terminal (required)
 - `-o, --output`: Output file (defaults to stdout)
 - `-f, --format`: Input format override (auto-detected from extension)
@@ -112,8 +122,16 @@ Options:
 Convert directly between terminal configuration formats.
 
 ```bash
-console-cowboy convert INPUT_FILE -f FROM_TERMINAL -t TO_TERMINAL [-o OUTPUT] [-q]
+console-cowboy convert INPUT_FILE -f FROM_TERMINAL -t TO_TERMINAL [-o OUTPUT] [-p PROFILE] [-q]
 ```
+
+Options:
+- `INPUT_FILE`: Path to source terminal configuration file
+- `-f, --from`: Source terminal (required)
+- `-t, --to`: Target terminal (required)
+- `-o, --output`: Output file (defaults to stdout)
+- `-p, --profile`: Profile name to convert (iTerm2 and Terminal.app source only)
+- `-q, --quiet`: Suppress warnings
 
 ### `list`
 
@@ -169,59 +187,65 @@ Settings that cannot be mapped to common CTEC fields are preserved in a `termina
 
 ### Example CTEC File
 
-```toml
-version = "1.0"
-source_terminal = "ghostty"
+```yaml
+version: "1.0"
+source_terminal: ghostty
 
-[color_scheme]
-name = "Tomorrow Night"
+color_scheme:
+  name: Tomorrow Night
+  foreground: "#c5c8c6"
+  background: "#1d1f21"
+  cursor: "#c5c8c6"
+  black: "#1d1f21"
+  red: "#cc6666"
+  green: "#b5bd68"
+  yellow: "#f0c674"
+  blue: "#81a2be"
+  magenta: "#b294bb"
+  cyan: "#8abeb7"
+  white: "#c5c8c6"
 
-[color_scheme.foreground]
-r = 197
-g = 200
-b = 198
+font:
+  family: JetBrains Mono
+  size: 14.0
+  ligatures: true
 
-[color_scheme.background]
-r = 29
-g = 31
-b = 33
+cursor:
+  style: block
+  blink: true
+  blink_interval: 500
 
-[font]
-family = "JetBrains Mono"
-size = 14.0
-ligatures = true
+window:
+  columns: 120
+  rows: 40
+  opacity: 0.95
 
-[cursor]
-style = "block"
-blink = true
-blink_interval = 500
+behavior:
+  shell: /bin/zsh
+  bell_mode: visual
 
-[window]
-columns = 120
-rows = 40
-opacity = 0.95
+scroll:
+  lines: 10000
 
-[behavior]
-shell = "/bin/zsh"
-scrollback_lines = 10000
-bell_mode = "visual"
-
-[[key_bindings]]
-action = "Copy"
-key = "c"
-mods = ["ctrl", "shift"]
+key_bindings:
+  - action: Copy
+    key: c
+    mods:
+      - ctrl
+      - shift
 ```
 
 ## Supported Terminals
 
-| Terminal | Config Format | Import | Export |
-|----------|--------------|--------|--------|
-| iTerm2 | plist XML | Yes | Yes |
-| Ghostty | key=value | Yes | Yes |
-| Alacritty | TOML/YAML | Yes | Yes |
-| Kitty | key value | Yes | Yes |
-| Wezterm | Lua | Yes | Yes |
-| Terminal.app | plist XML | Yes | Yes |
+| Terminal | Config Format | Import | Export | Quick Terminal |
+|----------|--------------|--------|--------|----------------|
+| iTerm2 | plist XML | Yes | Yes | Yes |
+| Ghostty | key=value | Yes | Yes | Yes |
+| Alacritty | TOML/YAML | Yes | Yes | No |
+| Kitty | key value | Yes | Yes | Yes |
+| Wezterm | Lua | Yes | Yes | No |
+| VS Code | JSON | Yes | Yes | No |
+| Terminal.app | plist XML | Yes | Yes | No |
 
 ### Default Config Locations
 
@@ -230,13 +254,14 @@ mods = ["ctrl", "shift"]
 - **Alacritty**: `~/.config/alacritty/alacritty.toml` or `.yml`
 - **Kitty**: `~/.config/kitty/kitty.conf`
 - **Wezterm**: `~/.wezterm.lua` or `~/.config/wezterm/wezterm.lua`
+- **VS Code**: `~/Library/Application Support/Code/User/settings.json` (macOS) or `~/.config/Code/User/settings.json` (Linux)
 - **Terminal.app**: `~/Library/Preferences/com.apple.Terminal.plist`
 
 ## Compatibility Notes
 
 Not all settings can be perfectly converted between terminals:
 
-1. **Color Formats**: All terminals use slightly different color representations. Console Cowboy normalizes to RGB and converts appropriately.
+1. **Color Formats**: All terminals use slightly different color representations. Console Cowboy normalizes to hex colors (e.g., `#c5c8c6`) compatible with the iTerm2-Color-Schemes format.
 
 2. **Font Handling**: Font names may need adjustment depending on how each terminal resolves fonts.
 
@@ -246,7 +271,11 @@ Not all settings can be perfectly converted between terminals:
 
 5. **Terminal-Specific Features**: Features unique to one terminal (like iTerm2's "Unlimited Scrollback" or Kitty's remote control) are preserved but only work when converting back to the same terminal.
 
-6. **Terminal.app NSKeyedArchiver**: Terminal.app uses Apple's NSKeyedArchiver format for colors and fonts. Console Cowboy can parse this format, but for best accuracy on macOS, installing PyObjC (`pip install pyobjc-framework-Cocoa`) is recommended.
+6. **Terminal.app NSKeyedArchiver**: Terminal.app uses Apple's NSKeyedArchiver format for colors and fonts. Console Cowboy can parse this format, but for best accuracy on macOS, installing PyObjC (`uv pip install pyobjc-framework-Cocoa`) is recommended.
+
+7. **Quick Terminal / Hotkey Window**: Quake-style dropdown terminal settings can be migrated between iTerm2, Ghostty, and Kitty. Alacritty, Wezterm, and VS Code don't have native quick terminal support.
+
+8. **VS Code**: VS Code's integrated terminal has limited customization compared to dedicated terminal emulators. Only colors, fonts, cursor, and basic behavior settings are supported.
 
 Console Cowboy will report any incompatibilities or settings that couldn't be converted.
 
@@ -259,24 +288,28 @@ git clone https://github.com/zetlen/console-cowboy
 cd console-cowboy
 ```
 
-Create a virtual environment and install dependencies:
+Install dependencies with [uv](https://docs.astral.sh/uv/) (recommended):
 
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -e '.[test]'
+uv sync --all-extras
 ```
 
 Run the tests:
 
 ```bash
-python -m pytest
+uv run pytest
 ```
 
 Run tests with coverage:
 
 ```bash
-python -m pytest --cov=console_cowboy
+uv run pytest --cov=console_cowboy
+```
+
+Run the CLI during development:
+
+```bash
+uv run console-cowboy --help
 ```
 
 ## License
@@ -285,7 +318,7 @@ Apache 2.0
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+Contributions are welcome! Repo's open.
 
 ### Adding Support for New Terminals
 

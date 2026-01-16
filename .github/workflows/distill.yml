@@ -64,9 +64,7 @@ jobs:
             echo '<details>'
             echo '<summary>Click to expand analysis results</summary>'
             echo ''
-            echo '```'
             cat distill-output.md
-            echo '```'
             echo ''
             echo '</details>'
             echo ''
