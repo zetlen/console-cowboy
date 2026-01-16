@@ -11,6 +11,8 @@ from console_cowboy.ctec.schema import (
     CursorConfig,
     CursorStyle,
     FontConfig,
+    FontWeight,
+    FontStyle,
     KeyBinding,
     Profile,
     ScrollConfig,
@@ -109,6 +111,65 @@ class TestColorScheme:
         assert scheme.foreground.r == 255
 
 
+class TestFontWeight:
+    """Tests for the FontWeight enum."""
+
+    def test_weight_values(self):
+        """Test numeric weight values."""
+        assert FontWeight.THIN.value == 100
+        assert FontWeight.REGULAR.value == 400
+        assert FontWeight.BOLD.value == 700
+        assert FontWeight.BLACK.value == 900
+
+    def test_from_string_regular(self):
+        """Test parsing 'Regular' string."""
+        assert FontWeight.from_string("Regular") == FontWeight.REGULAR
+        assert FontWeight.from_string("regular") == FontWeight.REGULAR
+        assert FontWeight.from_string("Normal") == FontWeight.REGULAR
+
+    def test_from_string_bold(self):
+        """Test parsing 'Bold' string."""
+        assert FontWeight.from_string("Bold") == FontWeight.BOLD
+        assert FontWeight.from_string("bold") == FontWeight.BOLD
+
+    def test_from_string_light(self):
+        """Test parsing 'Light' string."""
+        assert FontWeight.from_string("Light") == FontWeight.LIGHT
+
+    def test_from_string_semibold(self):
+        """Test parsing 'SemiBold' string."""
+        assert FontWeight.from_string("SemiBold") == FontWeight.SEMI_BOLD
+        assert FontWeight.from_string("Semibold") == FontWeight.SEMI_BOLD
+        assert FontWeight.from_string("DemiBold") == FontWeight.SEMI_BOLD
+
+    def test_from_string_numeric(self):
+        """Test parsing numeric weight strings."""
+        assert FontWeight.from_string("400") == FontWeight.REGULAR
+        assert FontWeight.from_string("700") == FontWeight.BOLD
+
+    def test_from_string_invalid(self):
+        """Test invalid string raises ValueError."""
+        with pytest.raises(ValueError):
+            FontWeight.from_string("InvalidWeight")
+
+    def test_to_string(self):
+        """Test converting weight to string."""
+        assert FontWeight.REGULAR.to_string() == "Regular"
+        assert FontWeight.BOLD.to_string() == "Bold"
+        assert FontWeight.LIGHT.to_string() == "Light"
+        assert FontWeight.SEMI_BOLD.to_string() == "SemiBold"
+
+
+class TestFontStyle:
+    """Tests for the FontStyle enum."""
+
+    def test_style_values(self):
+        """Test style values."""
+        assert FontStyle.NORMAL.value == "normal"
+        assert FontStyle.ITALIC.value == "italic"
+        assert FontStyle.OBLIQUE.value == "oblique"
+
+
 class TestFontConfig:
     """Tests for the FontConfig class."""
 
@@ -133,6 +194,65 @@ class TestFontConfig:
         font = FontConfig.from_dict({"family": "Fira Code", "size": 12.0})
         assert font.family == "Fira Code"
         assert font.size == 12.0
+
+    def test_new_fields(self):
+        """Test new FontConfig fields."""
+        font = FontConfig(
+            family="JetBrains Mono",
+            size=14.0,
+            cell_width=1.1,
+            weight=FontWeight.BOLD,
+            style=FontStyle.ITALIC,
+            bold_italic_font="JetBrains Mono Bold Italic",
+            anti_aliasing=True,
+            fallback_fonts=["Menlo", "Monaco"],
+        )
+        assert font.cell_width == 1.1
+        assert font.weight == FontWeight.BOLD
+        assert font.style == FontStyle.ITALIC
+        assert font.bold_italic_font == "JetBrains Mono Bold Italic"
+        assert font.anti_aliasing is True
+        assert font.fallback_fonts == ["Menlo", "Monaco"]
+
+    def test_source_name_roundtrip(self):
+        """Test storing and retrieving source names."""
+        font = FontConfig(family="JetBrains Mono")
+        font.set_source_name("iterm2", "JetBrainsMono-Regular")
+        assert font.get_source_name("iterm2") == "JetBrainsMono-Regular"
+        assert font.get_source_name("ghostty") is None
+
+    def test_multiple_source_names(self):
+        """Test storing source names from multiple terminals."""
+        font = FontConfig(family="JetBrains Mono")
+        font.set_source_name("iterm2", "JetBrainsMono-Regular")
+        font.set_source_name("alacritty", "JetBrains Mono")
+        assert font.get_source_name("iterm2") == "JetBrainsMono-Regular"
+        assert font.get_source_name("alacritty") == "JetBrains Mono"
+
+    def test_to_dict_with_new_fields(self):
+        """Test serialization with new fields."""
+        font = FontConfig(
+            family="Fira Code",
+            weight=FontWeight.BOLD,
+            fallback_fonts=["Menlo"],
+        )
+        d = font.to_dict()
+        assert d["family"] == "Fira Code"
+        assert d["weight"] == "bold"
+        assert d["fallback_fonts"] == ["Menlo"]
+
+    def test_from_dict_with_new_fields(self):
+        """Test deserialization with new fields."""
+        font = FontConfig.from_dict({
+            "family": "Fira Code",
+            "weight": "bold",
+            "style": "italic",
+            "fallback_fonts": ["Menlo", "Monaco"],
+        })
+        assert font.family == "Fira Code"
+        assert font.weight == FontWeight.BOLD
+        assert font.style == FontStyle.ITALIC
+        assert font.fallback_fonts == ["Menlo", "Monaco"]
 
 
 class TestCursorConfig:

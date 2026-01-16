@@ -142,3 +142,75 @@ def is_postscript_name(font_name: str) -> bool:
             return True
 
     return False
+
+
+def extract_weight_from_name(font_name: str) -> tuple[str, Optional[str]]:
+    """
+    Extract weight/style suffix from a font name.
+
+    Works with both PostScript and friendly names:
+    - 'JetBrainsMono-Bold' -> ('JetBrainsMono', 'Bold')
+    - 'JetBrains Mono Bold' -> ('JetBrains Mono', 'Bold')
+    - 'Fira Code' -> ('Fira Code', None)
+
+    Args:
+        font_name: Font name potentially containing weight
+
+    Returns:
+        Tuple of (base_name, weight) where weight may be None
+    """
+    if not font_name:
+        return (font_name, None)
+
+    # Common weight suffixes in order of specificity
+    weights = [
+        'ExtraBold', 'SemiBold', 'UltraBold', 'DemiBold',
+        'ExtraLight', 'UltraLight',
+        'Bold', 'Light', 'Medium', 'Regular', 'Thin', 'Black', 'Heavy',
+        'Italic', 'Oblique', 'Retina', 'Book',
+    ]
+
+    # Check PostScript format (with dash)
+    for weight in weights:
+        if font_name.endswith(f"-{weight}"):
+            return (font_name[: -len(weight) - 1], weight)
+
+    # Check friendly format (with space)
+    for weight in weights:
+        if font_name.endswith(f" {weight}"):
+            return (font_name[: -len(weight) - 1], weight)
+
+    # Check no-separator format
+    for weight in weights:
+        if font_name.endswith(weight) and len(font_name) > len(weight):
+            # Make sure we're not matching part of the font name
+            base = font_name[: -len(weight)]
+            if base and (base[-1].islower() or base[-1] == '-'):
+                return (base.rstrip('-'), weight)
+
+    return (font_name, None)
+
+
+def normalize_font_family(font_name: str) -> str:
+    """
+    Normalize a font family name to a canonical form.
+
+    Removes weight/style suffixes and converts to friendly format.
+
+    Args:
+        font_name: Font name in any format
+
+    Returns:
+        Normalized font family name
+    """
+    if not font_name:
+        return font_name
+
+    # Extract weight
+    base_name, _ = extract_weight_from_name(font_name)
+
+    # Convert to friendly if PostScript
+    if is_postscript_name(base_name):
+        return postscript_to_friendly(base_name)
+
+    return base_name

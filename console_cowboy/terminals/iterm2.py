@@ -26,6 +26,11 @@ from console_cowboy.ctec.schema import (
     WindowConfig,
 )
 from console_cowboy.utils.colors import color_to_float_tuple, float_tuple_to_color
+from console_cowboy.utils.fonts import (
+    is_postscript_name,
+    postscript_to_friendly,
+    friendly_to_postscript,
+)
 
 from .base import TerminalAdapter
 
@@ -132,12 +137,49 @@ class ITerm2Adapter(TerminalAdapter):
             # iTerm2 font format: "FontName Size"
             parts = font_str.rsplit(" ", 1)
             if len(parts) == 2:
-                profile.font = FontConfig(
-                    family=parts[0],
-                    size=float(parts[1]) if parts[1].replace(".", "").isdigit() else None,
-                )
+                font_family = parts[0]
+                font_size = float(parts[1]) if parts[1].replace(".", "").isdigit() else None
             else:
-                profile.font = FontConfig(family=font_str)
+                font_family = font_str
+                font_size = None
+
+            # Convert PostScript name to friendly and store original
+            if is_postscript_name(font_family):
+                friendly_family = postscript_to_friendly(font_family)
+                profile.font = FontConfig(family=friendly_family, size=font_size)
+                profile.font.set_source_name("iterm2", font_family)
+            else:
+                profile.font = FontConfig(family=font_family, size=font_size)
+
+        # Handle Non-ASCII Font as fallback font
+        if "Non-ASCII Font" in profile_data and profile_data.get("Use Non-ASCII Font", False):
+            non_ascii_str = profile_data["Non-ASCII Font"]
+            non_ascii_parts = non_ascii_str.rsplit(" ", 1)
+            non_ascii_family = non_ascii_parts[0] if non_ascii_parts else non_ascii_str
+            # Convert to friendly name
+            if is_postscript_name(non_ascii_family):
+                non_ascii_family = postscript_to_friendly(non_ascii_family)
+            if profile.font:
+                profile.font.fallback_fonts = [non_ascii_family]
+                # Store original for lossless round-trip (includes size)
+                profile.font.set_source_name("iterm2_non_ascii", non_ascii_str)
+            else:
+                profile.font = FontConfig(fallback_fonts=[non_ascii_family])
+                profile.font.set_source_name("iterm2_non_ascii", non_ascii_str)
+
+        # Handle anti-aliasing
+        if "ASCII Anti Aliased" in profile_data:
+            if profile.font:
+                profile.font.anti_aliasing = profile_data["ASCII Anti Aliased"]
+            else:
+                profile.font = FontConfig(anti_aliasing=profile_data["ASCII Anti Aliased"])
+
+        # Handle Powerline glyphs
+        if "Draw Powerline Glyphs" in profile_data:
+            if profile.font:
+                profile.font.draw_powerline_glyphs = profile_data["Draw Powerline Glyphs"]
+            else:
+                profile.font = FontConfig(draw_powerline_glyphs=profile_data["Draw Powerline Glyphs"])
 
         # Parse cursor configuration
         cursor_config = CursorConfig()
@@ -177,7 +219,6 @@ class ITerm2Adapter(TerminalAdapter):
             "Vertical Spacing",
             "Use Non-ASCII Font",
             "Minimum Contrast",
-            "Draw Powerline Glyphs",
         ]
         for key in specific_keys:
             if key in profile_data:
@@ -289,7 +330,35 @@ class ITerm2Adapter(TerminalAdapter):
         font = profile.font or ctec.font
         if font and font.family:
             size = font.size or 12
-            result["Normal Font"] = f"{font.family} {size}"
+            # Use stored PostScript name for lossless round-trip, otherwise convert
+            ps_name = font.get_source_name("iterm2")
+            if ps_name:
+                font_name = ps_name
+            else:
+                # Convert friendly name to PostScript
+                font_name = friendly_to_postscript(font.family)
+            result["Normal Font"] = f"{font_name} {size}"
+
+            # Export fallback fonts as Non-ASCII Font
+            if font.fallback_fonts:
+                # Use stored original for lossless round-trip, otherwise convert
+                non_ascii_original = font.get_source_name("iterm2_non_ascii")
+                if non_ascii_original:
+                    result["Non-ASCII Font"] = non_ascii_original
+                else:
+                    fallback = font.fallback_fonts[0]
+                    fallback_ps = friendly_to_postscript(fallback)
+                    result["Non-ASCII Font"] = f"{fallback_ps} {size}"
+                result["Use Non-ASCII Font"] = True
+
+            # Export anti-aliasing
+            if font.anti_aliasing is not None:
+                result["ASCII Anti Aliased"] = font.anti_aliasing
+                result["Non-ASCII Anti Aliased"] = font.anti_aliasing
+
+            # Export Powerline glyphs
+            if font.draw_powerline_glyphs is not None:
+                result["Draw Powerline Glyphs"] = font.draw_powerline_glyphs
 
         # Export cursor
         cursor = profile.cursor or ctec.cursor

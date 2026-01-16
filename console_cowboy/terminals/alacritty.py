@@ -20,6 +20,7 @@ from console_cowboy.ctec.schema import (
     CursorConfig,
     CursorStyle,
     FontConfig,
+    FontStyle,
     KeyBinding,
     ScrollConfig,
     WindowConfig,
@@ -155,12 +156,23 @@ class AlacrittyAdapter(TerminalAdapter):
         if "font" in data:
             font_data = data["font"]
             font = FontConfig()
-            if "normal" in font_data and "family" in font_data["normal"]:
-                font.family = font_data["normal"]["family"]
+            if "normal" in font_data:
+                normal = font_data["normal"]
+                if "family" in normal:
+                    font.family = normal["family"]
+                # Parse font style from normal font
+                if "style" in normal:
+                    style_str = normal["style"].lower()
+                    if "italic" in style_str:
+                        font.style = FontStyle.ITALIC
+                    elif "oblique" in style_str:
+                        font.style = FontStyle.OBLIQUE
             if "bold" in font_data and "family" in font_data["bold"]:
                 font.bold_font = font_data["bold"]["family"]
             if "italic" in font_data and "family" in font_data["italic"]:
                 font.italic_font = font_data["italic"]["family"]
+            if "bold_italic" in font_data and "family" in font_data["bold_italic"]:
+                font.bold_italic_font = font_data["bold_italic"]["family"]
             if "size" in font_data:
                 font.size = float(font_data["size"])
             if "offset" in font_data and "y" in font_data["offset"]:
@@ -373,11 +385,17 @@ class AlacrittyAdapter(TerminalAdapter):
         if ctec.font:
             font = {}
             if ctec.font.family:
-                font["normal"] = {"family": ctec.font.family}
+                normal = {"family": ctec.font.family}
+                # Add style if not default
+                if ctec.font.style and ctec.font.style != FontStyle.NORMAL:
+                    normal["style"] = ctec.font.style.value.capitalize()
+                font["normal"] = normal
             if ctec.font.bold_font:
                 font["bold"] = {"family": ctec.font.bold_font}
             if ctec.font.italic_font:
                 font["italic"] = {"family": ctec.font.italic_font}
+            if ctec.font.bold_italic_font:
+                font["bold_italic"] = {"family": ctec.font.bold_italic_font}
             if ctec.font.size:
                 font["size"] = ctec.font.size
             if ctec.font.line_height and ctec.font.line_height != 1.0:

@@ -159,6 +159,15 @@ class GhosttyAdapter(TerminalAdapter):
                     font.line_height = 1.0 + float(value) / 100
                 except ValueError:
                     ctec.add_warning(f"Invalid adjust-cell-height: {value}")
+            elif key == "adjust-cell-width":
+                try:
+                    # Handle both "5" and "5%" formats
+                    val_str = value.rstrip("%")
+                    font.cell_width = 1.0 + float(val_str) / 100
+                except ValueError:
+                    ctec.add_warning(f"Invalid adjust-cell-width: {value}")
+            elif key == "font-family-bold-italic":
+                font.bold_italic_font = value
 
             # Parse cursor settings
             elif key == "cursor-style":
@@ -316,9 +325,14 @@ class GhosttyAdapter(TerminalAdapter):
                 lines.append(f"font-family-bold = {ctec.font.bold_font}")
             if ctec.font.italic_font:
                 lines.append(f"font-family-italic = {ctec.font.italic_font}")
+            if ctec.font.bold_italic_font:
+                lines.append(f"font-family-bold-italic = {ctec.font.bold_italic_font}")
             if ctec.font.line_height and ctec.font.line_height != 1.0:
                 adjust = int((ctec.font.line_height - 1.0) * 100)
                 lines.append(f"adjust-cell-height = {adjust}")
+            if ctec.font.cell_width and ctec.font.cell_width != 1.0:
+                adjust = int((ctec.font.cell_width - 1.0) * 100)
+                lines.append(f"adjust-cell-width = {adjust}")
             lines.append("")
 
         # Export cursor settings
