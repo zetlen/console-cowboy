@@ -1,0 +1,28 @@
+[project]
+name = "console-cowboy"
+version = "0.1"
+description = "Hop terminals like you hop linux distributions."
+readme = "README.md"
+authors = [{name = "zetlen"}]
+license = "Apache-2.0"
+requires-python = ">=3.10"
+classifiers = []
+dependencies = [
+    "click"
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project.urls]
+Homepage = "https://github.com/zetlen/console-cowboy"
+Changelog = "https://github.com/zetlen/console-cowboy/releases"
+Issues = "https://github.com/zetlen/console-cowboy/issues"
+CI = "https://github.com/zetlen/console-cowboy/actions"
+
+[project.scripts]
+console-cowboy = "console_cowboy.cli:cli"
+
+[project.optional-dependencies]
+test = ["pytest"]
