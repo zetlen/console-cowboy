@@ -235,8 +235,10 @@ class TestKittyAdapter:
 
         assert ctec.behavior is not None
         assert ctec.behavior.shell == "/bin/zsh"
-        assert ctec.behavior.scrollback_lines == 10000
         assert ctec.behavior.bell_mode == BellMode.VISUAL
+        # Scrollback is now in ctec.scroll, not behavior
+        assert ctec.scroll is not None
+        assert ctec.scroll.lines == 10000
 
     def test_export(self):
         ctec = CTEC(

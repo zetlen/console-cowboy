@@ -16,6 +16,7 @@ from console_cowboy.ctec.schema import (
     CursorConfig,
     CursorStyle,
     FontConfig,
+    ScrollConfig,
     WindowConfig,
 )
 from console_cowboy.utils.colors import normalize_color
@@ -211,7 +212,9 @@ class GhosttyAdapter(TerminalAdapter):
                 behavior.working_directory = value
             elif key == "scrollback-limit":
                 try:
-                    behavior.scrollback_lines = int(value)
+                    # Ghostty uses bytes, not lines - convert to ScrollConfig
+                    byte_count = int(value)
+                    ctec.scroll = ScrollConfig.from_bytes(byte_count)
                 except ValueError:
                     ctec.add_warning(f"Invalid scrollback-limit: {value}")
             elif key == "mouse-hide-while-typing":
@@ -359,12 +362,22 @@ class GhosttyAdapter(TerminalAdapter):
                 lines.append(f"command = {ctec.behavior.shell}")
             if ctec.behavior.working_directory:
                 lines.append(f"working-directory = {ctec.behavior.working_directory}")
-            if ctec.behavior.scrollback_lines is not None:
-                lines.append(f"scrollback-limit = {ctec.behavior.scrollback_lines}")
             if ctec.behavior.copy_on_select is not None:
                 lines.append(f"copy-on-select = {str(ctec.behavior.copy_on_select).lower()}")
             if ctec.behavior.confirm_close is not None:
                 lines.append(f"confirm-close-surface = {str(ctec.behavior.confirm_close).lower()}")
+            lines.append("")
+
+        # Export scroll settings (Ghostty uses bytes, not lines)
+        if ctec.scroll:
+            lines.append("# Scrollback")
+            if ctec.scroll.disabled:
+                lines.append("scrollback-limit = 0")
+            else:
+                # Convert to bytes - Ghostty default is 10MB (10485760 bytes)
+                byte_count = ctec.scroll.get_effective_bytes(default_bytes=10485760)
+                if byte_count > 0:
+                    lines.append(f"scrollback-limit = {byte_count}")
             lines.append("")
 
         # Restore terminal-specific settings

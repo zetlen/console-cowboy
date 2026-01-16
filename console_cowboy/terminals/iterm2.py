@@ -22,6 +22,7 @@ from console_cowboy.ctec.schema import (
     FontConfig,
     KeyBinding,
     Profile,
+    ScrollConfig,
     WindowConfig,
 )
 from console_cowboy.utils.colors import color_to_float_tuple, float_tuple_to_color
@@ -153,8 +154,8 @@ class ITerm2Adapter(TerminalAdapter):
             behavior.shell = profile_data["Command"]
         if "Working Directory" in profile_data:
             behavior.working_directory = profile_data["Working Directory"]
-        if "Scrollback Lines" in profile_data:
-            behavior.scrollback_lines = profile_data["Scrollback Lines"]
+        # Note: Scrollback is handled at the CTEC level via ctec.scroll
+        # We store the raw values here for profile-level settings
         if "Silence Bell" in profile_data:
             if profile_data["Silence Bell"]:
                 behavior.bell_mode = BellMode.NONE
@@ -216,10 +217,12 @@ class ITerm2Adapter(TerminalAdapter):
         # Full iTerm2 config
         if "New Bookmarks" in data:
             # Parse profiles
+            default_profile_data = None
             for i, profile_data in enumerate(data["New Bookmarks"]):
                 profile = cls._parse_profile(profile_data, ctec)
                 if i == 0 or profile_data.get("Default Bookmark", "No") == "Yes":
                     profile.is_default = True
+                    default_profile_data = profile_data
                 ctec.profiles.append(profile)
 
             # Set global settings from default profile if available
@@ -231,6 +234,17 @@ class ITerm2Adapter(TerminalAdapter):
                 ctec.font = default_profile.font
                 ctec.cursor = default_profile.cursor
                 ctec.behavior = default_profile.behavior
+
+                # Parse scroll settings from default profile
+                if default_profile_data:
+                    if default_profile_data.get("Unlimited Scrollback", False):
+                        ctec.scroll = ScrollConfig(unlimited=True)
+                    elif "Scrollback Lines" in default_profile_data:
+                        lines = default_profile_data["Scrollback Lines"]
+                        if lines == 0:
+                            ctec.scroll = ScrollConfig(disabled=True)
+                        else:
+                            ctec.scroll = ScrollConfig(lines=lines)
 
         # Parse window configuration
         window = WindowConfig()
@@ -294,11 +308,21 @@ class ITerm2Adapter(TerminalAdapter):
             if behavior.working_directory:
                 result["Working Directory"] = behavior.working_directory
                 result["Custom Directory"] = "Yes"
-            if behavior.scrollback_lines is not None:
-                result["Scrollback Lines"] = behavior.scrollback_lines
             if behavior.bell_mode is not None:
                 result["Silence Bell"] = behavior.bell_mode == BellMode.NONE
                 result["Visual Bell"] = behavior.bell_mode == BellMode.VISUAL
+
+        # Export scroll settings from CTEC scroll config
+        if ctec.scroll:
+            if ctec.scroll.unlimited:
+                result["Unlimited Scrollback"] = True
+                result["Scrollback Lines"] = 0
+            elif ctec.scroll.disabled:
+                result["Unlimited Scrollback"] = False
+                result["Scrollback Lines"] = 0
+            elif ctec.scroll.lines is not None:
+                result["Unlimited Scrollback"] = False
+                result["Scrollback Lines"] = ctec.scroll.lines
 
         # Restore terminal-specific settings
         for setting in ctec.get_terminal_specific("iterm2"):

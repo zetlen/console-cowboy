@@ -17,6 +17,7 @@ from console_cowboy.ctec.schema import (
     CursorStyle,
     FontConfig,
     KeyBinding,
+    ScrollConfig,
     WindowConfig,
 )
 from console_cowboy.utils.colors import normalize_color
@@ -205,9 +206,18 @@ class KittyAdapter(TerminalAdapter):
                     behavior.shell = value
             elif key == "scrollback_lines":
                 try:
-                    behavior.scrollback_lines = int(value)
+                    lines = int(value)
+                    # Kitty uses -1 for unlimited, 0 for disabled
+                    ctec.scroll = ScrollConfig.from_lines(lines)
                 except ValueError:
                     ctec.add_warning(f"Invalid scrollback_lines: {value}")
+            elif key == "wheel_scroll_multiplier":
+                try:
+                    if ctec.scroll is None:
+                        ctec.scroll = ScrollConfig()
+                    ctec.scroll.multiplier = float(value)
+                except ValueError:
+                    ctec.add_warning(f"Invalid wheel_scroll_multiplier: {value}")
             elif key == "enable_audio_bell":
                 if value.lower() == "no":
                     behavior.bell_mode = BellMode.NONE
@@ -346,8 +356,6 @@ class KittyAdapter(TerminalAdapter):
             lines.append("# Behavior")
             if ctec.behavior.shell:
                 lines.append(f"shell {ctec.behavior.shell}")
-            if ctec.behavior.scrollback_lines is not None:
-                lines.append(f"scrollback_lines {ctec.behavior.scrollback_lines}")
             if ctec.behavior.bell_mode is not None:
                 if ctec.behavior.bell_mode == BellMode.NONE:
                     lines.append("enable_audio_bell no")
@@ -366,6 +374,19 @@ class KittyAdapter(TerminalAdapter):
             if ctec.behavior.close_on_exit:
                 val = "yes" if ctec.behavior.close_on_exit == "close" else "no"
                 lines.append(f"close_on_child_death {val}")
+            lines.append("")
+
+        # Export scroll settings (Kitty uses -1 for unlimited)
+        if ctec.scroll:
+            lines.append("# Scrollback")
+            if ctec.scroll.unlimited:
+                lines.append("scrollback_lines -1")
+            elif ctec.scroll.disabled:
+                lines.append("scrollback_lines 0")
+            elif ctec.scroll.lines is not None:
+                lines.append(f"scrollback_lines {ctec.scroll.lines}")
+            if ctec.scroll.multiplier is not None:
+                lines.append(f"wheel_scroll_multiplier {ctec.scroll.multiplier}")
             lines.append("")
 
         # Export key bindings
