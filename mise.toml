@@ -1,2 +1,10 @@
 [tools]
 "pipx:cookiecutter" = "latest"
+
+[tasks.publish]
+description = "Build and publish to PyPI"
+run = """
+rm -rf dist/
+uv run python -m build
+uv run twine upload dist/*
+"""

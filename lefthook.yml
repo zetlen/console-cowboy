@@ -2,6 +2,11 @@
 # Pre-commit hooks for Console Cowboy
 # See: https://lefthook.dev/
 
+commit-msg:
+  jobs:
+    - name: conventional-commit
+      run: uv run cz check --commit-msg-file {1}
+
 pre-commit:
   parallel: true
   jobs:
