@@ -21,9 +21,11 @@ from console_cowboy.ctec.schema import (
     CursorStyle,
     FontConfig,
     KeyBinding,
+    ScrollConfig,
     WindowConfig,
 )
 from console_cowboy.utils.colors import normalize_color
+from console_cowboy.utils.fonts import is_postscript_name, postscript_to_friendly
 
 from .base import TerminalAdapter
 
@@ -291,9 +293,10 @@ class WeztermAdapter(TerminalAdapter):
         scrollback = cls._extract_lua_value(content, "scrollback_lines")
         if scrollback:
             try:
-                behavior.scrollback_lines = int(scrollback)
+                lines = int(scrollback)
+                ctec.scroll = ScrollConfig.from_lines(lines)
             except ValueError:
-                pass
+                ctec.add_warning(f"Invalid scrollback_lines: {scrollback}")
 
         # Bell
         audible_bell = cls._extract_lua_value(content, "audible_bell")
@@ -395,7 +398,15 @@ class WeztermAdapter(TerminalAdapter):
         if ctec.font:
             lines.append("-- Font")
             if ctec.font.family:
-                lines.append(f'config.font = wezterm.font("{ctec.font.family}")')
+                font_family = ctec.font.family
+                # Convert PostScript names to friendly names for Wezterm
+                if is_postscript_name(font_family):
+                    friendly_name = postscript_to_friendly(font_family)
+                    lines.append(f'config.font = wezterm.font("{friendly_name}")')
+                    if friendly_name != font_family:
+                        lines.append(f'-- Note: Converted from PostScript name "{font_family}"')
+                else:
+                    lines.append(f'config.font = wezterm.font("{font_family}")')
             if ctec.font.size:
                 lines.append(f"config.font_size = {ctec.font.size}")
             if ctec.font.line_height:
@@ -446,8 +457,6 @@ class WeztermAdapter(TerminalAdapter):
             lines.append("-- Behavior")
             if ctec.behavior.shell:
                 lines.append(f'config.default_prog = {{ "{ctec.behavior.shell}" }}')
-            if ctec.behavior.scrollback_lines is not None:
-                lines.append(f"config.scrollback_lines = {ctec.behavior.scrollback_lines}")
             if ctec.behavior.bell_mode is not None:
                 if ctec.behavior.bell_mode == BellMode.NONE:
                     lines.append('config.audible_bell = "Disabled"')
@@ -461,6 +470,15 @@ class WeztermAdapter(TerminalAdapter):
                     lines.append("}")
                 else:
                     lines.append('config.audible_bell = "SystemBeep"')
+            lines.append("")
+
+        # Export scroll settings (Wezterm default is 3500 lines)
+        if ctec.scroll:
+            lines.append("-- Scrollback")
+            # Wezterm doesn't have explicit unlimited mode, use large value
+            scroll_lines = ctec.scroll.get_effective_lines(default=3500, max_lines=1000000)
+            if ctec.scroll.disabled or ctec.scroll.lines is not None or ctec.scroll.unlimited:
+                lines.append(f"config.scrollback_lines = {scroll_lines}")
             lines.append("")
 
         # Export key bindings

@@ -351,6 +351,143 @@ class WindowConfig:
 
 
 @dataclass
+class ScrollConfig:
+    """
+    Scrollback buffer and scroll behavior configuration.
+
+    Provides an implementation-agnostic representation of scrolling that
+    maps losslessly to terminal-specific settings. Different terminals use
+    different units (lines vs bytes) and have different capabilities
+    (unlimited vs capped).
+
+    Capacity Semantics (mutually exclusive, checked in priority order):
+    1. disabled=True: Explicitly disable scrollback (maps to 0 everywhere)
+    2. unlimited=True: Maximum scrollback (maps to iTerm2 "Unlimited Scrollback",
+       Kitty -1, or max safe values for terminals without unlimited support)
+    3. lines set: Specific line count (converted to bytes for Ghostty using
+       an estimated ~100 bytes per line)
+
+    If none are set, the terminal's default is used.
+
+    Terminal Defaults:
+    - iTerm2: 1000 lines (or unlimited if checkbox enabled)
+    - Ghostty: 10MB (~100,000 lines equivalent)
+    - Alacritty: 10,000 lines (max 100,000)
+    - Kitty: 2,000 lines (-1 for unlimited)
+    - Wezterm: 3,500 lines
+
+    Attributes:
+        unlimited: User wants maximum possible scrollback history
+        disabled: User explicitly wants no scrollback (security/memory)
+        lines: Specific number of lines to keep in scrollback buffer
+        multiplier: Scroll speed multiplier (1.0 = normal, higher = faster)
+    """
+
+    unlimited: Optional[bool] = None
+    disabled: Optional[bool] = None
+    lines: Optional[int] = None
+    multiplier: Optional[float] = None
+
+    def get_effective_lines(self, default: int = 10000, max_lines: int = 100000) -> int:
+        """
+        Get the effective line count for terminals that use line-based scrollback.
+
+        Args:
+            default: Default line count if nothing specified
+            max_lines: Maximum supported lines (for unlimited mode)
+
+        Returns:
+            Line count to use, or 0 if disabled
+        """
+        if self.disabled:
+            return 0
+        if self.unlimited:
+            return max_lines
+        if self.lines is not None:
+            return min(self.lines, max_lines)
+        return default
+
+    def get_effective_bytes(self, default_bytes: int = 10485760) -> int:
+        """
+        Get the effective byte count for terminals that use byte-based scrollback.
+
+        Uses an estimate of ~100 bytes per line for conversion.
+
+        Args:
+            default_bytes: Default byte count if nothing specified (10MB)
+
+        Returns:
+            Byte count to use, or 0 if disabled
+        """
+        bytes_per_line = 100  # Conservative estimate for average line
+
+        if self.disabled:
+            return 0
+        if self.unlimited:
+            # Ghostty max is u32::MAX, but 100MB is practical
+            return 104857600  # 100MB
+        if self.lines is not None:
+            return self.lines * bytes_per_line
+        return default_bytes
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary representation."""
+        result = {}
+        if self.unlimited is not None:
+            result["unlimited"] = self.unlimited
+        if self.disabled is not None:
+            result["disabled"] = self.disabled
+        if self.lines is not None:
+            result["lines"] = self.lines
+        if self.multiplier is not None:
+            result["multiplier"] = self.multiplier
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ScrollConfig":
+        """Create a ScrollConfig from a dictionary."""
+        return cls(
+            unlimited=data.get("unlimited"),
+            disabled=data.get("disabled"),
+            lines=data.get("lines"),
+            multiplier=data.get("multiplier"),
+        )
+
+    @classmethod
+    def from_lines(cls, lines: int) -> "ScrollConfig":
+        """Create a ScrollConfig from a line count.
+
+        Handles special values:
+        - Negative values: treated as unlimited
+        - Zero: treated as disabled
+        - Positive: specific line count
+        """
+        if lines < 0:
+            return cls(unlimited=True)
+        elif lines == 0:
+            return cls(disabled=True)
+        else:
+            return cls(lines=lines)
+
+    @classmethod
+    def from_bytes(cls, byte_count: int, bytes_per_line: int = 100) -> "ScrollConfig":
+        """Create a ScrollConfig from a byte count (for Ghostty).
+
+        Args:
+            byte_count: Scrollback limit in bytes
+            bytes_per_line: Estimated bytes per line for conversion
+        """
+        if byte_count == 0:
+            return cls(disabled=True)
+        # Convert bytes to approximate lines
+        lines = byte_count // bytes_per_line
+        # If it's a very large value (>1M lines), treat as unlimited
+        if lines > 1000000:
+            return cls(unlimited=True)
+        return cls(lines=lines)
+
+
+@dataclass
 class BehaviorConfig:
     """
     Terminal behavior configuration.
@@ -358,7 +495,7 @@ class BehaviorConfig:
     Attributes:
         shell: Shell command or path to execute
         working_directory: Initial working directory
-        scrollback_lines: Number of lines to keep in scrollback buffer
+        scrollback_lines: DEPRECATED - use CTEC.scroll instead
         mouse_enabled: Whether to enable mouse support
         bell_mode: Bell notification mode
         copy_on_select: Whether to copy text to clipboard on selection
@@ -368,7 +505,7 @@ class BehaviorConfig:
 
     shell: Optional[str] = None
     working_directory: Optional[str] = None
-    scrollback_lines: Optional[int] = None
+    scrollback_lines: Optional[int] = None  # DEPRECATED: use CTEC.scroll
     mouse_enabled: Optional[bool] = None
     bell_mode: Optional[BellMode] = None
     copy_on_select: Optional[bool] = None
@@ -535,6 +672,7 @@ class CTEC:
         cursor: Global cursor configuration
         window: Window configuration
         behavior: Terminal behavior configuration
+        scroll: Scrollback and scroll behavior configuration
         key_bindings: List of keyboard shortcuts
         profiles: List of terminal profiles
         terminal_specific: Settings that cannot be mapped to common CTEC fields
@@ -548,6 +686,7 @@ class CTEC:
     cursor: Optional[CursorConfig] = None
     window: Optional[WindowConfig] = None
     behavior: Optional[BehaviorConfig] = None
+    scroll: Optional[ScrollConfig] = None
     key_bindings: list[KeyBinding] = field(default_factory=list)
     profiles: list[Profile] = field(default_factory=list)
     terminal_specific: list[TerminalSpecificSetting] = field(default_factory=list)
@@ -568,6 +707,8 @@ class CTEC:
             result["window"] = self.window.to_dict()
         if self.behavior is not None:
             result["behavior"] = self.behavior.to_dict()
+        if self.scroll is not None:
+            result["scroll"] = self.scroll.to_dict()
         if self.key_bindings:
             result["key_bindings"] = [kb.to_dict() for kb in self.key_bindings]
         if self.profiles:
@@ -590,6 +731,9 @@ class CTEC:
             window=WindowConfig.from_dict(data["window"]) if "window" in data else None,
             behavior=BehaviorConfig.from_dict(data["behavior"])
             if "behavior" in data
+            else None,
+            scroll=ScrollConfig.from_dict(data["scroll"])
+            if "scroll" in data
             else None,
             key_bindings=[KeyBinding.from_dict(kb) for kb in data.get("key_bindings", [])],
             profiles=[Profile.from_dict(p) for p in data.get("profiles", [])],

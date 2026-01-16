@@ -21,6 +21,7 @@ from console_cowboy.ctec.schema import (
     CursorStyle,
     FontConfig,
     KeyBinding,
+    ScrollConfig,
     WindowConfig,
 )
 from console_cowboy.utils.colors import normalize_color
@@ -224,10 +225,15 @@ class AlacrittyAdapter(TerminalAdapter):
             ctec.behavior = behavior
 
         if "scrolling" in data:
-            if ctec.behavior is None:
-                ctec.behavior = BehaviorConfig()
-            if "history" in data["scrolling"]:
-                ctec.behavior.scrollback_lines = data["scrolling"]["history"]
+            scrolling = data["scrolling"]
+            if "history" in scrolling:
+                lines = scrolling["history"]
+                # Alacritty max is 100,000 lines
+                ctec.scroll = ScrollConfig.from_lines(lines)
+            if "multiplier" in scrolling:
+                if ctec.scroll is None:
+                    ctec.scroll = ScrollConfig()
+                ctec.scroll.multiplier = float(scrolling["multiplier"])
 
         if "bell" in data:
             if ctec.behavior is None:
@@ -428,8 +434,6 @@ class AlacrittyAdapter(TerminalAdapter):
         if ctec.behavior:
             if ctec.behavior.shell:
                 result["shell"] = {"program": ctec.behavior.shell}
-            if ctec.behavior.scrollback_lines is not None:
-                result["scrolling"] = {"history": ctec.behavior.scrollback_lines}
             if ctec.behavior.bell_mode is not None:
                 if ctec.behavior.bell_mode == BellMode.NONE:
                     result["bell"] = {"duration": 0}
@@ -437,6 +441,18 @@ class AlacrittyAdapter(TerminalAdapter):
                     result["bell"] = {"duration": 100}
             if ctec.behavior.copy_on_select is not None:
                 result["selection"] = {"save_to_clipboard": ctec.behavior.copy_on_select}
+
+        # Export scroll settings (Alacritty max is 100,000 lines)
+        if ctec.scroll:
+            scrolling = {}
+            # Alacritty uses line-based scrollback with max 100,000
+            lines = ctec.scroll.get_effective_lines(default=10000, max_lines=100000)
+            if ctec.scroll.disabled or ctec.scroll.lines is not None or ctec.scroll.unlimited:
+                scrolling["history"] = lines
+            if ctec.scroll.multiplier is not None:
+                scrolling["multiplier"] = int(ctec.scroll.multiplier)
+            if scrolling:
+                result["scrolling"] = scrolling
 
         # Export key bindings
         if ctec.key_bindings:

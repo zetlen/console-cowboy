@@ -13,6 +13,7 @@ from console_cowboy.ctec.schema import (
     FontConfig,
     KeyBinding,
     Profile,
+    ScrollConfig,
     TerminalSpecificSetting,
     WindowConfig,
 )
@@ -423,3 +424,145 @@ class TestCTEC:
         assert len(restored.key_bindings) == 1
         assert len(restored.profiles) == 1
         assert len(restored.terminal_specific) == 1
+
+
+class TestScrollConfig:
+    """Tests for the ScrollConfig class."""
+
+    def test_default_config(self):
+        """Test that default ScrollConfig has all None values."""
+        config = ScrollConfig()
+        assert config.unlimited is None
+        assert config.disabled is None
+        assert config.lines is None
+        assert config.multiplier is None
+
+    def test_from_lines_positive(self):
+        """Test creating config from positive line count."""
+        config = ScrollConfig.from_lines(10000)
+        assert config.lines == 10000
+        assert config.unlimited is None
+        assert config.disabled is None
+
+    def test_from_lines_unlimited(self):
+        """Test that -1 lines means unlimited."""
+        config = ScrollConfig.from_lines(-1)
+        assert config.unlimited is True
+        assert config.lines is None
+        assert config.disabled is None
+
+    def test_from_lines_disabled(self):
+        """Test that 0 lines means disabled."""
+        config = ScrollConfig.from_lines(0)
+        assert config.disabled is True
+        assert config.lines is None
+        assert config.unlimited is None
+
+    def test_from_bytes_positive(self):
+        """Test creating config from byte count."""
+        config = ScrollConfig.from_bytes(1000000)  # 1MB
+        # 1MB / 100 bytes per line = 10000 lines
+        assert config.lines == 10000
+        assert config.unlimited is None
+        assert config.disabled is None
+
+    def test_from_bytes_disabled(self):
+        """Test that 0 bytes means disabled."""
+        config = ScrollConfig.from_bytes(0)
+        assert config.disabled is True
+        assert config.lines is None
+
+    def test_from_bytes_custom_bytes_per_line(self):
+        """Test from_bytes with custom bytes per line estimate."""
+        config = ScrollConfig.from_bytes(5000, bytes_per_line=50)
+        assert config.lines == 100  # 5000 / 50 = 100
+
+    def test_get_effective_lines_explicit(self):
+        """Test get_effective_lines with explicit line count."""
+        config = ScrollConfig(lines=5000)
+        assert config.get_effective_lines() == 5000
+
+    def test_get_effective_lines_unlimited(self):
+        """Test get_effective_lines with unlimited returns max."""
+        config = ScrollConfig(unlimited=True)
+        assert config.get_effective_lines(max_lines=100000) == 100000
+        assert config.get_effective_lines(max_lines=50000) == 50000
+
+    def test_get_effective_lines_disabled(self):
+        """Test get_effective_lines with disabled returns 0."""
+        config = ScrollConfig(disabled=True)
+        assert config.get_effective_lines() == 0
+
+    def test_get_effective_lines_default(self):
+        """Test get_effective_lines returns default when nothing set."""
+        config = ScrollConfig()
+        assert config.get_effective_lines(default=10000) == 10000
+        assert config.get_effective_lines(default=5000) == 5000
+
+    def test_get_effective_lines_capped_at_max(self):
+        """Test get_effective_lines caps at max_lines."""
+        config = ScrollConfig(lines=200000)
+        assert config.get_effective_lines(max_lines=100000) == 100000
+
+    def test_get_effective_bytes_explicit_lines(self):
+        """Test get_effective_bytes converts lines to bytes."""
+        config = ScrollConfig(lines=10000)
+        # 10000 lines * 100 bytes/line = 1000000 bytes
+        assert config.get_effective_bytes() == 1000000
+
+    def test_get_effective_bytes_unlimited(self):
+        """Test get_effective_bytes with unlimited returns 100MB."""
+        config = ScrollConfig(unlimited=True)
+        assert config.get_effective_bytes() == 104857600  # 100MB
+
+    def test_get_effective_bytes_disabled(self):
+        """Test get_effective_bytes with disabled returns 0."""
+        config = ScrollConfig(disabled=True)
+        assert config.get_effective_bytes() == 0
+
+    def test_get_effective_bytes_default(self):
+        """Test get_effective_bytes returns default when nothing set."""
+        config = ScrollConfig()
+        assert config.get_effective_bytes(default_bytes=10485760) == 10485760
+
+    def test_multiplier(self):
+        """Test scroll multiplier/speed setting."""
+        config = ScrollConfig(multiplier=3.0)
+        assert config.multiplier == 3.0
+
+    def test_combined_settings(self):
+        """Test config with lines and multiplier."""
+        config = ScrollConfig(lines=5000, multiplier=2.0)
+        assert config.lines == 5000
+        assert config.multiplier == 2.0
+        assert config.get_effective_lines() == 5000
+
+    def test_to_dict(self):
+        """Test serialization to dict."""
+        config = ScrollConfig(lines=10000, multiplier=3.0)
+        d = config.to_dict()
+        assert d["lines"] == 10000
+        assert d["multiplier"] == 3.0
+        # None values should not appear
+        assert "unlimited" not in d or d["unlimited"] is None
+        assert "disabled" not in d or d["disabled"] is None
+
+    def test_from_dict(self):
+        """Test deserialization from dict."""
+        d = {"lines": 10000, "multiplier": 3.0}
+        config = ScrollConfig.from_dict(d)
+        assert config.lines == 10000
+        assert config.multiplier == 3.0
+
+    def test_from_dict_unlimited(self):
+        """Test deserialization with unlimited flag."""
+        d = {"unlimited": True}
+        config = ScrollConfig.from_dict(d)
+        assert config.unlimited is True
+
+    def test_roundtrip_serialization(self):
+        """Test that to_dict/from_dict round-trips correctly."""
+        original = ScrollConfig(lines=8000, multiplier=2.5)
+        restored = ScrollConfig.from_dict(original.to_dict())
+        assert restored.lines == original.lines
+        assert restored.multiplier == original.multiplier
