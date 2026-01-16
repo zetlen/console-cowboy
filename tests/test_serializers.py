@@ -1,11 +1,10 @@
-"""Tests for CTEC serializers (TOML, JSON, YAML)."""
+"""Tests for CTEC serializers (YAML, JSON)."""
 
 import json
 import tempfile
 from pathlib import Path
 
 import pytest
-import tomli
 import yaml
 
 from console_cowboy.ctec.schema import (
@@ -16,7 +15,13 @@ from console_cowboy.ctec.schema import (
     CursorStyle,
     FontConfig,
 )
-from console_cowboy.ctec.serializers import CTECSerializer, OutputFormat
+from console_cowboy.ctec.serializers import (
+    CTECSerializer,
+    OutputFormat,
+    CTEC_JSON_SCHEMA,
+    CTEC_JSON_SCHEMA_BUNDLED,
+    ITERM2_COLOR_SCHEME_SCHEMA,
+)
 
 
 @pytest.fixture
@@ -37,49 +42,14 @@ class TestOutputFormat:
     """Tests for OutputFormat enum."""
 
     def test_format_values(self):
-        assert OutputFormat.TOML.value == "toml"
-        assert OutputFormat.JSON.value == "json"
         assert OutputFormat.YAML.value == "yaml"
+        assert OutputFormat.JSON.value == "json"
 
-
-class TestTOMLSerialization:
-    """Tests for TOML serialization."""
-
-    def test_to_toml(self, sample_ctec):
-        output = CTECSerializer.to_toml(sample_ctec)
-        assert isinstance(output, str)
-
-        # Parse the output and verify
-        parsed = tomli.loads(output)
-        assert parsed["version"] == "1.0"
-        assert parsed["source_terminal"] == "test"
-        assert parsed["font"]["family"] == "JetBrains Mono"
-
-    def test_from_toml(self):
-        toml_content = """
-version = "1.0"
-source_terminal = "kitty"
-
-[font]
-family = "Fira Code"
-size = 12.0
-
-[cursor]
-style = "beam"
-blink = false
-"""
-        ctec = CTECSerializer.from_toml(toml_content)
-        assert ctec.source_terminal == "kitty"
-        assert ctec.font.family == "Fira Code"
-        assert ctec.cursor.style == CursorStyle.BEAM
-
-    def test_toml_roundtrip(self, sample_ctec):
-        toml_str = CTECSerializer.to_toml(sample_ctec)
-        restored = CTECSerializer.from_toml(toml_str)
-
-        assert restored.source_terminal == sample_ctec.source_terminal
-        assert restored.font.family == sample_ctec.font.family
-        assert restored.cursor.style == sample_ctec.cursor.style
+    def test_format_iteration(self):
+        formats = list(OutputFormat)
+        assert len(formats) == 2
+        assert OutputFormat.YAML in formats
+        assert OutputFormat.JSON in formats
 
 
 class TestJSONSerialization:
@@ -164,11 +134,6 @@ cursor:
 class TestSerializeMethod:
     """Tests for the generic serialize method."""
 
-    def test_serialize_toml(self, sample_ctec):
-        output = CTECSerializer.serialize(sample_ctec, OutputFormat.TOML)
-        parsed = tomli.loads(output)
-        assert parsed["version"] == "1.0"
-
     def test_serialize_json(self, sample_ctec):
         output = CTECSerializer.serialize(sample_ctec, OutputFormat.JSON)
         parsed = json.loads(output)
@@ -182,11 +147,6 @@ class TestSerializeMethod:
 
 class TestDeserializeMethod:
     """Tests for the generic deserialize method."""
-
-    def test_deserialize_toml(self):
-        content = 'version = "1.0"\n[font]\nfamily = "Test"'
-        ctec = CTECSerializer.deserialize(content, OutputFormat.TOML)
-        assert ctec.font.family == "Test"
 
     def test_deserialize_json(self):
         content = '{"version": "1.0", "font": {"family": "Test"}}'
@@ -202,9 +162,6 @@ class TestDeserializeMethod:
 class TestFormatDetection:
     """Tests for format detection from file extension."""
 
-    def test_detect_toml(self):
-        assert CTECSerializer.detect_format("config.toml") == OutputFormat.TOML
-
     def test_detect_json(self):
         assert CTECSerializer.detect_format("config.json") == OutputFormat.JSON
 
@@ -216,20 +173,17 @@ class TestFormatDetection:
         with pytest.raises(ValueError):
             CTECSerializer.detect_format("config.txt")
 
+    def test_detect_toml_raises(self):
+        # TOML is no longer supported
+        with pytest.raises(ValueError):
+            CTECSerializer.detect_format("config.toml")
+
     def test_detect_with_path_object(self):
-        assert CTECSerializer.detect_format(Path("config.toml")) == OutputFormat.TOML
+        assert CTECSerializer.detect_format(Path("config.yaml")) == OutputFormat.YAML
 
 
 class TestFileOperations:
     """Tests for file read/write operations."""
-
-    def test_write_and_read_toml(self, sample_ctec):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "config.toml"
-            CTECSerializer.write_file(sample_ctec, path)
-
-            restored = CTECSerializer.read_file(path)
-            assert restored.font.family == sample_ctec.font.family
 
     def test_write_and_read_json(self, sample_ctec):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -249,12 +203,12 @@ class TestFileOperations:
 
     def test_read_with_explicit_format(self, sample_ctec):
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Write as TOML but with .txt extension
+            # Write as YAML but with .txt extension
             path = Path(tmpdir) / "config.txt"
-            path.write_text(CTECSerializer.to_toml(sample_ctec))
+            path.write_text(CTECSerializer.to_yaml(sample_ctec))
 
             # Read with explicit format
-            restored = CTECSerializer.read_file(path, OutputFormat.TOML)
+            restored = CTECSerializer.read_file(path, OutputFormat.YAML)
             assert restored.font.family == sample_ctec.font.family
 
     def test_write_with_explicit_format(self, sample_ctec):
@@ -267,3 +221,81 @@ class TestFileOperations:
             content = path.read_text()
             parsed = json.loads(content)
             assert parsed["font"]["family"] == sample_ctec.font.family
+
+
+class TestJSONSchema:
+    """Tests for JSON Schema generation."""
+
+    def test_get_json_schema(self):
+        schema = CTECSerializer.get_json_schema()
+        assert "$schema" in schema
+        assert schema["title"] == "CTEC - Common Terminal Emulator Configuration"
+        assert "properties" in schema
+        assert "color_scheme" in schema["properties"]
+
+    def test_schema_has_color_scheme_properties(self):
+        schema = CTECSerializer.get_json_schema()
+        color_scheme = schema["properties"]["color_scheme"]["properties"]
+
+        # Check for extended YAML fields
+        assert "bold" in color_scheme
+        assert "link" in color_scheme
+        assert "underline" in color_scheme
+        assert "cursor_guide" in color_scheme
+        assert "variant" in color_scheme
+
+    def test_write_json_schema(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "ctec.schema.json"
+            CTECSerializer.write_json_schema(path)
+
+            assert path.exists()
+            content = json.loads(path.read_text())
+            assert "$schema" in content
+
+    def test_schema_bundled_constant_matches(self):
+        """Test that get_json_schema(bundled=True) returns CTEC_JSON_SCHEMA_BUNDLED."""
+        assert CTEC_JSON_SCHEMA_BUNDLED == CTECSerializer.get_json_schema(bundled=True)
+        assert CTEC_JSON_SCHEMA_BUNDLED == CTECSerializer.get_json_schema()  # Default
+
+    def test_schema_unbundled_constant_matches(self):
+        """Test that get_json_schema(bundled=False) returns CTEC_JSON_SCHEMA."""
+        assert CTEC_JSON_SCHEMA == CTECSerializer.get_json_schema(bundled=False)
+
+    def test_get_color_scheme_schema(self):
+        """Test getting the standalone color scheme schema."""
+        schema = CTECSerializer.get_color_scheme_schema()
+        assert schema == ITERM2_COLOR_SCHEME_SCHEMA
+        assert "$schema" in schema
+        assert schema["title"] == "Terminal Color Scheme"
+
+    def test_color_scheme_schema_has_hex_colors(self):
+        """Test that color scheme schema uses hex color format."""
+        schema = ITERM2_COLOR_SCHEME_SCHEMA
+        # Check hex color definition
+        assert "$defs" in schema
+        assert "hexColor" in schema["$defs"]
+        assert schema["$defs"]["hexColor"]["pattern"] == "^#[0-9a-fA-F]{6}$"
+
+    def test_write_color_scheme_schema(self):
+        """Test writing the standalone color scheme schema to a file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "iterm2-color-scheme.schema.json"
+            CTECSerializer.write_color_scheme_schema(path)
+
+            assert path.exists()
+            content = json.loads(path.read_text())
+            assert "$schema" in content
+            assert content["title"] == "Terminal Color Scheme"
+
+    def test_bundled_schema_has_inlined_color_scheme(self):
+        """Test that bundled schema has color_scheme properties inlined."""
+        # Bundled should have properties directly
+        assert "properties" in CTEC_JSON_SCHEMA_BUNDLED["properties"]["color_scheme"]
+        # Should not have $ref
+        assert "$ref" not in CTEC_JSON_SCHEMA_BUNDLED["properties"]["color_scheme"]
+
+    def test_unbundled_schema_has_ref(self):
+        """Test that unbundled schema uses $ref for color_scheme."""
+        assert "$ref" in CTEC_JSON_SCHEMA["properties"]["color_scheme"]
+        assert CTEC_JSON_SCHEMA["properties"]["color_scheme"]["$ref"] == "iterm2-color-scheme.schema.json"

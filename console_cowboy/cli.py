@@ -65,18 +65,24 @@ def cli():
     terminal emulators. Export your settings from one terminal and import
     them into another.
 
+    CTEC uses YAML as its primary format, aligned with the iTerm2-Color-Schemes
+    ecosystem for maximum compatibility with existing themes.
+
     Supported terminals: iTerm2, Ghostty, Alacritty, Kitty, Wezterm
 
     \b
     Examples:
         # Export iTerm2 config to CTEC format
-        console-cowboy export iterm2 -o my-config.toml
+        console-cowboy export iterm2 -o my-config.yaml
 
         # Import CTEC config into Ghostty format
-        console-cowboy import my-config.toml -t ghostty -o ~/.config/ghostty/config
+        console-cowboy import my-config.yaml -t ghostty -o ~/.config/ghostty/config
 
         # Convert directly between terminals
         console-cowboy convert ~/.config/kitty/kitty.conf -f kitty -t alacritty
+
+        # Generate JSON schema for editor validation
+        console-cowboy schema -o ctec.schema.json
     """
     pass
 
@@ -123,9 +129,9 @@ def list_terminals():
     "-f",
     "--format",
     "output_format",
-    type=click.Choice(["toml", "json", "yaml"], case_sensitive=False),
-    default="toml",
-    help="Output format (default: toml).",
+    type=click.Choice(["yaml", "json"], case_sensitive=False),
+    default="yaml",
+    help="Output format (default: yaml).",
 )
 @click.option(
     "-p",
@@ -156,8 +162,8 @@ def export_config(
 
     \b
     Examples:
-        # Export iTerm2 config to TOML
-        console-cowboy export iterm2 -o my-config.toml
+        # Export iTerm2 config to YAML (default)
+        console-cowboy export iterm2 -o my-config.yaml
 
         # Export from a specific file
         console-cowboy export ghostty -i ~/custom/config -o config.json -f json
@@ -166,7 +172,7 @@ def export_config(
         console-cowboy export kitty
 
         # Export a specific iTerm2 profile
-        console-cowboy export iterm2 -p "Development" -o dev-config.toml
+        console-cowboy export iterm2 -p "Development" -o dev-config.yaml
     """
     adapter = TerminalRegistry.get(terminal)
     if not adapter:
@@ -250,7 +256,7 @@ def export_config(
     "-f",
     "--format",
     "input_format",
-    type=click.Choice(["toml", "json", "yaml"], case_sensitive=False),
+    type=click.Choice(["yaml", "json"], case_sensitive=False),
     help="Input format. If not specified, detected from file extension.",
 )
 @click.option(
@@ -269,18 +275,18 @@ def import_config(
     """
     Import a CTEC configuration into a terminal's native format.
 
-    INPUT_FILE is the path to a CTEC configuration file (.toml, .json, or .yaml).
+    INPUT_FILE is the path to a CTEC configuration file (.yaml or .json).
 
     \b
     Examples:
         # Import CTEC config into Ghostty format
-        console-cowboy import config.toml -t ghostty -o ~/.config/ghostty/config
+        console-cowboy import config.yaml -t ghostty -o ~/.config/ghostty/config
 
         # Import and output to stdout
-        console-cowboy import config.toml -t alacritty
+        console-cowboy import config.yaml -t alacritty
 
         # Specify input format explicitly
-        console-cowboy import config -t kitty -f toml
+        console-cowboy import config -t kitty -f yaml
     """
     adapter = TerminalRegistry.get(terminal)
     if not adapter:

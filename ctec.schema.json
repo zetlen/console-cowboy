@@ -1,0 +1,426 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zetlen/console-cowboy/ctec.schema.json",
+  "title": "CTEC - Common Terminal Emulator Configuration",
+  "description": "Portable terminal configuration format for cross-emulator settings migration",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "CTEC format version",
+      "default": "1.0"
+    },
+    "source_terminal": {
+      "type": "string",
+      "description": "Terminal emulator this config was exported from",
+      "enum": [
+        "iterm2",
+        "ghostty",
+        "alacritty",
+        "kitty",
+        "wezterm"
+      ]
+    },
+    "color_scheme": {
+      "description": "Color scheme (iTerm2-Color-Schemes YAML format). See: https://github.com/mbadolato/iTerm2-Color-Schemes",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Color scheme name"
+        },
+        "author": {
+          "type": "string",
+          "description": "Color scheme author"
+        },
+        "variant": {
+          "type": "string",
+          "enum": [
+            "dark",
+            "light"
+          ],
+          "description": "Theme variant (dark or light)"
+        },
+        "foreground": {
+          "$ref": "#/$defs/hexColor",
+          "description": "Default text color"
+        },
+        "background": {
+          "$ref": "#/$defs/hexColor",
+          "description": "Default background color"
+        },
+        "cursor": {
+          "$ref": "#/$defs/hexColor",
+          "description": "Cursor color"
+        },
+        "cursor_text": {
+          "$ref": "#/$defs/hexColor",
+          "description": "Text color when under cursor (default: foreground)"
+        },
+        "selection": {
+          "$ref": "#/$defs/hexColor",
+          "description": "Selection highlight color (default: foreground)"
+        },
+        "selection_text": {
+          "$ref": "#/$defs/hexColor",
+          "description": "Selected text color (default: background)"
+        },
+        "bold": {
+          "$ref": "#/$defs/hexColor",
+          "description": "Bold text color (default: foreground)"
+        },
+        "link": {
+          "$ref": "#/$defs/hexColor",
+          "description": "Hyperlink/URL color"
+        },
+        "underline": {
+          "$ref": "#/$defs/hexColor",
+          "description": "Underlined text color"
+        },
+        "cursor_guide": {
+          "$ref": "#/$defs/hexColor",
+          "description": "Cursor guide/highlight color (default: cursor)"
+        },
+        "black": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 0 (normal black)"
+        },
+        "red": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 1 (normal red)"
+        },
+        "green": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 2 (normal green)"
+        },
+        "yellow": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 3 (normal yellow)"
+        },
+        "blue": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 4 (normal blue)"
+        },
+        "magenta": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 5 (normal magenta)"
+        },
+        "cyan": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 6 (normal cyan)"
+        },
+        "white": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 7 (normal white)"
+        },
+        "bright_black": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 8 (bright black)"
+        },
+        "bright_red": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 9 (bright red)"
+        },
+        "bright_green": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 10 (bright green)"
+        },
+        "bright_yellow": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 11 (bright yellow)"
+        },
+        "bright_blue": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 12 (bright blue)"
+        },
+        "bright_magenta": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 13 (bright magenta)"
+        },
+        "bright_cyan": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 14 (bright cyan)"
+        },
+        "bright_white": {
+          "$ref": "#/$defs/hexColor",
+          "description": "ANSI color 15 (bright white)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "font": {
+      "type": "object",
+      "description": "Font configuration",
+      "properties": {
+        "family": {
+          "type": "string",
+          "description": "Primary font family"
+        },
+        "size": {
+          "type": "number",
+          "description": "Font size in points"
+        },
+        "line_height": {
+          "type": "number",
+          "description": "Line height multiplier"
+        },
+        "cell_width": {
+          "type": "number",
+          "description": "Cell width multiplier"
+        },
+        "weight": {
+          "type": "string",
+          "description": "Font weight",
+          "enum": [
+            "thin",
+            "extralight",
+            "light",
+            "regular",
+            "medium",
+            "semibold",
+            "bold",
+            "extrabold",
+            "black"
+          ]
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "italic",
+            "oblique"
+          ]
+        },
+        "bold_font": {
+          "type": "string"
+        },
+        "italic_font": {
+          "type": "string"
+        },
+        "bold_italic_font": {
+          "type": "string"
+        },
+        "ligatures": {
+          "type": "boolean"
+        },
+        "anti_aliasing": {
+          "type": "boolean"
+        },
+        "fallback_fonts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "symbol_map": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "draw_powerline_glyphs": {
+          "type": "boolean"
+        },
+        "box_drawing_scale": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "cursor": {
+      "type": "object",
+      "description": "Cursor configuration",
+      "properties": {
+        "style": {
+          "type": "string",
+          "enum": [
+            "block",
+            "beam",
+            "underline"
+          ]
+        },
+        "blink": {
+          "type": "boolean"
+        },
+        "blink_interval": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "window": {
+      "type": "object",
+      "description": "Window configuration",
+      "properties": {
+        "columns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "blur": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "padding_horizontal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "padding_vertical": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decorations": {
+          "type": "boolean"
+        },
+        "startup_mode": {
+          "type": "string",
+          "enum": [
+            "windowed",
+            "maximized",
+            "fullscreen"
+          ]
+        },
+        "dynamic_title": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "behavior": {
+      "type": "object",
+      "description": "Terminal behavior configuration",
+      "properties": {
+        "shell": {
+          "type": "string"
+        },
+        "working_directory": {
+          "type": "string"
+        },
+        "scrollback_lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mouse_enabled": {
+          "type": "boolean"
+        },
+        "bell_mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "audible",
+            "visual"
+          ]
+        },
+        "copy_on_select": {
+          "type": "boolean"
+        },
+        "confirm_close": {
+          "type": "boolean"
+        },
+        "close_on_exit": {
+          "type": "string",
+          "enum": [
+            "close",
+            "hold",
+            "restart"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "scroll": {
+      "type": "object",
+      "description": "Scrollback configuration",
+      "properties": {
+        "unlimited": {
+          "type": "boolean"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "multiplier": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "key_bindings": {
+      "type": "array",
+      "description": "Keyboard shortcuts",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "mods": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "action",
+          "key"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "terminal_specific": {
+      "type": "array",
+      "description": "Terminal-specific settings that cannot be mapped",
+      "items": {
+        "type": "object",
+        "properties": {
+          "terminal": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "value": {}
+        },
+        "required": [
+          "terminal",
+          "key",
+          "value"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "hexColor": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "description": "Hex color string (e.g., '#ff0000')",
+      "examples": [
+        "#ffffff",
+        "#000000",
+        "#c5c8c6"
+      ]
+    }
+  }
+}
