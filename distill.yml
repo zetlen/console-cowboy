@@ -16,7 +16,7 @@ concerns:
       - watch:
           include: '*.md'
           type: regex
-          pattern: '.'
+          pattern: "^.+$"
         report:
           type: handlebars
           template: |
@@ -369,7 +369,7 @@ concerns:
       - watch:
           include: 'tests/fixtures/kitty*'
           type: regex
-          pattern: '.'
+          pattern: '^.+$'
         report:
           type: handlebars
           template: |
