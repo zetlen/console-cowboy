@@ -1,0 +1,55 @@
+# Alacritty YAML configuration example (legacy format)
+
+colors:
+  primary:
+    foreground: '#c5c8c6'
+    background: '#1d1f21'
+  cursor:
+    cursor: '#c5c8c6'
+    text: '#1d1f21'
+  selection:
+    background: '#373b41'
+    text: '#c5c8c6'
+  normal:
+    black: '#1d1f21'
+    red: '#cc6666'
+    green: '#b5bd68'
+    yellow: '#f0c674'
+    blue: '#81a2be'
+    magenta: '#b294bb'
+    cyan: '#8abeb7'
+    white: '#c5c8c6'
+  bright:
+    black: '#969896'
+    red: '#cc6666'
+    green: '#b5bd68'
+    yellow: '#f0c674'
+    blue: '#81a2be'
+    magenta: '#b294bb'
+    cyan: '#8abeb7'
+    white: '#ffffff'
+
+font:
+  normal:
+    family: JetBrains Mono
+  size: 14.0
+
+cursor:
+  style:
+    shape: Block
+    blinking: On
+
+window:
+  opacity: 0.95
+  dimensions:
+    columns: 120
+    lines: 40
+  padding:
+    x: 10
+    y: 10
+
+shell:
+  program: /bin/zsh
+
+scrolling:
+  history: 10000

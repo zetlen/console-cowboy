@@ -1,0 +1,169 @@
+# Complete CTEC configuration example
+
+version = "1.0"
+source_terminal = "ghostty"
+
+[color_scheme]
+name = "Tomorrow Night"
+
+[color_scheme.foreground]
+r = 197
+g = 200
+b = 198
+
+[color_scheme.background]
+r = 29
+g = 31
+b = 33
+
+[color_scheme.cursor]
+r = 197
+g = 200
+b = 198
+
+[color_scheme.cursor_text]
+r = 29
+g = 31
+b = 33
+
+[color_scheme.selection]
+r = 55
+g = 59
+b = 65
+
+[color_scheme.selection_text]
+r = 197
+g = 200
+b = 198
+
+[color_scheme.black]
+r = 29
+g = 31
+b = 33
+
+[color_scheme.red]
+r = 204
+g = 102
+b = 102
+
+[color_scheme.green]
+r = 181
+g = 189
+b = 104
+
+[color_scheme.yellow]
+r = 240
+g = 198
+b = 116
+
+[color_scheme.blue]
+r = 129
+g = 162
+b = 190
+
+[color_scheme.magenta]
+r = 178
+g = 148
+b = 187
+
+[color_scheme.cyan]
+r = 138
+g = 190
+b = 183
+
+[color_scheme.white]
+r = 197
+g = 200
+b = 198
+
+[color_scheme.bright_black]
+r = 150
+g = 152
+b = 150
+
+[color_scheme.bright_red]
+r = 204
+g = 102
+b = 102
+
+[color_scheme.bright_green]
+r = 181
+g = 189
+b = 104
+
+[color_scheme.bright_yellow]
+r = 240
+g = 198
+b = 116
+
+[color_scheme.bright_blue]
+r = 129
+g = 162
+b = 190
+
+[color_scheme.bright_magenta]
+r = 178
+g = 148
+b = 187
+
+[color_scheme.bright_cyan]
+r = 138
+g = 190
+b = 183
+
+[color_scheme.bright_white]
+r = 255
+g = 255
+b = 255
+
+[font]
+family = "JetBrains Mono"
+size = 14.0
+line_height = 1.1
+bold_font = "JetBrains Mono Bold"
+italic_font = "JetBrains Mono Italic"
+ligatures = true
+
+[cursor]
+style = "block"
+blink = true
+blink_interval = 500
+
+[window]
+columns = 120
+rows = 40
+opacity = 0.95
+blur = 20
+padding_horizontal = 10
+padding_vertical = 10
+decorations = true
+dynamic_title = true
+
+[behavior]
+shell = "/bin/zsh"
+scrollback_lines = 10000
+bell_mode = "visual"
+copy_on_select = true
+confirm_close = true
+
+[[key_bindings]]
+action = "Copy"
+key = "c"
+mods = ["ctrl", "shift"]
+
+[[key_bindings]]
+action = "Paste"
+key = "v"
+mods = ["ctrl", "shift"]
+
+[[profiles]]
+name = "Default"
+is_default = true
+
+[profiles.color_scheme]
+name = "Tomorrow Night"
+
+[[terminal_specific]]
+terminal = "ghostty"
+key = "gtk-single-instance"
+value = true

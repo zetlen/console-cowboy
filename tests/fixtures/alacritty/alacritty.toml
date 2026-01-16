@@ -1,0 +1,88 @@
+# Alacritty TOML configuration example
+
+[colors]
+[colors.primary]
+foreground = "#c5c8c6"
+background = "#1d1f21"
+
+[colors.cursor]
+cursor = "#c5c8c6"
+text = "#1d1f21"
+
+[colors.selection]
+background = "#373b41"
+text = "#c5c8c6"
+
+[colors.normal]
+black = "#1d1f21"
+red = "#cc6666"
+green = "#b5bd68"
+yellow = "#f0c674"
+blue = "#81a2be"
+magenta = "#b294bb"
+cyan = "#8abeb7"
+white = "#c5c8c6"
+
+[colors.bright]
+black = "#969896"
+red = "#cc6666"
+green = "#b5bd68"
+yellow = "#f0c674"
+blue = "#81a2be"
+magenta = "#b294bb"
+cyan = "#8abeb7"
+white = "#ffffff"
+
+[font]
+size = 14.0
+
+[font.normal]
+family = "JetBrains Mono"
+
+[font.bold]
+family = "JetBrains Mono"
+
+[font.italic]
+family = "JetBrains Mono"
+
+[font.offset]
+y = 2
+
+[cursor]
+blink_interval = 500
+
+[cursor.style]
+shape = "Block"
+blinking = "On"
+
+[window]
+opacity = 0.95
+dynamic_title = true
+decorations = "Full"
+
+[window.dimensions]
+columns = 120
+lines = 40
+
+[window.padding]
+x = 10
+y = 10
+
+[shell]
+program = "/bin/zsh"
+
+[scrolling]
+history = 10000
+
+[selection]
+save_to_clipboard = true
+
+[[keyboard.bindings]]
+key = "V"
+mods = "Control+Shift"
+action = "Paste"
+
+[[keyboard.bindings]]
+key = "C"
+mods = "Control+Shift"
+action = "Copy"

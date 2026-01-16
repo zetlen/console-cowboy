@@ -1,0 +1,425 @@
+"""Tests for CTEC schema and data model."""
+
+import pytest
+
+from console_cowboy.ctec.schema import (
+    CTEC,
+    BehaviorConfig,
+    BellMode,
+    Color,
+    ColorScheme,
+    CursorConfig,
+    CursorStyle,
+    FontConfig,
+    KeyBinding,
+    Profile,
+    TerminalSpecificSetting,
+    WindowConfig,
+)
+
+
+class TestColor:
+    """Tests for the Color class."""
+
+    def test_create_valid_color(self):
+        color = Color(r=255, g=128, b=0)
+        assert color.r == 255
+        assert color.g == 128
+        assert color.b == 0
+
+    def test_invalid_color_raises(self):
+        with pytest.raises(ValueError):
+            Color(r=256, g=0, b=0)
+        with pytest.raises(ValueError):
+            Color(r=0, g=-1, b=0)
+
+    def test_to_hex(self):
+        color = Color(r=255, g=128, b=0)
+        assert color.to_hex() == "#ff8000"
+
+    def test_to_hex_with_leading_zeros(self):
+        color = Color(r=0, g=15, b=255)
+        assert color.to_hex() == "#000fff"
+
+    def test_from_hex_with_hash(self):
+        color = Color.from_hex("#ff8000")
+        assert color.r == 255
+        assert color.g == 128
+        assert color.b == 0
+
+    def test_from_hex_without_hash(self):
+        color = Color.from_hex("ff8000")
+        assert color.r == 255
+        assert color.g == 128
+        assert color.b == 0
+
+    def test_from_hex_short_format(self):
+        color = Color.from_hex("#f80")
+        assert color.r == 255
+        assert color.g == 136
+        assert color.b == 0
+
+    def test_from_hex_invalid(self):
+        with pytest.raises(ValueError):
+            Color.from_hex("invalid")
+
+    def test_to_dict(self):
+        color = Color(r=255, g=128, b=0)
+        assert color.to_dict() == {"r": 255, "g": 128, "b": 0}
+
+    def test_from_dict(self):
+        color = Color.from_dict({"r": 255, "g": 128, "b": 0})
+        assert color.r == 255
+        assert color.g == 128
+        assert color.b == 0
+
+
+class TestColorScheme:
+    """Tests for the ColorScheme class."""
+
+    def test_empty_scheme(self):
+        scheme = ColorScheme()
+        assert scheme.foreground is None
+        assert scheme.background is None
+
+    def test_scheme_with_colors(self):
+        scheme = ColorScheme(
+            foreground=Color(255, 255, 255),
+            background=Color(0, 0, 0),
+        )
+        assert scheme.foreground.r == 255
+        assert scheme.background.r == 0
+
+    def test_to_dict(self):
+        scheme = ColorScheme(
+            name="Test",
+            foreground=Color(255, 255, 255),
+        )
+        d = scheme.to_dict()
+        assert d["name"] == "Test"
+        assert d["foreground"] == {"r": 255, "g": 255, "b": 255}
+
+    def test_from_dict(self):
+        scheme = ColorScheme.from_dict({
+            "name": "Test",
+            "foreground": {"r": 255, "g": 255, "b": 255},
+        })
+        assert scheme.name == "Test"
+        assert scheme.foreground.r == 255
+
+
+class TestFontConfig:
+    """Tests for the FontConfig class."""
+
+    def test_empty_font(self):
+        font = FontConfig()
+        assert font.family is None
+        assert font.size is None
+
+    def test_font_with_values(self):
+        font = FontConfig(family="JetBrains Mono", size=14.0, ligatures=True)
+        assert font.family == "JetBrains Mono"
+        assert font.size == 14.0
+        assert font.ligatures is True
+
+    def test_to_dict(self):
+        font = FontConfig(family="Fira Code", size=12.0)
+        d = font.to_dict()
+        assert d["family"] == "Fira Code"
+        assert d["size"] == 12.0
+
+    def test_from_dict(self):
+        font = FontConfig.from_dict({"family": "Fira Code", "size": 12.0})
+        assert font.family == "Fira Code"
+        assert font.size == 12.0
+
+
+class TestCursorConfig:
+    """Tests for the CursorConfig class."""
+
+    def test_cursor_style_enum(self):
+        assert CursorStyle.BLOCK.value == "block"
+        assert CursorStyle.BEAM.value == "beam"
+        assert CursorStyle.UNDERLINE.value == "underline"
+
+    def test_cursor_with_values(self):
+        cursor = CursorConfig(style=CursorStyle.BEAM, blink=True, blink_interval=500)
+        assert cursor.style == CursorStyle.BEAM
+        assert cursor.blink is True
+        assert cursor.blink_interval == 500
+
+    def test_to_dict(self):
+        cursor = CursorConfig(style=CursorStyle.BLOCK, blink=False)
+        d = cursor.to_dict()
+        assert d["style"] == "block"
+        assert d["blink"] is False
+
+    def test_from_dict(self):
+        cursor = CursorConfig.from_dict({"style": "beam", "blink": True})
+        assert cursor.style == CursorStyle.BEAM
+        assert cursor.blink is True
+
+
+class TestWindowConfig:
+    """Tests for the WindowConfig class."""
+
+    def test_window_with_values(self):
+        window = WindowConfig(
+            columns=120,
+            rows=40,
+            opacity=0.95,
+            blur=20,
+        )
+        assert window.columns == 120
+        assert window.rows == 40
+        assert window.opacity == 0.95
+        assert window.blur == 20
+
+    def test_to_dict(self):
+        window = WindowConfig(columns=80, rows=24)
+        d = window.to_dict()
+        assert d["columns"] == 80
+        assert d["rows"] == 24
+
+    def test_from_dict(self):
+        window = WindowConfig.from_dict({"columns": 120, "opacity": 0.9})
+        assert window.columns == 120
+        assert window.opacity == 0.9
+
+
+class TestBehaviorConfig:
+    """Tests for the BehaviorConfig class."""
+
+    def test_bell_mode_enum(self):
+        assert BellMode.NONE.value == "none"
+        assert BellMode.AUDIBLE.value == "audible"
+        assert BellMode.VISUAL.value == "visual"
+
+    def test_behavior_with_values(self):
+        behavior = BehaviorConfig(
+            shell="/bin/zsh",
+            scrollback_lines=10000,
+            bell_mode=BellMode.VISUAL,
+        )
+        assert behavior.shell == "/bin/zsh"
+        assert behavior.scrollback_lines == 10000
+        assert behavior.bell_mode == BellMode.VISUAL
+
+    def test_to_dict(self):
+        behavior = BehaviorConfig(shell="/bin/bash", bell_mode=BellMode.NONE)
+        d = behavior.to_dict()
+        assert d["shell"] == "/bin/bash"
+        assert d["bell_mode"] == "none"
+
+    def test_from_dict(self):
+        behavior = BehaviorConfig.from_dict({
+            "shell": "/bin/zsh",
+            "bell_mode": "audible"
+        })
+        assert behavior.shell == "/bin/zsh"
+        assert behavior.bell_mode == BellMode.AUDIBLE
+
+
+class TestKeyBinding:
+    """Tests for the KeyBinding class."""
+
+    def test_key_binding(self):
+        kb = KeyBinding(action="copy", key="c", mods=["ctrl", "shift"])
+        assert kb.action == "copy"
+        assert kb.key == "c"
+        assert kb.mods == ["ctrl", "shift"]
+
+    def test_key_binding_no_mods(self):
+        kb = KeyBinding(action="enter", key="Return")
+        assert kb.mods == []
+
+    def test_to_dict(self):
+        kb = KeyBinding(action="paste", key="v", mods=["ctrl"])
+        d = kb.to_dict()
+        assert d["action"] == "paste"
+        assert d["key"] == "v"
+        assert d["mods"] == ["ctrl"]
+
+    def test_from_dict(self):
+        kb = KeyBinding.from_dict({"action": "copy", "key": "c", "mods": ["ctrl"]})
+        assert kb.action == "copy"
+        assert kb.key == "c"
+        assert kb.mods == ["ctrl"]
+
+
+class TestProfile:
+    """Tests for the Profile class."""
+
+    def test_profile_minimal(self):
+        profile = Profile(name="Default")
+        assert profile.name == "Default"
+        assert profile.is_default is False
+
+    def test_profile_with_config(self):
+        profile = Profile(
+            name="Development",
+            font=FontConfig(family="Fira Code"),
+            is_default=True,
+        )
+        assert profile.name == "Development"
+        assert profile.font.family == "Fira Code"
+        assert profile.is_default is True
+
+    def test_to_dict(self):
+        profile = Profile(
+            name="Test",
+            font=FontConfig(size=12.0),
+            is_default=True,
+        )
+        d = profile.to_dict()
+        assert d["name"] == "Test"
+        assert d["is_default"] is True
+        assert d["font"]["size"] == 12.0
+
+    def test_from_dict(self):
+        profile = Profile.from_dict({
+            "name": "Test",
+            "font": {"family": "Monaco"},
+            "is_default": False,
+        })
+        assert profile.name == "Test"
+        assert profile.font.family == "Monaco"
+
+
+class TestTerminalSpecificSetting:
+    """Tests for the TerminalSpecificSetting class."""
+
+    def test_terminal_specific(self):
+        setting = TerminalSpecificSetting(
+            terminal="iterm2",
+            key="Unlimited Scrollback",
+            value=True,
+        )
+        assert setting.terminal == "iterm2"
+        assert setting.key == "Unlimited Scrollback"
+        assert setting.value is True
+
+    def test_to_dict(self):
+        setting = TerminalSpecificSetting(
+            terminal="kitty",
+            key="allow_remote_control",
+            value="yes",
+        )
+        d = setting.to_dict()
+        assert d["terminal"] == "kitty"
+        assert d["key"] == "allow_remote_control"
+        assert d["value"] == "yes"
+
+    def test_from_dict(self):
+        setting = TerminalSpecificSetting.from_dict({
+            "terminal": "ghostty",
+            "key": "gtk-single-instance",
+            "value": True,
+        })
+        assert setting.terminal == "ghostty"
+        assert setting.key == "gtk-single-instance"
+        assert setting.value is True
+
+
+class TestCTEC:
+    """Tests for the main CTEC class."""
+
+    def test_empty_ctec(self):
+        ctec = CTEC()
+        assert ctec.version == "1.0"
+        assert ctec.source_terminal is None
+        assert ctec.color_scheme is None
+        assert ctec.key_bindings == []
+        assert ctec.profiles == []
+        assert ctec.terminal_specific == []
+        assert ctec.warnings == []
+
+    def test_ctec_with_config(self):
+        ctec = CTEC(
+            source_terminal="ghostty",
+            font=FontConfig(family="JetBrains Mono"),
+            cursor=CursorConfig(style=CursorStyle.BLOCK),
+        )
+        assert ctec.source_terminal == "ghostty"
+        assert ctec.font.family == "JetBrains Mono"
+        assert ctec.cursor.style == CursorStyle.BLOCK
+
+    def test_add_warning(self):
+        ctec = CTEC()
+        ctec.add_warning("Test warning")
+        assert "Test warning" in ctec.warnings
+
+    def test_add_terminal_specific(self):
+        ctec = CTEC()
+        ctec.add_terminal_specific("iterm2", "test_key", "test_value")
+        assert len(ctec.terminal_specific) == 1
+        assert ctec.terminal_specific[0].terminal == "iterm2"
+
+    def test_get_terminal_specific(self):
+        ctec = CTEC()
+        ctec.add_terminal_specific("iterm2", "key1", "value1")
+        ctec.add_terminal_specific("ghostty", "key2", "value2")
+        ctec.add_terminal_specific("iterm2", "key3", "value3")
+
+        iterm_settings = ctec.get_terminal_specific("iterm2")
+        assert len(iterm_settings) == 2
+
+        ghostty_settings = ctec.get_terminal_specific("ghostty")
+        assert len(ghostty_settings) == 1
+
+    def test_to_dict(self):
+        ctec = CTEC(
+            source_terminal="kitty",
+            font=FontConfig(family="Fira Code", size=12.0),
+        )
+        d = ctec.to_dict()
+        assert d["version"] == "1.0"
+        assert d["source_terminal"] == "kitty"
+        assert d["font"]["family"] == "Fira Code"
+
+    def test_from_dict(self):
+        ctec = CTEC.from_dict({
+            "version": "1.0",
+            "source_terminal": "alacritty",
+            "font": {"family": "Monaco", "size": 14.0},
+        })
+        assert ctec.source_terminal == "alacritty"
+        assert ctec.font.family == "Monaco"
+        assert ctec.font.size == 14.0
+
+    def test_full_roundtrip(self):
+        """Test that CTEC can be converted to dict and back."""
+        original = CTEC(
+            source_terminal="wezterm",
+            color_scheme=ColorScheme(
+                foreground=Color(255, 255, 255),
+                background=Color(0, 0, 0),
+            ),
+            font=FontConfig(family="JetBrains Mono", size=14.0),
+            cursor=CursorConfig(style=CursorStyle.BEAM, blink=True),
+            window=WindowConfig(columns=120, rows=40, opacity=0.95),
+            behavior=BehaviorConfig(shell="/bin/zsh", scrollback_lines=10000),
+            key_bindings=[
+                KeyBinding(action="copy", key="c", mods=["ctrl"]),
+            ],
+            profiles=[
+                Profile(name="Default", is_default=True),
+            ],
+        )
+        original.add_terminal_specific("wezterm", "test_key", "test_value")
+        original.add_warning("Test warning")
+
+        # Convert to dict and back
+        d = original.to_dict()
+        restored = CTEC.from_dict(d)
+
+        # Verify all fields
+        assert restored.source_terminal == "wezterm"
+        assert restored.color_scheme.foreground.r == 255
+        assert restored.font.family == "JetBrains Mono"
+        assert restored.cursor.style == CursorStyle.BEAM
+        assert restored.window.columns == 120
+        assert restored.behavior.shell == "/bin/zsh"
+        assert len(restored.key_bindings) == 1
+        assert len(restored.profiles) == 1
+        assert len(restored.terminal_specific) == 1
