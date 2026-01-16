@@ -178,9 +178,9 @@ def export_config(
         raise click.ClickException(f"Unknown terminal: {terminal}")
 
     # Check if profile option is valid for this terminal
-    if profile_name and terminal.lower() != "iterm2":
+    if profile_name and terminal.lower() not in ("iterm2", "terminal_app"):
         raise click.ClickException(
-            f"The --profile option is only supported for iTerm2. "
+            f"The --profile option is only supported for iTerm2 and Terminal.app. "
             f"{adapter.display_name} does not have multiple profiles."
         )
 
@@ -200,8 +200,8 @@ def export_config(
 
     # Parse configuration
     try:
-        # Pass profile_name for iTerm2, other adapters ignore extra kwargs
-        if terminal.lower() == "iterm2":
+        # Pass profile_name for iTerm2 and Terminal.app, other adapters ignore extra kwargs
+        if terminal.lower() in ("iterm2", "terminal_app"):
             ctec = adapter.parse(input_path, profile_name=profile_name)
         else:
             ctec = adapter.parse(input_path)
@@ -417,15 +417,15 @@ def convert_config(
         raise click.ClickException(f"Unknown target terminal: {to_terminal}")
 
     # Check if profile option is valid for this terminal
-    if profile_name and from_terminal.lower() != "iterm2":
+    if profile_name and from_terminal.lower() not in ("iterm2", "terminal_app"):
         raise click.ClickException(
-            f"The --profile option is only supported when converting from iTerm2. "
+            f"The --profile option is only supported when converting from iTerm2 or Terminal.app. "
             f"{from_adapter.display_name} does not have multiple profiles."
         )
 
     # Parse source configuration
     try:
-        if from_terminal.lower() == "iterm2":
+        if from_terminal.lower() in ("iterm2", "terminal_app"):
             ctec = from_adapter.parse(input_file, profile_name=profile_name)
         else:
             ctec = from_adapter.parse(input_file)

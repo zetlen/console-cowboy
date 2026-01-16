@@ -18,6 +18,7 @@ Console Cowboy is a CLI tool for making terminal configurations portable across 
   - Alacritty
   - Kitty
   - Wezterm
+  - Terminal.app (macOS)
 - **Multiple Output Formats**: CTEC files can be stored as TOML (default), JSON, or YAML
 - **Incompatibility Reporting**: Clearly reports which settings cannot be converted between terminals
 - **Terminal-Specific Settings**: Preserves terminal-specific settings that don't have equivalents in other terminals
@@ -220,6 +221,7 @@ mods = ["ctrl", "shift"]
 | Alacritty | TOML/YAML | Yes | Yes |
 | Kitty | key value | Yes | Yes |
 | Wezterm | Lua | Yes | Yes |
+| Terminal.app | plist XML | Yes | Yes |
 
 ### Default Config Locations
 
@@ -228,6 +230,7 @@ mods = ["ctrl", "shift"]
 - **Alacritty**: `~/.config/alacritty/alacritty.toml` or `.yml`
 - **Kitty**: `~/.config/kitty/kitty.conf`
 - **Wezterm**: `~/.wezterm.lua` or `~/.config/wezterm/wezterm.lua`
+- **Terminal.app**: `~/Library/Preferences/com.apple.Terminal.plist`
 
 ## Compatibility Notes
 
@@ -242,6 +245,8 @@ Not all settings can be perfectly converted between terminals:
 4. **Wezterm Lua**: Wezterm uses Lua for configuration. Console Cowboy can parse common patterns but complex Lua configurations may not be fully captured.
 
 5. **Terminal-Specific Features**: Features unique to one terminal (like iTerm2's "Unlimited Scrollback" or Kitty's remote control) are preserved but only work when converting back to the same terminal.
+
+6. **Terminal.app NSKeyedArchiver**: Terminal.app uses Apple's NSKeyedArchiver format for colors and fonts. Console Cowboy can parse this format, but for best accuracy on macOS, installing PyObjC (`pip install pyobjc-framework-Cocoa`) is recommended.
 
 Console Cowboy will report any incompatibilities or settings that couldn't be converted.
 

@@ -10,6 +10,7 @@ from .base import TerminalAdapter, TerminalRegistry
 from .ghostty import GhosttyAdapter
 from .iterm2 import ITerm2Adapter
 from .kitty import KittyAdapter
+from .terminal_app import TerminalAppAdapter
 from .vscode import VSCodeAdapter
 from .wezterm import WeztermAdapter
 
@@ -20,6 +21,7 @@ TerminalRegistry.register(AlacrittyAdapter)
 TerminalRegistry.register(KittyAdapter)
 TerminalRegistry.register(WeztermAdapter)
 TerminalRegistry.register(VSCodeAdapter)
+TerminalRegistry.register(TerminalAppAdapter)
 
 __all__ = [
     "TerminalAdapter",
@@ -30,4 +32,5 @@ __all__ = [
     "KittyAdapter",
     "WeztermAdapter",
     "VSCodeAdapter",
+    "TerminalAppAdapter",
 ]
