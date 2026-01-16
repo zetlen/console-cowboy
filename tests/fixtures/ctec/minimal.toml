@@ -1,0 +1,11 @@
+# Minimal CTEC configuration
+
+version = "1.0"
+
+[font]
+family = "Fira Code"
+size = 12.0
+
+[cursor]
+style = "beam"
+blink = false

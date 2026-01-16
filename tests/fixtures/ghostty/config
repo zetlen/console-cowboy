@@ -1,0 +1,58 @@
+# Ghostty configuration example
+# A complete configuration file for testing
+
+# Colors
+foreground = #c5c8c6
+background = #1d1f21
+cursor-color = #c5c8c6
+cursor-text = #1d1f21
+selection-foreground = #1d1f21
+selection-background = #373b41
+
+# Palette colors (Tomorrow Night)
+palette = 0=#1d1f21
+palette = 1=#cc6666
+palette = 2=#b5bd68
+palette = 3=#f0c674
+palette = 4=#81a2be
+palette = 5=#b294bb
+palette = 6=#8abeb7
+palette = 7=#c5c8c6
+palette = 8=#969896
+palette = 9=#cc6666
+palette = 10=#b5bd68
+palette = 11=#f0c674
+palette = 12=#81a2be
+palette = 13=#b294bb
+palette = 14=#8abeb7
+palette = 15=#ffffff
+
+# Font
+font-family = JetBrains Mono
+font-size = 14
+font-family-bold = JetBrains Mono Bold
+font-family-italic = JetBrains Mono Italic
+
+# Cursor
+cursor-style = block
+cursor-style-blink = true
+
+# Window
+window-width = 120
+window-height = 40
+background-opacity = 0.95
+background-blur-radius = 20
+window-padding-x = 10
+window-padding-y = 10
+window-decoration = true
+
+# Behavior
+command = /bin/zsh
+scrollback-limit = 10000
+copy-on-select = true
+confirm-close-surface = true
+mouse-hide-while-typing = true
+
+# Ghostty-specific settings
+gtk-single-instance = true
+shell-integration = detect
