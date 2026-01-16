@@ -106,6 +106,47 @@ class FontStyle(Enum):
     OBLIQUE = "oblique"
 
 
+class QuickTerminalPosition(Enum):
+    """
+    Position where the quick terminal appears on screen.
+
+    Common across terminals:
+    - Ghostty: quick-terminal-position (top, bottom, left, right)
+    - iTerm2: Hotkey Window Type (0=floating, 1=fullscreen, 2=left, 3=right, 4=bottom, 5=top)
+    - Kitty: edge option (top, bottom, left, right, background)
+    """
+
+    TOP = "top"
+    BOTTOM = "bottom"
+    LEFT = "left"
+    RIGHT = "right"
+    # iTerm2-specific: floating window (not docked to edge)
+    FLOATING = "floating"
+    # iTerm2-specific: full screen
+    FULLSCREEN = "fullscreen"
+    # Kitty-specific: use as desktop background
+    BACKGROUND = "background"
+
+
+class QuickTerminalScreen(Enum):
+    """
+    Which screen/monitor the quick terminal appears on.
+
+    Common across terminals:
+    - Ghostty: quick-terminal-screen (main, mouse, macos-menu-bar)
+    - iTerm2: Screen with Selection (uses current screen by default)
+    """
+
+    # Primary/main display
+    MAIN = "main"
+    # Screen where mouse cursor is located
+    MOUSE = "mouse"
+    # macOS menu bar screen (Ghostty-specific)
+    MACOS_MENU_BAR = "macos-menu-bar"
+    # Use all screens (for background mode in Kitty)
+    ALL = "all"
+
+
 @dataclass
 class Color:
     """
@@ -758,6 +799,91 @@ class KeyBinding:
 
 
 @dataclass
+class QuickTerminalConfig:
+    """
+    Configuration for quake-style/dropdown quick terminal functionality.
+
+    This is a cross-terminal representation of the "quick terminal" or "hotkey window"
+    feature that allows summoning a terminal with a global hotkey, typically sliding
+    in from a screen edge.
+
+    Terminal Support:
+    - iTerm2: Hotkey Window profiles with Has Hotkey, Hotkey Key Code, etc.
+    - Ghostty: quick-terminal-* settings (quick-terminal-position, etc.)
+    - Kitty 0.42+: quick-access-terminal kitten with edge, hide_on_focus_loss, etc.
+    - Alacritty: No native support (requires external tools like tdrop)
+    - WezTerm: No native support (requires external tools)
+
+    Attributes:
+        enabled: Whether this profile/config is a quick terminal
+        position: Which screen edge the terminal appears from
+        screen: Which monitor/screen to use
+        animation_duration: Animation duration in milliseconds (0 = instant)
+        opacity: Override opacity for quick terminal (0.0-1.0, None = use default)
+        hide_on_focus_loss: Auto-hide when terminal loses keyboard focus
+        floating: Whether window floats above other windows (iTerm2)
+        hotkey: The hotkey trigger as a string (e.g., "ctrl+`", "F12")
+        hotkey_key_code: Raw key code for the hotkey (iTerm2)
+        hotkey_modifiers: Modifier flags as integer bitmask (iTerm2)
+        size_percent: Size as percentage of screen (height for top/bottom, width for left/right)
+    """
+
+    enabled: bool | None = None
+    position: QuickTerminalPosition | None = None
+    screen: QuickTerminalScreen | None = None
+    animation_duration: int | None = None  # milliseconds
+    opacity: float | None = None
+    hide_on_focus_loss: bool | None = None
+    floating: bool | None = None
+    hotkey: str | None = None
+    hotkey_key_code: int | None = None
+    hotkey_modifiers: int | None = None
+    size_percent: float | None = None  # e.g., 0.5 = 50% of screen
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary representation."""
+        result = {}
+        for field_name in [
+            "enabled",
+            "animation_duration",
+            "opacity",
+            "hide_on_focus_loss",
+            "floating",
+            "hotkey",
+            "hotkey_key_code",
+            "hotkey_modifiers",
+            "size_percent",
+        ]:
+            value = getattr(self, field_name)
+            if value is not None:
+                result[field_name] = value
+        if self.position is not None:
+            result["position"] = self.position.value
+        if self.screen is not None:
+            result["screen"] = self.screen.value
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "QuickTerminalConfig":
+        """Create a QuickTerminalConfig from a dictionary."""
+        return cls(
+            enabled=data.get("enabled"),
+            position=QuickTerminalPosition(data["position"])
+            if "position" in data
+            else None,
+            screen=QuickTerminalScreen(data["screen"]) if "screen" in data else None,
+            animation_duration=data.get("animation_duration"),
+            opacity=data.get("opacity"),
+            hide_on_focus_loss=data.get("hide_on_focus_loss"),
+            floating=data.get("floating"),
+            hotkey=data.get("hotkey"),
+            hotkey_key_code=data.get("hotkey_key_code"),
+            hotkey_modifiers=data.get("hotkey_modifiers"),
+            size_percent=data.get("size_percent"),
+        )
+
+
+@dataclass
 class TerminalSpecificSetting:
     """
     A setting specific to a particular terminal emulator that cannot
@@ -801,6 +927,7 @@ class CTEC:
         window: Window configuration
         behavior: Terminal behavior configuration
         scroll: Scrollback and scroll behavior configuration
+        quick_terminal: Quick terminal / hotkey window configuration
         key_bindings: List of keyboard shortcuts
         terminal_specific: Settings that cannot be mapped to common CTEC fields
         warnings: Compatibility warnings generated during import/export
@@ -814,6 +941,7 @@ class CTEC:
     window: WindowConfig | None = None
     behavior: BehaviorConfig | None = None
     scroll: ScrollConfig | None = None
+    quick_terminal: QuickTerminalConfig | None = None
     key_bindings: list[KeyBinding] = field(default_factory=list)
     terminal_specific: list[TerminalSpecificSetting] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -835,6 +963,8 @@ class CTEC:
             result["behavior"] = self.behavior.to_dict()
         if self.scroll is not None:
             result["scroll"] = self.scroll.to_dict()
+        if self.quick_terminal is not None:
+            result["quick_terminal"] = self.quick_terminal.to_dict()
         if self.key_bindings:
             result["key_bindings"] = [kb.to_dict() for kb in self.key_bindings]
         if self.terminal_specific:
@@ -859,6 +989,9 @@ class CTEC:
             if "behavior" in data
             else None,
             scroll=ScrollConfig.from_dict(data["scroll"]) if "scroll" in data else None,
+            quick_terminal=QuickTerminalConfig.from_dict(data["quick_terminal"])
+            if "quick_terminal" in data
+            else None,
             key_bindings=[
                 KeyBinding.from_dict(kb) for kb in data.get("key_bindings", [])
             ],

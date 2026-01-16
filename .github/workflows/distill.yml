@@ -24,7 +24,7 @@ jobs:
           node-version: '20'
 
       - name: Install Distill
-        run: npm install -g @distill/cli
+        run: npm install -g @ast-grep/cli @distill/cli
 
       - name: Run Distill Analysis
         id: distill

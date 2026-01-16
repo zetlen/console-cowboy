@@ -19,6 +19,8 @@ from console_cowboy.ctec.schema import (
     CursorConfig,
     CursorStyle,
     FontConfig,
+    QuickTerminalConfig,
+    QuickTerminalPosition,
     ScrollConfig,
     WindowConfig,
 )
@@ -96,6 +98,19 @@ class ITerm2Adapter(TerminalAdapter):
     }
 
     COLOR_KEY_REVERSE_MAP = {v: k for k, v in COLOR_KEY_MAP.items()}
+
+    # Mapping of iTerm2 Hotkey Window Type to QuickTerminalPosition
+    # iTerm2 values: 0=floating, 1=fullscreen, 2=left, 3=right, 4=bottom, 5=top
+    HOTKEY_WINDOW_TYPE_MAP = {
+        0: QuickTerminalPosition.FLOATING,
+        1: QuickTerminalPosition.FULLSCREEN,
+        2: QuickTerminalPosition.LEFT,
+        3: QuickTerminalPosition.RIGHT,
+        4: QuickTerminalPosition.BOTTOM,
+        5: QuickTerminalPosition.TOP,
+    }
+
+    HOTKEY_WINDOW_TYPE_REVERSE_MAP = {v: k for k, v in HOTKEY_WINDOW_TYPE_MAP.items()}
 
     @classmethod
     def _parse_iterm_color(cls, color_dict: dict) -> Color:
@@ -246,6 +261,40 @@ class ITerm2Adapter(TerminalAdapter):
         if window_modified:
             ctec.window = window
 
+        # Parse hotkey window (quick terminal) settings
+        if profile_data.get("Has Hotkey", False):
+            quick = QuickTerminalConfig(enabled=True)
+
+            # Parse window position/type
+            if "Hotkey Window Type" in profile_data:
+                window_type = profile_data["Hotkey Window Type"]
+                quick.position = cls.HOTKEY_WINDOW_TYPE_MAP.get(
+                    window_type, QuickTerminalPosition.TOP
+                )
+
+            # Parse animation setting
+            if "Hotkey Window Animates" in profile_data:
+                # iTerm2 just has a boolean; we'll use a default duration
+                if profile_data["Hotkey Window Animates"]:
+                    quick.animation_duration = 200  # Default 200ms
+                else:
+                    quick.animation_duration = 0
+
+            # Parse floating setting
+            if "Hotkey Window Float" in profile_data:
+                quick.floating = profile_data["Hotkey Window Float"]
+
+            # Parse hotkey configuration
+            if "Hotkey Key Code" in profile_data:
+                quick.hotkey_key_code = profile_data["Hotkey Key Code"]
+            if "Hotkey Modifier Flags" in profile_data:
+                quick.hotkey_modifiers = profile_data["Hotkey Modifier Flags"]
+            if "Hotkey Characters" in profile_data:
+                # Store the character representation as the hotkey string
+                quick.hotkey = profile_data["Hotkey Characters"]
+
+            ctec.quick_terminal = quick
+
         # Store iTerm2-specific settings for round-trip preservation
         # These are settings that either:
         # 1. Have no CTEC equivalent, or
@@ -275,15 +324,8 @@ class ITerm2Adapter(TerminalAdapter):
             "Badge Max Height",
             "Badge Right Margin",
             "Badge Top Margin",
-            # Hotkey window settings
-            "Has Hotkey",
-            "Hotkey Characters",
-            "Hotkey Key Code",
-            "Hotkey Modifier Flags",
-            "Hotkey Window Type",
-            "Hotkey Window Animates",
+            # Hotkey window settings (only preserve ones not mapped to QuickTerminalConfig)
             "Hotkey Window Dock Click Action",
-            "Hotkey Window Float",
             # Background image settings
             "Background Image Location",
             "Background Image Mode",
@@ -515,6 +557,36 @@ class ITerm2Adapter(TerminalAdapter):
             if ctec.window.blur is not None and ctec.window.blur > 0:
                 result["Blur"] = True
                 result["Blur Radius"] = ctec.window.blur
+
+        # Export quick terminal (hotkey window) settings
+        if ctec.quick_terminal and ctec.quick_terminal.enabled:
+            result["Has Hotkey"] = True
+
+            # Export position as Hotkey Window Type
+            if ctec.quick_terminal.position is not None:
+                window_type = cls.HOTKEY_WINDOW_TYPE_REVERSE_MAP.get(
+                    ctec.quick_terminal.position,
+                    5,  # Default to TOP
+                )
+                result["Hotkey Window Type"] = window_type
+
+            # Export animation
+            if ctec.quick_terminal.animation_duration is not None:
+                result["Hotkey Window Animates"] = (
+                    ctec.quick_terminal.animation_duration > 0
+                )
+
+            # Export floating
+            if ctec.quick_terminal.floating is not None:
+                result["Hotkey Window Float"] = ctec.quick_terminal.floating
+
+            # Export hotkey configuration
+            if ctec.quick_terminal.hotkey_key_code is not None:
+                result["Hotkey Key Code"] = ctec.quick_terminal.hotkey_key_code
+            if ctec.quick_terminal.hotkey_modifiers is not None:
+                result["Hotkey Modifier Flags"] = ctec.quick_terminal.hotkey_modifiers
+            if ctec.quick_terminal.hotkey is not None:
+                result["Hotkey Characters"] = ctec.quick_terminal.hotkey
 
         # Restore terminal-specific settings (no longer profile-prefixed)
         for setting in ctec.get_terminal_specific("iterm2"):

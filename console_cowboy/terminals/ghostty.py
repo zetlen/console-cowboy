@@ -14,6 +14,9 @@ from console_cowboy.ctec.schema import (
     CursorConfig,
     CursorStyle,
     FontConfig,
+    QuickTerminalConfig,
+    QuickTerminalPosition,
+    QuickTerminalScreen,
     ScrollConfig,
     WindowConfig,
 )
@@ -58,6 +61,29 @@ class GhosttyAdapter(TerminalAdapter):
 
     CURSOR_STYLE_REVERSE_MAP = {v: k for k, v in CURSOR_STYLE_MAP.items()}
 
+    # Quick terminal position mapping
+    QUICK_TERMINAL_POSITION_MAP = {
+        "top": QuickTerminalPosition.TOP,
+        "bottom": QuickTerminalPosition.BOTTOM,
+        "left": QuickTerminalPosition.LEFT,
+        "right": QuickTerminalPosition.RIGHT,
+    }
+
+    QUICK_TERMINAL_POSITION_REVERSE_MAP = {
+        v: k for k, v in QUICK_TERMINAL_POSITION_MAP.items()
+    }
+
+    # Quick terminal screen mapping
+    QUICK_TERMINAL_SCREEN_MAP = {
+        "main": QuickTerminalScreen.MAIN,
+        "mouse": QuickTerminalScreen.MOUSE,
+        "macos-menu-bar": QuickTerminalScreen.MACOS_MENU_BAR,
+    }
+
+    QUICK_TERMINAL_SCREEN_REVERSE_MAP = {
+        v: k for k, v in QUICK_TERMINAL_SCREEN_MAP.items()
+    }
+
     @classmethod
     def _parse_palette_color(cls, index: int, value: str, scheme: ColorScheme) -> None:
         """Parse a palette color from Ghostty format (index=color)."""
@@ -97,6 +123,7 @@ class GhosttyAdapter(TerminalAdapter):
         cursor = CursorConfig()
         window = WindowConfig()
         behavior = BehaviorConfig()
+        quick_terminal = QuickTerminalConfig()
 
         if content is None:
             path = Path(source)
@@ -234,6 +261,27 @@ class GhosttyAdapter(TerminalAdapter):
             elif key == "confirm-close-surface":
                 behavior.confirm_close = value.lower() == "true"
 
+            # Parse quick terminal settings
+            elif key == "quick-terminal-position":
+                quick_terminal.enabled = True
+                quick_terminal.position = cls.QUICK_TERMINAL_POSITION_MAP.get(
+                    value.lower(), QuickTerminalPosition.TOP
+                )
+            elif key == "quick-terminal-screen":
+                quick_terminal.enabled = True
+                quick_terminal.screen = cls.QUICK_TERMINAL_SCREEN_MAP.get(
+                    value.lower(), QuickTerminalScreen.MAIN
+                )
+            elif key == "quick-terminal-animation-duration":
+                quick_terminal.enabled = True
+                try:
+                    # Ghostty uses fractional seconds, convert to milliseconds
+                    quick_terminal.animation_duration = int(float(value) * 1000)
+                except ValueError:
+                    ctec.add_warning(
+                        f"Invalid quick-terminal-animation-duration: {value}"
+                    )
+
             # Store unrecognized settings as terminal-specific
             else:
                 ctec.add_terminal_specific("ghostty", key, value)
@@ -264,6 +312,8 @@ class GhosttyAdapter(TerminalAdapter):
             ctec.window = window
         if behavior.shell or behavior.scrollback_lines:
             ctec.behavior = behavior
+        if quick_terminal.enabled:
+            ctec.quick_terminal = quick_terminal
 
         return ctec
 
@@ -398,6 +448,25 @@ class GhosttyAdapter(TerminalAdapter):
                 byte_count = ctec.scroll.get_effective_bytes(default_bytes=10485760)
                 if byte_count > 0:
                     lines.append(f"scrollback-limit = {byte_count}")
+            lines.append("")
+
+        # Export quick terminal settings
+        if ctec.quick_terminal and ctec.quick_terminal.enabled:
+            lines.append("# Quick Terminal")
+            if ctec.quick_terminal.position is not None:
+                position = cls.QUICK_TERMINAL_POSITION_REVERSE_MAP.get(
+                    ctec.quick_terminal.position, "top"
+                )
+                lines.append(f"quick-terminal-position = {position}")
+            if ctec.quick_terminal.screen is not None:
+                screen = cls.QUICK_TERMINAL_SCREEN_REVERSE_MAP.get(
+                    ctec.quick_terminal.screen, "main"
+                )
+                lines.append(f"quick-terminal-screen = {screen}")
+            if ctec.quick_terminal.animation_duration is not None:
+                # Ghostty uses fractional seconds, convert from milliseconds
+                duration_sec = ctec.quick_terminal.animation_duration / 1000.0
+                lines.append(f"quick-terminal-animation-duration = {duration_sec}")
             lines.append("")
 
         # Restore terminal-specific settings
