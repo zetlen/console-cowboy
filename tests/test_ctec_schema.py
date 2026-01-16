@@ -14,7 +14,6 @@ from console_cowboy.ctec.schema import (
     FontWeight,
     FontStyle,
     KeyBinding,
-    Profile,
     ScrollConfig,
     TerminalSpecificSetting,
     WindowConfig,
@@ -368,45 +367,6 @@ class TestKeyBinding:
         assert kb.mods == ["ctrl"]
 
 
-class TestProfile:
-    """Tests for the Profile class."""
-
-    def test_profile_minimal(self):
-        profile = Profile(name="Default")
-        assert profile.name == "Default"
-        assert profile.is_default is False
-
-    def test_profile_with_config(self):
-        profile = Profile(
-            name="Development",
-            font=FontConfig(family="Fira Code"),
-            is_default=True,
-        )
-        assert profile.name == "Development"
-        assert profile.font.family == "Fira Code"
-        assert profile.is_default is True
-
-    def test_to_dict(self):
-        profile = Profile(
-            name="Test",
-            font=FontConfig(size=12.0),
-            is_default=True,
-        )
-        d = profile.to_dict()
-        assert d["name"] == "Test"
-        assert d["is_default"] is True
-        assert d["font"]["size"] == 12.0
-
-    def test_from_dict(self):
-        profile = Profile.from_dict({
-            "name": "Test",
-            "font": {"family": "Monaco"},
-            "is_default": False,
-        })
-        assert profile.name == "Test"
-        assert profile.font.family == "Monaco"
-
-
 class TestTerminalSpecificSetting:
     """Tests for the TerminalSpecificSetting class."""
 
@@ -451,7 +411,6 @@ class TestCTEC:
         assert ctec.source_terminal is None
         assert ctec.color_scheme is None
         assert ctec.key_bindings == []
-        assert ctec.profiles == []
         assert ctec.terminal_specific == []
         assert ctec.warnings == []
 
@@ -523,9 +482,6 @@ class TestCTEC:
             key_bindings=[
                 KeyBinding(action="copy", key="c", mods=["ctrl"]),
             ],
-            profiles=[
-                Profile(name="Default", is_default=True),
-            ],
         )
         original.add_terminal_specific("wezterm", "test_key", "test_value")
         original.add_warning("Test warning")
@@ -542,7 +498,6 @@ class TestCTEC:
         assert restored.window.columns == 120
         assert restored.behavior.shell == "/bin/zsh"
         assert len(restored.key_bindings) == 1
-        assert len(restored.profiles) == 1
         assert len(restored.terminal_specific) == 1
 
 

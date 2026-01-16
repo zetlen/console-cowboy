@@ -757,57 +757,6 @@ class TerminalSpecificSetting:
 
 
 @dataclass
-class Profile:
-    """
-    A terminal profile with its own set of configurations.
-
-    Attributes:
-        name: Profile name
-        color_scheme: Color scheme for this profile
-        font: Font configuration for this profile
-        cursor: Cursor configuration for this profile
-        behavior: Behavior configuration for this profile
-        is_default: Whether this is the default profile
-    """
-
-    name: str
-    color_scheme: Optional[ColorScheme] = None
-    font: Optional[FontConfig] = None
-    cursor: Optional[CursorConfig] = None
-    behavior: Optional[BehaviorConfig] = None
-    is_default: bool = False
-
-    def to_dict(self) -> dict:
-        """Convert to dictionary representation."""
-        result = {"name": self.name, "is_default": self.is_default}
-        if self.color_scheme is not None:
-            result["color_scheme"] = self.color_scheme.to_dict()
-        if self.font is not None:
-            result["font"] = self.font.to_dict()
-        if self.cursor is not None:
-            result["cursor"] = self.cursor.to_dict()
-        if self.behavior is not None:
-            result["behavior"] = self.behavior.to_dict()
-        return result
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "Profile":
-        """Create a Profile from a dictionary."""
-        return cls(
-            name=data["name"],
-            color_scheme=ColorScheme.from_dict(data["color_scheme"])
-            if "color_scheme" in data
-            else None,
-            font=FontConfig.from_dict(data["font"]) if "font" in data else None,
-            cursor=CursorConfig.from_dict(data["cursor"]) if "cursor" in data else None,
-            behavior=BehaviorConfig.from_dict(data["behavior"])
-            if "behavior" in data
-            else None,
-            is_default=data.get("is_default", False),
-        )
-
-
-@dataclass
 class CTEC:
     """
     Common Terminal Emulator Configuration.
@@ -819,14 +768,13 @@ class CTEC:
     Attributes:
         version: CTEC format version
         source_terminal: Original terminal emulator this config was exported from
-        color_scheme: Global color scheme (used if no profile specified)
-        font: Global font configuration
-        cursor: Global cursor configuration
+        color_scheme: Color scheme configuration
+        font: Font configuration
+        cursor: Cursor configuration
         window: Window configuration
         behavior: Terminal behavior configuration
         scroll: Scrollback and scroll behavior configuration
         key_bindings: List of keyboard shortcuts
-        profiles: List of terminal profiles
         terminal_specific: Settings that cannot be mapped to common CTEC fields
         warnings: Compatibility warnings generated during import/export
     """
@@ -840,7 +788,6 @@ class CTEC:
     behavior: Optional[BehaviorConfig] = None
     scroll: Optional[ScrollConfig] = None
     key_bindings: list[KeyBinding] = field(default_factory=list)
-    profiles: list[Profile] = field(default_factory=list)
     terminal_specific: list[TerminalSpecificSetting] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -863,8 +810,6 @@ class CTEC:
             result["scroll"] = self.scroll.to_dict()
         if self.key_bindings:
             result["key_bindings"] = [kb.to_dict() for kb in self.key_bindings]
-        if self.profiles:
-            result["profiles"] = [p.to_dict() for p in self.profiles]
         if self.terminal_specific:
             result["terminal_specific"] = [ts.to_dict() for ts in self.terminal_specific]
         return result
@@ -888,7 +833,6 @@ class CTEC:
             if "scroll" in data
             else None,
             key_bindings=[KeyBinding.from_dict(kb) for kb in data.get("key_bindings", [])],
-            profiles=[Profile.from_dict(p) for p in data.get("profiles", [])],
             terminal_specific=[
                 TerminalSpecificSetting.from_dict(ts)
                 for ts in data.get("terminal_specific", [])

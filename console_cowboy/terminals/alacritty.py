@@ -211,7 +211,12 @@ class AlacrittyAdapter(TerminalAdapter):
             if "opacity" in window_data:
                 window.opacity = window_data["opacity"]
             if "blur" in window_data:
-                window.blur = window_data["blur"] if isinstance(window_data["blur"], int) else 0
+                blur_val = window_data["blur"]
+                # Alacritty uses boolean blur; store as default radius if enabled
+                if isinstance(blur_val, bool):
+                    window.blur = 20 if blur_val else None
+                elif isinstance(blur_val, int):
+                    window.blur = blur_val if blur_val > 0 else None
             if "padding" in window_data:
                 padding = window_data["padding"]
                 if "x" in padding:
@@ -431,7 +436,8 @@ class AlacrittyAdapter(TerminalAdapter):
             if ctec.window.opacity is not None:
                 window["opacity"] = ctec.window.opacity
             if ctec.window.blur:
-                window["blur"] = ctec.window.blur
+                # Alacritty uses boolean blur, not radius
+                window["blur"] = True
             if ctec.window.padding_horizontal is not None or ctec.window.padding_vertical is not None:
                 padding = {}
                 if ctec.window.padding_horizontal is not None:

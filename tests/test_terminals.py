@@ -350,13 +350,14 @@ class TestITerm2Adapter:
         assert ctec.window.columns == 120
         assert ctec.window.rows == 40
 
-    def test_parse_profiles(self):
+    def test_parse_default_profile(self):
+        """Test that the default profile settings are imported correctly."""
         config_path = FIXTURES_DIR / "iterm2" / "com.googlecode.iterm2.plist"
         ctec = ITerm2Adapter.parse(config_path)
 
-        assert len(ctec.profiles) > 0
-        default_profile = next(p for p in ctec.profiles if p.is_default)
-        assert default_profile.name == "Default"
+        # Settings from the default profile should be at the CTEC level
+        assert ctec.color_scheme is not None
+        assert ctec.font is not None or ctec.cursor is not None
 
     def test_parse_colors(self):
         config_path = FIXTURES_DIR / "iterm2" / "com.googlecode.iterm2.plist"
