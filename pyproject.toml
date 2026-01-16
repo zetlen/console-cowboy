@@ -1,12 +1,22 @@
 [project]
 name = "console-cowboy"
-version = "0.1"
+version = "0.1.0"
 description = "Hop terminals like you hop linux distributions."
 readme = "README.md"
 authors = [{name = "zetlen"}]
 license = "Apache-2.0"
 requires-python = ">=3.10"
-classifiers = []
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+]
 dependencies = [
     "click",
     "pyyaml>=6.0",
@@ -20,7 +30,7 @@ build-backend = "setuptools.build_meta"
 
 [project.urls]
 Homepage = "https://github.com/zetlen/console-cowboy"
-Changelog = "https://github.com/zetlen/console-cowboy/releases"
+Changelog = "https://github.com/zetlen/console-cowboy/blob/main/CHANGELOG.md"
 Issues = "https://github.com/zetlen/console-cowboy/issues"
 CI = "https://github.com/zetlen/console-cowboy/actions"
 
@@ -62,6 +72,16 @@ indent-style = "space"
 
 [dependency-groups]
 dev = [
+    "build>=1.0",
+    "commitizen>=4.0",
     "lefthook>=2.0.15",
     "ruff>=0.4",
+    "twine>=6.2.0",
 ]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+version_files = ["pyproject.toml:^version"]
+tag_format = "v$version"
+update_changelog_on_bump = false  # release-please handles changelog
