@@ -128,6 +128,14 @@ def list_terminals():
     help="Output format (default: toml).",
 )
 @click.option(
+    "-p",
+    "--profile",
+    "profile_name",
+    type=str,
+    default=None,
+    help="Profile name to export (iTerm2 only). If not specified, uses the default profile.",
+)
+@click.option(
     "-q",
     "--quiet",
     is_flag=True,
@@ -138,6 +146,7 @@ def export_config(
     input_path: Optional[Path],
     output_path: Optional[Path],
     output_format: str,
+    profile_name: Optional[str],
     quiet: bool,
 ):
     """
@@ -155,10 +164,20 @@ def export_config(
 
         # Export to stdout
         console-cowboy export kitty
+
+        # Export a specific iTerm2 profile
+        console-cowboy export iterm2 -p "Development" -o dev-config.toml
     """
     adapter = TerminalRegistry.get(terminal)
     if not adapter:
         raise click.ClickException(f"Unknown terminal: {terminal}")
+
+    # Check if profile option is valid for this terminal
+    if profile_name and terminal.lower() != "iterm2":
+        raise click.ClickException(
+            f"The --profile option is only supported for iTerm2. "
+            f"{adapter.display_name} does not have multiple profiles."
+        )
 
     # Determine input path
     if input_path is None:
@@ -176,8 +195,15 @@ def export_config(
 
     # Parse configuration
     try:
-        ctec = adapter.parse(input_path)
+        # Pass profile_name for iTerm2, other adapters ignore extra kwargs
+        if terminal.lower() == "iterm2":
+            ctec = adapter.parse(input_path, profile_name=profile_name)
+        else:
+            ctec = adapter.parse(input_path)
     except FileNotFoundError as e:
+        raise click.ClickException(str(e))
+    except ValueError as e:
+        # Profile not found error
         raise click.ClickException(str(e))
     except Exception as e:
         raise click.ClickException(f"Failed to parse {terminal} config: {e}")
@@ -341,6 +367,14 @@ def import_config(
     help="Output file path. If not specified, outputs to stdout.",
 )
 @click.option(
+    "-p",
+    "--profile",
+    "profile_name",
+    type=str,
+    default=None,
+    help="Profile name to convert (iTerm2 source only). If not specified, uses the default profile.",
+)
+@click.option(
     "-q",
     "--quiet",
     is_flag=True,
@@ -351,6 +385,7 @@ def convert_config(
     from_terminal: str,
     to_terminal: str,
     output_path: Optional[Path],
+    profile_name: Optional[str],
     quiet: bool,
 ):
     """
@@ -365,6 +400,9 @@ def convert_config(
 
         # Convert iTerm2 plist to Ghostty
         console-cowboy convert com.googlecode.iterm2.plist -f iterm2 -t ghostty
+
+        # Convert a specific iTerm2 profile to Ghostty
+        console-cowboy convert com.googlecode.iterm2.plist -f iterm2 -t ghostty -p "Development"
     """
     from_adapter = TerminalRegistry.get(from_terminal)
     to_adapter = TerminalRegistry.get(to_terminal)
@@ -374,10 +412,23 @@ def convert_config(
     if not to_adapter:
         raise click.ClickException(f"Unknown target terminal: {to_terminal}")
 
+    # Check if profile option is valid for this terminal
+    if profile_name and from_terminal.lower() != "iterm2":
+        raise click.ClickException(
+            f"The --profile option is only supported when converting from iTerm2. "
+            f"{from_adapter.display_name} does not have multiple profiles."
+        )
+
     # Parse source configuration
     try:
-        ctec = from_adapter.parse(input_file)
+        if from_terminal.lower() == "iterm2":
+            ctec = from_adapter.parse(input_file, profile_name=profile_name)
+        else:
+            ctec = from_adapter.parse(input_file)
     except FileNotFoundError as e:
+        raise click.ClickException(str(e))
+    except ValueError as e:
+        # Profile not found error
         raise click.ClickException(str(e))
     except Exception as e:
         raise click.ClickException(f"Failed to parse {from_terminal} config: {e}")
@@ -541,14 +592,6 @@ def show_info(input_file: Path, terminal: Optional[str]):
     if ctec.key_bindings:
         click.echo(click.style("Key Bindings:", bold=True))
         click.echo(f"  Defined: {len(ctec.key_bindings)}")
-        click.echo()
-
-    # Profiles
-    if ctec.profiles:
-        click.echo(click.style("Profiles:", bold=True))
-        for profile in ctec.profiles:
-            marker = " (default)" if profile.is_default else ""
-            click.echo(f"  - {profile.name}{marker}")
         click.echo()
 
     # Terminal-specific

@@ -19,7 +19,6 @@ from .schema import (
     BellMode,
     ScrollConfig,
     KeyBinding,
-    Profile,
     TerminalSpecificSetting,
 )
 from .serializers import CTECSerializer
@@ -38,7 +37,6 @@ __all__ = [
     "BellMode",
     "ScrollConfig",
     "KeyBinding",
-    "Profile",
     "TerminalSpecificSetting",
     "CTECSerializer",
 ]

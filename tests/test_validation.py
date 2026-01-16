@@ -6,7 +6,6 @@ from console_cowboy.ctec.schema import (
     CTEC,
     FontConfig,
     ScrollConfig,
-    Profile,
 )
 from console_cowboy.validation import (
     ValidationResult,
@@ -84,20 +83,6 @@ class TestValidateFonts:
         # Should have a warning about the missing font
         assert result.has_warnings is True
         assert any("NonexistentFont12345" in w for w in result.warnings)
-
-    def test_profile_fonts_validated(self):
-        """Test that profile fonts are also validated."""
-        ctec = CTEC(
-            profiles=[
-                Profile(
-                    name="Test",
-                    font=FontConfig(family="AnotherMissingFont999"),
-                )
-            ]
-        )
-        result = validate_fonts(ctec)
-        assert result.has_warnings is True
-        assert any("AnotherMissingFont999" in w for w in result.warnings)
 
 
 class TestValidateCTEC:

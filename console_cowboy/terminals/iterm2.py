@@ -21,7 +21,6 @@ from console_cowboy.ctec.schema import (
     CursorStyle,
     FontConfig,
     KeyBinding,
-    Profile,
     ScrollConfig,
     WindowConfig,
 )
@@ -123,13 +122,12 @@ class ITerm2Adapter(TerminalAdapter):
         return scheme
 
     @classmethod
-    def _parse_profile(cls, profile_data: dict, ctec: CTEC) -> Profile:
-        """Parse an iTerm2 profile into a CTEC Profile."""
+    def _parse_profile_into_ctec(cls, profile_data: dict, ctec: CTEC) -> None:
+        """Parse an iTerm2 profile's settings directly into a CTEC object."""
         name = profile_data.get("Name", "Default")
-        profile = Profile(name=name)
 
         # Parse color scheme
-        profile.color_scheme = cls._parse_color_scheme(profile_data)
+        ctec.color_scheme = cls._parse_color_scheme(profile_data)
 
         # Parse font configuration
         if "Normal Font" in profile_data:
@@ -146,10 +144,10 @@ class ITerm2Adapter(TerminalAdapter):
             # Convert PostScript name to friendly and store original
             if is_postscript_name(font_family):
                 friendly_family = postscript_to_friendly(font_family)
-                profile.font = FontConfig(family=friendly_family, size=font_size)
-                profile.font.set_source_name("iterm2", font_family)
+                ctec.font = FontConfig(family=friendly_family, size=font_size)
+                ctec.font.set_source_name("iterm2", font_family)
             else:
-                profile.font = FontConfig(family=font_family, size=font_size)
+                ctec.font = FontConfig(family=font_family, size=font_size)
 
         # Handle Non-ASCII Font as fallback font
         if "Non-ASCII Font" in profile_data and profile_data.get("Use Non-ASCII Font", False):
@@ -159,27 +157,27 @@ class ITerm2Adapter(TerminalAdapter):
             # Convert to friendly name
             if is_postscript_name(non_ascii_family):
                 non_ascii_family = postscript_to_friendly(non_ascii_family)
-            if profile.font:
-                profile.font.fallback_fonts = [non_ascii_family]
+            if ctec.font:
+                ctec.font.fallback_fonts = [non_ascii_family]
                 # Store original for lossless round-trip (includes size)
-                profile.font.set_source_name("iterm2_non_ascii", non_ascii_str)
+                ctec.font.set_source_name("iterm2_non_ascii", non_ascii_str)
             else:
-                profile.font = FontConfig(fallback_fonts=[non_ascii_family])
-                profile.font.set_source_name("iterm2_non_ascii", non_ascii_str)
+                ctec.font = FontConfig(fallback_fonts=[non_ascii_family])
+                ctec.font.set_source_name("iterm2_non_ascii", non_ascii_str)
 
         # Handle anti-aliasing
         if "ASCII Anti Aliased" in profile_data:
-            if profile.font:
-                profile.font.anti_aliasing = profile_data["ASCII Anti Aliased"]
+            if ctec.font:
+                ctec.font.anti_aliasing = profile_data["ASCII Anti Aliased"]
             else:
-                profile.font = FontConfig(anti_aliasing=profile_data["ASCII Anti Aliased"])
+                ctec.font = FontConfig(anti_aliasing=profile_data["ASCII Anti Aliased"])
 
         # Handle Powerline glyphs
         if "Draw Powerline Glyphs" in profile_data:
-            if profile.font:
-                profile.font.draw_powerline_glyphs = profile_data["Draw Powerline Glyphs"]
+            if ctec.font:
+                ctec.font.draw_powerline_glyphs = profile_data["Draw Powerline Glyphs"]
             else:
-                profile.font = FontConfig(draw_powerline_glyphs=profile_data["Draw Powerline Glyphs"])
+                ctec.font = FontConfig(draw_powerline_glyphs=profile_data["Draw Powerline Glyphs"])
 
         # Parse cursor configuration
         cursor_config = CursorConfig()
@@ -188,7 +186,7 @@ class ITerm2Adapter(TerminalAdapter):
             cursor_config.style = cls.CURSOR_STYLE_MAP.get(cursor_type, CursorStyle.BLOCK)
         if "Blinking Cursor" in profile_data:
             cursor_config.blink = profile_data["Blinking Cursor"]
-        profile.cursor = cursor_config
+        ctec.cursor = cursor_config
 
         # Parse behavior configuration
         behavior = BehaviorConfig()
@@ -196,8 +194,6 @@ class ITerm2Adapter(TerminalAdapter):
             behavior.shell = profile_data["Command"]
         if "Working Directory" in profile_data:
             behavior.working_directory = profile_data["Working Directory"]
-        # Note: Scrollback is handled at the CTEC level via ctec.scroll
-        # We store the raw values here for profile-level settings
         if "Silence Bell" in profile_data:
             if profile_data["Silence Bell"]:
                 behavior.bell_mode = BellMode.NONE
@@ -205,10 +201,45 @@ class ITerm2Adapter(TerminalAdapter):
                 behavior.bell_mode = BellMode.VISUAL
             else:
                 behavior.bell_mode = BellMode.AUDIBLE
-        profile.behavior = behavior
+        ctec.behavior = behavior
 
-        # Store iTerm2-specific settings
+        # Parse scroll settings
+        if profile_data.get("Unlimited Scrollback", False):
+            ctec.scroll = ScrollConfig(unlimited=True)
+        elif "Scrollback Lines" in profile_data:
+            lines = profile_data["Scrollback Lines"]
+            if lines == 0:
+                ctec.scroll = ScrollConfig(disabled=True)
+            else:
+                ctec.scroll = ScrollConfig(lines=lines)
+
+        # Parse window settings from profile (transparency, blur)
+        # Note: columns/rows are parsed from global config in parse(), not here
+        window = ctec.window or WindowConfig()
+        window_modified = False
+
+        # Transparency: iTerm2 uses 0=opaque, 1=fully transparent
+        # CTEC uses opacity where 1.0=opaque, 0.0=fully transparent
+        if "Transparency" in profile_data:
+            transparency = profile_data["Transparency"]
+            window.opacity = 1.0 - transparency  # Invert for CTEC
+            window_modified = True
+
+        # Blur settings
+        if profile_data.get("Blur", False):
+            blur_radius = profile_data.get("Blur Radius", 10)
+            window.blur = blur_radius
+            window_modified = True
+
+        if window_modified:
+            ctec.window = window
+
+        # Store iTerm2-specific settings for round-trip preservation
+        # These are settings that either:
+        # 1. Have no CTEC equivalent, or
+        # 2. Need to be preserved exactly for iTerm2-to-iTerm2 round-trips
         specific_keys = [
+            # Basic settings
             "Unlimited Scrollback",
             "Use Bold Font",
             "Use Italic Font",
@@ -219,12 +250,42 @@ class ITerm2Adapter(TerminalAdapter):
             "Vertical Spacing",
             "Use Non-ASCII Font",
             "Minimum Contrast",
+            # Advanced features (iTerm2-only, no equivalent in other terminals)
+            "Triggers",
+            "Smart Selection Rules",
+            "Semantic History",
+            "Bound Hosts",  # Automatic Profile Switching rules
+            # Badge settings
+            "Badge Text",
+            "Badge Color",
+            "Badge Font",
+            "Badge Max Width",
+            "Badge Max Height",
+            "Badge Right Margin",
+            "Badge Top Margin",
+            # Hotkey window settings
+            "Has Hotkey",
+            "Hotkey Characters",
+            "Hotkey Key Code",
+            "Hotkey Modifier Flags",
+            "Hotkey Window Type",
+            "Hotkey Window Animates",
+            "Hotkey Window Dock Click Action",
+            "Hotkey Window Float",
+            # Background image settings
+            "Background Image Location",
+            "Background Image Mode",
+            "Blend",
+            # Session settings
+            "Custom Directory",
+            "Jobs to Ignore",
+            "Keyboard Map",
+            "Title Components",
+            "Custom Window Title",
         ]
         for key in specific_keys:
             if key in profile_data:
-                ctec.add_terminal_specific("iterm2", f"profile.{name}.{key}", profile_data[key])
-
-        return profile
+                ctec.add_terminal_specific("iterm2", key, profile_data[key])
 
     @classmethod
     def parse(
@@ -232,11 +293,22 @@ class ITerm2Adapter(TerminalAdapter):
         source: Union[str, Path],
         *,
         content: Optional[str] = None,
+        profile_name: Optional[str] = None,
     ) -> CTEC:
         """
         Parse an iTerm2 configuration file.
 
         Supports both full plist configs and .itermcolors files.
+
+        Args:
+            source: Path to the configuration file
+            content: Optional string content to parse instead of reading from file
+            profile_name: Optional profile name to import. If not specified,
+                         uses the default profile. If multiple profiles exist
+                         and no profile_name is specified, a warning is emitted.
+
+        Returns:
+            CTEC configuration object
         """
         ctec = CTEC(source_terminal="iterm2")
 
@@ -257,35 +329,61 @@ class ITerm2Adapter(TerminalAdapter):
 
         # Full iTerm2 config
         if "New Bookmarks" in data:
-            # Parse profiles
+            profiles = data["New Bookmarks"]
+
+            if not profiles:
+                ctec.add_warning("No profiles found in iTerm2 configuration")
+                return ctec
+
+            # Build list of profile names and find default
+            profile_names = [p.get("Name", f"Profile {i}") for i, p in enumerate(profiles)]
             default_profile_data = None
-            for i, profile_data in enumerate(data["New Bookmarks"]):
-                profile = cls._parse_profile(profile_data, ctec)
-                if i == 0 or profile_data.get("Default Bookmark", "No") == "Yes":
-                    profile.is_default = True
+            default_profile_name = None
+
+            for profile_data in profiles:
+                if profile_data.get("Default Bookmark", "No") == "Yes":
                     default_profile_data = profile_data
-                ctec.profiles.append(profile)
+                    default_profile_name = profile_data.get("Name", "Default")
+                    break
 
-            # Set global settings from default profile if available
-            if ctec.profiles:
-                default_profile = next(
-                    (p for p in ctec.profiles if p.is_default), ctec.profiles[0]
-                )
-                ctec.color_scheme = default_profile.color_scheme
-                ctec.font = default_profile.font
-                ctec.cursor = default_profile.cursor
-                ctec.behavior = default_profile.behavior
+            # If no explicit default, use the first profile
+            if default_profile_data is None:
+                default_profile_data = profiles[0]
+                default_profile_name = profile_names[0]
 
-                # Parse scroll settings from default profile
-                if default_profile_data:
-                    if default_profile_data.get("Unlimited Scrollback", False):
-                        ctec.scroll = ScrollConfig(unlimited=True)
-                    elif "Scrollback Lines" in default_profile_data:
-                        lines = default_profile_data["Scrollback Lines"]
-                        if lines == 0:
-                            ctec.scroll = ScrollConfig(disabled=True)
-                        else:
-                            ctec.scroll = ScrollConfig(lines=lines)
+            # Determine which profile to use
+            selected_profile_data = None
+            selected_profile_name = None
+
+            if profile_name:
+                # User specified a profile name
+                for profile_data in profiles:
+                    if profile_data.get("Name") == profile_name:
+                        selected_profile_data = profile_data
+                        selected_profile_name = profile_name
+                        break
+                if selected_profile_data is None:
+                    raise ValueError(
+                        f"Profile '{profile_name}' not found. "
+                        f"Available profiles: {', '.join(profile_names)}"
+                    )
+            else:
+                # Use default profile
+                selected_profile_data = default_profile_data
+                selected_profile_name = default_profile_name
+
+                # Warn if multiple profiles exist
+                if len(profiles) > 1:
+                    other_profiles = [n for n in profile_names if n != selected_profile_name]
+                    ctec.add_warning(
+                        f"iTerm2 config contains {len(profiles)} profiles. "
+                        f"Importing '{selected_profile_name}' (default). "
+                        f"Use --profile to select a different profile. "
+                        f"Other profiles: {', '.join(other_profiles)}"
+                    )
+
+            # Parse the selected profile into CTEC
+            cls._parse_profile_into_ctec(selected_profile_data, ctec)
 
         # Parse window configuration
         window = WindowConfig()
@@ -314,72 +412,68 @@ class ITerm2Adapter(TerminalAdapter):
         return ctec
 
     @classmethod
-    def _export_profile(cls, profile: Profile, ctec: CTEC) -> dict:
-        """Export a CTEC Profile to iTerm2 profile format."""
-        result = {"Name": profile.name, "Guid": profile.name.lower().replace(" ", "-")}
+    def _export_ctec_to_profile(cls, ctec: CTEC, profile_name: str = "Default") -> dict:
+        """Export CTEC settings to an iTerm2 profile dictionary."""
+        result = {"Name": profile_name, "Guid": profile_name.lower().replace(" ", "-")}
 
         # Export colors
-        color_scheme = profile.color_scheme or ctec.color_scheme
-        if color_scheme:
+        if ctec.color_scheme:
             for ctec_key, iterm_key in cls.COLOR_KEY_REVERSE_MAP.items():
-                color = getattr(color_scheme, ctec_key, None)
+                color = getattr(ctec.color_scheme, ctec_key, None)
                 if color:
                     result[iterm_key] = cls._export_color(color)
 
         # Export font
-        font = profile.font or ctec.font
-        if font and font.family:
-            size = font.size or 12
+        if ctec.font and ctec.font.family:
+            size = ctec.font.size or 12
             # Use stored PostScript name for lossless round-trip, otherwise convert
-            ps_name = font.get_source_name("iterm2")
+            ps_name = ctec.font.get_source_name("iterm2")
             if ps_name:
                 font_name = ps_name
             else:
                 # Convert friendly name to PostScript
-                font_name = friendly_to_postscript(font.family)
+                font_name = friendly_to_postscript(ctec.font.family)
             result["Normal Font"] = f"{font_name} {size}"
 
             # Export fallback fonts as Non-ASCII Font
-            if font.fallback_fonts:
+            if ctec.font.fallback_fonts:
                 # Use stored original for lossless round-trip, otherwise convert
-                non_ascii_original = font.get_source_name("iterm2_non_ascii")
+                non_ascii_original = ctec.font.get_source_name("iterm2_non_ascii")
                 if non_ascii_original:
                     result["Non-ASCII Font"] = non_ascii_original
                 else:
-                    fallback = font.fallback_fonts[0]
+                    fallback = ctec.font.fallback_fonts[0]
                     fallback_ps = friendly_to_postscript(fallback)
                     result["Non-ASCII Font"] = f"{fallback_ps} {size}"
                 result["Use Non-ASCII Font"] = True
 
             # Export anti-aliasing
-            if font.anti_aliasing is not None:
-                result["ASCII Anti Aliased"] = font.anti_aliasing
-                result["Non-ASCII Anti Aliased"] = font.anti_aliasing
+            if ctec.font.anti_aliasing is not None:
+                result["ASCII Anti Aliased"] = ctec.font.anti_aliasing
+                result["Non-ASCII Anti Aliased"] = ctec.font.anti_aliasing
 
             # Export Powerline glyphs
-            if font.draw_powerline_glyphs is not None:
-                result["Draw Powerline Glyphs"] = font.draw_powerline_glyphs
+            if ctec.font.draw_powerline_glyphs is not None:
+                result["Draw Powerline Glyphs"] = ctec.font.draw_powerline_glyphs
 
         # Export cursor
-        cursor = profile.cursor or ctec.cursor
-        if cursor:
-            if cursor.style:
-                result["Cursor Type"] = cls.CURSOR_STYLE_REVERSE_MAP.get(cursor.style, 1)
-            if cursor.blink is not None:
-                result["Blinking Cursor"] = cursor.blink
+        if ctec.cursor:
+            if ctec.cursor.style:
+                result["Cursor Type"] = cls.CURSOR_STYLE_REVERSE_MAP.get(ctec.cursor.style, 1)
+            if ctec.cursor.blink is not None:
+                result["Blinking Cursor"] = ctec.cursor.blink
 
         # Export behavior
-        behavior = profile.behavior or ctec.behavior
-        if behavior:
-            if behavior.shell:
-                result["Command"] = behavior.shell
+        if ctec.behavior:
+            if ctec.behavior.shell:
+                result["Command"] = ctec.behavior.shell
                 result["Custom Command"] = "Yes"
-            if behavior.working_directory:
-                result["Working Directory"] = behavior.working_directory
+            if ctec.behavior.working_directory:
+                result["Working Directory"] = ctec.behavior.working_directory
                 result["Custom Directory"] = "Yes"
-            if behavior.bell_mode is not None:
-                result["Silence Bell"] = behavior.bell_mode == BellMode.NONE
-                result["Visual Bell"] = behavior.bell_mode == BellMode.VISUAL
+            if ctec.behavior.bell_mode is not None:
+                result["Silence Bell"] = ctec.behavior.bell_mode == BellMode.NONE
+                result["Visual Bell"] = ctec.behavior.bell_mode == BellMode.VISUAL
 
         # Export scroll settings from CTEC scroll config
         if ctec.scroll:
@@ -393,11 +487,32 @@ class ITerm2Adapter(TerminalAdapter):
                 result["Unlimited Scrollback"] = False
                 result["Scrollback Lines"] = ctec.scroll.lines
 
-        # Restore terminal-specific settings
+        # Export window settings (transparency, blur)
+        if ctec.window:
+            # Opacity: CTEC uses 1.0=opaque, iTerm2 uses 0=opaque (Transparency)
+            if ctec.window.opacity is not None:
+                result["Transparency"] = 1.0 - ctec.window.opacity  # Invert for iTerm2
+
+            # Blur
+            if ctec.window.blur is not None and ctec.window.blur > 0:
+                result["Blur"] = True
+                result["Blur Radius"] = ctec.window.blur
+
+        # Restore terminal-specific settings (no longer profile-prefixed)
         for setting in ctec.get_terminal_specific("iterm2"):
-            if setting.key.startswith(f"profile.{profile.name}."):
-                actual_key = setting.key.split(".", 2)[2]
-                result[actual_key] = setting.value
+            # Skip global settings, only include profile-level ones
+            global_keys = [
+                "TabStyleWithAutomaticOption",
+                "HideTab",
+                "HideMenuBarInFullscreen",
+                "SplitPaneDimmingAmount",
+                "UseBorder",
+                "HideScrollbar",
+                "PromptOnQuit",
+                "OnlyWhenMoreTabs",
+            ]
+            if setting.key not in global_keys:
+                result[setting.key] = setting.value
 
         return result
 
@@ -406,28 +521,15 @@ class ITerm2Adapter(TerminalAdapter):
         """
         Export CTEC to iTerm2 plist format.
 
+        Creates a single profile named "Default" from the CTEC settings.
+
         Returns a plist XML string that can be saved to a file.
         """
         result = {}
 
-        # Export profiles
-        profiles = []
-        if ctec.profiles:
-            for profile in ctec.profiles:
-                profiles.append(cls._export_profile(profile, ctec))
-        else:
-            # Create a default profile from global settings
-            default_profile = Profile(
-                name="Default",
-                color_scheme=ctec.color_scheme,
-                font=ctec.font,
-                cursor=ctec.cursor,
-                behavior=ctec.behavior,
-                is_default=True,
-            )
-            profiles.append(cls._export_profile(default_profile, ctec))
-
-        result["New Bookmarks"] = profiles
+        # Create a single profile from CTEC settings
+        profile = cls._export_ctec_to_profile(ctec)
+        result["New Bookmarks"] = [profile]
 
         # Export window configuration
         if ctec.window:
@@ -437,8 +539,18 @@ class ITerm2Adapter(TerminalAdapter):
                 result["Default Bookmark Window Height"] = ctec.window.rows
 
         # Restore terminal-specific global settings
+        global_keys = [
+            "TabStyleWithAutomaticOption",
+            "HideTab",
+            "HideMenuBarInFullscreen",
+            "SplitPaneDimmingAmount",
+            "UseBorder",
+            "HideScrollbar",
+            "PromptOnQuit",
+            "OnlyWhenMoreTabs",
+        ]
         for setting in ctec.get_terminal_specific("iterm2"):
-            if not setting.key.startswith("profile."):
+            if setting.key in global_keys:
                 result[setting.key] = setting.value
 
         return plistlib.dumps(result).decode()

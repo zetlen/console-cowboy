@@ -78,7 +78,6 @@ def validate_fonts(ctec: CTEC) -> ValidationResult:
     - Primary font family exists
     - Bold/italic fonts exist
     - Fallback fonts exist
-    - Profile-specific fonts exist
 
     Args:
         ctec: CTEC configuration to validate
@@ -90,16 +89,9 @@ def validate_fonts(ctec: CTEC) -> ValidationResult:
 
     fonts_to_check: List[Tuple[str, str]] = []
 
-    # Global font config
+    # Font config
     if ctec.font:
-        fonts_to_check.extend(_extract_fonts_from_config(ctec.font, "global"))
-
-    # Profile fonts
-    for profile in ctec.profiles:
-        if profile.font:
-            fonts_to_check.extend(
-                _extract_fonts_from_config(profile.font, f"profile:{profile.name}")
-            )
+        fonts_to_check.extend(_extract_fonts_from_config(ctec.font, "font"))
 
     # Validate each font
     for font_name, context in fonts_to_check:

@@ -345,6 +345,14 @@ class WeztermAdapter(TerminalAdapter):
             except ValueError:
                 pass
 
+        # Window blur (macOS only)
+        blur = cls._extract_lua_value(content, "macos_window_background_blur")
+        if blur:
+            try:
+                window.blur = int(blur)
+            except ValueError:
+                pass
+
         # Window padding
         padding_table = cls._extract_lua_table(content, "window_padding")
         if padding_table:
@@ -361,7 +369,7 @@ class WeztermAdapter(TerminalAdapter):
             decorations = decorations.strip("'\"")
             window.decorations = decorations.upper() not in ("NONE", "RESIZE")
 
-        if window.columns or window.rows or window.opacity is not None:
+        if window.columns or window.rows or window.opacity is not None or window.blur is not None:
             ctec.window = window
 
         # Parse behavior
@@ -535,6 +543,8 @@ class WeztermAdapter(TerminalAdapter):
                 lines.append(f"config.initial_rows = {ctec.window.rows}")
             if ctec.window.opacity is not None:
                 lines.append(f"config.window_background_opacity = {ctec.window.opacity}")
+            if ctec.window.blur is not None:
+                lines.append(f"config.macos_window_background_blur = {ctec.window.blur}")
             if ctec.window.padding_horizontal is not None or ctec.window.padding_vertical is not None:
                 h = ctec.window.padding_horizontal or 0
                 v = ctec.window.padding_vertical or 0
