@@ -1,0 +1,1270 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/zetlen/distill/main/distill-schema.json
+
+# =============================================================================
+# DISTILL CONFIGURATION - Console Cowboy
+# =============================================================================
+# Monitors semantic concerns across the terminal configuration converter
+# =============================================================================
+
+concerns:
+  # ===========================================================================
+  # DOCUMENTATION
+  # ===========================================================================
+  docs:
+    signals:
+      # README and markdown documentation
+      - watch:
+          include: '*.md'
+          type: regex
+          pattern: '.'
+        report:
+          type: handlebars
+          template: |
+            # Documentation file changed
+
+            `{{filePath}}` was modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Module-level docstrings
+      - watch:
+          include: 'console_cowboy/**/*.py'
+          type: tsq
+          query: |
+            (module
+              (expression_statement
+                (string) @docstring
+              )
+            )
+          capture: docstring
+        report:
+          type: handlebars
+          template: |
+            # Module docstring changed
+
+            Module documentation was modified in `{{filePath}}`.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Class docstrings
+      - watch:
+          include: 'console_cowboy/**/*.py'
+          type: tsq
+          query: |
+            (class_definition
+              body: (block
+                .
+                (expression_statement
+                  (string) @docstring
+                )
+              )
+            )
+          capture: docstring
+        report:
+          type: handlebars
+          template: |
+            # Class docstring changed
+
+            Class documentation was modified in `{{filePath}}`.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Function/method docstrings
+      - watch:
+          include: 'console_cowboy/**/*.py'
+          type: tsq
+          query: |
+            (function_definition
+              body: (block
+                .
+                (expression_statement
+                  (string) @docstring
+                )
+              )
+            )
+          capture: docstring
+        report:
+          type: handlebars
+          template: |
+            # Function docstring changed
+
+            Function/method documentation was modified in `{{filePath}}`.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Warning messages (user-facing)
+      - watch:
+          include: 'console_cowboy/**/*.py'
+          type: ast-grep
+          language: python
+          pattern: '$OBJ.add_warning($$$ARGS)'
+        report:
+          type: handlebars
+          template: |
+            # Warning message changed
+
+            A user-facing warning message was modified in `{{filePath}}`.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # CLI output messages
+      - watch:
+          include: 'console_cowboy/cli.py'
+          type: ast-grep
+          language: python
+          pattern: 'click.echo($$$ARGS)'
+        report:
+          type: handlebars
+          template: |
+            # CLI output message changed
+
+            CLI output was modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Python comments
+      - watch:
+          include: 'console_cowboy/**/*.py'
+          type: tsq
+          query: '(comment) @comment'
+          capture: comment
+        report:
+          type: handlebars
+          template: |
+            # Code comment changed
+
+            A code comment was modified in `{{filePath}}`.
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # CTEC SCHEMA
+  # ===========================================================================
+  ctec:
+    signals:
+      # Dataclass definitions in schema
+      - watch:
+          include: 'console_cowboy/ctec/schema.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            @dataclass
+            class $NAME:
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # CTEC dataclass modified
+
+            A core CTEC dataclass was changed. This may affect all terminal adapters.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Enum definitions
+      - watch:
+          include: 'console_cowboy/ctec/schema.py'
+          type: tsq
+          query: |
+            (class_definition
+              name: (identifier) @name
+              superclasses: (argument_list
+                (identifier) @base
+              )
+            ) @enum_def
+          capture: enum_def
+        report:
+          type: handlebars
+          template: |
+            # CTEC enum definition changed
+
+            An enum in the CTEC schema was modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # to_dict serialization method
+      - watch:
+          include: 'console_cowboy/ctec/schema.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def to_dict(self):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # CTEC serialization changed
+
+            The `to_dict()` method was modified. This affects how CTEC exports data.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # from_dict deserialization method
+      - watch:
+          include: 'console_cowboy/ctec/schema.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def from_dict(cls, $DATA):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # CTEC deserialization changed
+
+            The `from_dict()` method was modified. This affects how CTEC imports data.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # JSON Schema definition
+      - watch:
+          include: 'console_cowboy/ctec/serializers.py'
+          type: ast-grep
+          language: python
+          pattern: 'JSON_SCHEMA = $$$SCHEMA'
+        report:
+          type: handlebars
+          template: |
+            # CTEC JSON schema changed
+
+            The JSON schema definition was modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # KITTY TERMINAL
+  # ===========================================================================
+  kitty:
+    signals:
+      # KittyAdapter class
+      - watch:
+          include: 'console_cowboy/terminals/kitty.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            class KittyAdapter($$$BASES):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Kitty adapter class modified
+
+            The KittyAdapter class structure was changed.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Color key mapping
+      - watch:
+          include: 'console_cowboy/terminals/kitty.py'
+          type: ast-grep
+          language: python
+          pattern: 'COLOR_KEY_MAP = {$$$ITEMS}'
+        report:
+          type: handlebars
+          template: |
+            # Kitty color mapping changed
+
+            The color key mapping for kitty was modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Cursor style mapping
+      - watch:
+          include: 'console_cowboy/terminals/kitty.py'
+          type: ast-grep
+          language: python
+          pattern: 'CURSOR_STYLE_MAP = {$$$ITEMS}'
+        report:
+          type: handlebars
+          template: |
+            # Kitty cursor style mapping changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Parse method
+      - watch:
+          include: 'console_cowboy/terminals/kitty.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def parse(cls, $SOURCE):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Kitty config parsing changed
+
+            The logic for importing kitty configurations was modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Export method
+      - watch:
+          include: 'console_cowboy/terminals/kitty.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def export(cls, $CTEC):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Kitty config export changed
+
+            The logic for exporting to kitty format was modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Kitty tests
+      - watch:
+          include: 'tests/test_terminals.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def test_kitty_$$$NAME($$$ARGS):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Kitty test changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Kitty fixtures
+      - watch:
+          include: 'tests/fixtures/kitty*'
+          type: regex
+          pattern: '.'
+        report:
+          type: handlebars
+          template: |
+            # Kitty test fixture changed
+
+            `{{filePath}}` was modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # GHOSTTY TERMINAL
+  # ===========================================================================
+  ghostty:
+    signals:
+      - watch:
+          include: 'console_cowboy/terminals/ghostty.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            class GhosttyAdapter($$$BASES):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Ghostty adapter modified
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/ghostty.py'
+          type: ast-grep
+          language: python
+          pattern: 'COLOR_KEY_MAP = {$$$ITEMS}'
+        report:
+          type: handlebars
+          template: |
+            # Ghostty color mapping changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/ghostty.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def parse(cls, $SOURCE):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Ghostty config parsing changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/ghostty.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def export(cls, $CTEC):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Ghostty config export changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'tests/test_terminals.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def test_ghostty_$$$NAME($$$ARGS):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Ghostty test changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'tests/fixtures/ghostty*'
+          type: regex
+          pattern: '.'
+        report:
+          type: handlebars
+          template: |
+            # Ghostty test fixture changed
+
+            `{{filePath}}`
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # ALACRITTY TERMINAL
+  # ===========================================================================
+  alacritty:
+    signals:
+      - watch:
+          include: 'console_cowboy/terminals/alacritty.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            class AlacrittyAdapter($$$BASES):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Alacritty adapter modified
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/alacritty.py'
+          type: ast-grep
+          language: python
+          pattern: 'COLOR_KEY_MAP = {$$$ITEMS}'
+        report:
+          type: handlebars
+          template: |
+            # Alacritty color mapping changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/alacritty.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def parse(cls, $SOURCE):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Alacritty config parsing changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/alacritty.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def export(cls, $CTEC):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Alacritty config export changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'tests/test_terminals.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def test_alacritty_$$$NAME($$$ARGS):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Alacritty test changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'tests/fixtures/alacritty*'
+          type: regex
+          pattern: '.'
+        report:
+          type: handlebars
+          template: |
+            # Alacritty test fixture changed
+
+            `{{filePath}}`
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # ITERM2 TERMINAL
+  # ===========================================================================
+  iterm2:
+    signals:
+      - watch:
+          include: 'console_cowboy/terminals/iterm2.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            class ITerm2Adapter($$$BASES):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # iTerm2 adapter modified
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/iterm2.py'
+          type: ast-grep
+          language: python
+          pattern: 'COLOR_KEY_MAP = {$$$ITEMS}'
+        report:
+          type: handlebars
+          template: |
+            # iTerm2 color mapping changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/iterm2.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def parse(cls, $SOURCE):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # iTerm2 config parsing changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/iterm2.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def export(cls, $CTEC):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # iTerm2 config export changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'tests/test_terminals.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def test_iterm2_$$$NAME($$$ARGS):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # iTerm2 test changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'tests/fixtures/iterm2*'
+          type: regex
+          pattern: '.'
+        report:
+          type: handlebars
+          template: |
+            # iTerm2 test fixture changed
+
+            `{{filePath}}`
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # WEZTERM TERMINAL
+  # ===========================================================================
+  wezterm:
+    signals:
+      - watch:
+          include: 'console_cowboy/terminals/wezterm.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            class WezTermAdapter($$$BASES):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # WezTerm adapter modified
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/wezterm.py'
+          type: ast-grep
+          language: python
+          pattern: 'COLOR_KEY_MAP = {$$$ITEMS}'
+        report:
+          type: handlebars
+          template: |
+            # WezTerm color mapping changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/wezterm.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def parse(cls, $SOURCE):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # WezTerm config parsing changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/wezterm.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def export(cls, $CTEC):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # WezTerm config export changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'tests/test_terminals.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def test_wezterm_$$$NAME($$$ARGS):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # WezTerm test changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'tests/fixtures/wezterm*'
+          type: regex
+          pattern: '.'
+        report:
+          type: handlebars
+          template: |
+            # WezTerm test fixture changed
+
+            `{{filePath}}`
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # VSCODE TERMINAL
+  # ===========================================================================
+  vscode:
+    signals:
+      - watch:
+          include: 'console_cowboy/terminals/vscode.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            class VSCodeAdapter($$$BASES):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # VSCode adapter modified
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/vscode.py'
+          type: ast-grep
+          language: python
+          pattern: 'COLOR_KEY_MAP = {$$$ITEMS}'
+        report:
+          type: handlebars
+          template: |
+            # VSCode color mapping changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/vscode.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def parse(cls, $SOURCE):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # VSCode config parsing changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/vscode.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def export(cls, $CTEC):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # VSCode config export changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'tests/test_terminals.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def test_vscode_$$$NAME($$$ARGS):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # VSCode test changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'tests/fixtures/vscode*'
+          type: regex
+          pattern: '.'
+        report:
+          type: handlebars
+          template: |
+            # VSCode test fixture changed
+
+            `{{filePath}}`
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # MACOS TERMINAL.APP
+  # ===========================================================================
+  macos-terminal:
+    signals:
+      - watch:
+          include: 'console_cowboy/terminals/terminal_app.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            class TerminalAppAdapter($$$BASES):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # macOS Terminal adapter modified
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/terminal_app.py'
+          type: ast-grep
+          language: python
+          pattern: 'COLOR_KEY_MAP = {$$$ITEMS}'
+        report:
+          type: handlebars
+          template: |
+            # macOS Terminal color mapping changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/terminal_app.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def parse(cls, $SOURCE):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # macOS Terminal config parsing changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/terminals/terminal_app.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def export(cls, $CTEC):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # macOS Terminal config export changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'tests/test_terminals.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def test_terminal_app_$$$NAME($$$ARGS):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # macOS Terminal test changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'tests/fixtures/terminal_app*'
+          type: regex
+          pattern: '.'
+        report:
+          type: handlebars
+          template: |
+            # macOS Terminal test fixture changed
+
+            `{{filePath}}`
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # CLI
+  # ===========================================================================
+  cli:
+    signals:
+      # Click command definitions
+      - watch:
+          include: 'console_cowboy/cli.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            @cli.command($$$ARGS)
+            def $NAME($$$PARAMS):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # CLI command modified
+
+            A CLI command was changed.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Click options
+      - watch:
+          include: 'console_cowboy/cli.py'
+          type: ast-grep
+          language: python
+          pattern: '@click.option($$$ARGS)'
+        report:
+          type: handlebars
+          template: |
+            # CLI option changed
+
+            A command-line option was modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Click arguments
+      - watch:
+          include: 'console_cowboy/cli.py'
+          type: ast-grep
+          language: python
+          pattern: '@click.argument($$$ARGS)'
+        report:
+          type: handlebars
+          template: |
+            # CLI argument changed
+
+            A command-line argument was modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # CLI tests
+      - watch:
+          include: 'tests/test_console_cowboy.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def test_$NAME($$$ARGS):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # CLI test changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # ADAPTER FRAMEWORK
+  # ===========================================================================
+  adapter-framework:
+    signals:
+      # TerminalAdapter base class
+      - watch:
+          include: 'console_cowboy/terminals/base.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            class TerminalAdapter($$$BASES):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # TerminalAdapter base class modified
+
+            Changes to the base adapter class affect all terminal adapters.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # TerminalRegistry
+      - watch:
+          include: 'console_cowboy/terminals/base.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            class TerminalRegistry:
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # TerminalRegistry modified
+
+            The adapter registration system was changed.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Adapter registration
+      - watch:
+          include: 'console_cowboy/terminals/__init__.py'
+          type: regex
+          pattern: '.'
+        report:
+          type: handlebars
+          template: |
+            # Terminal adapter registration changed
+
+            `{{filePath}}` was modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # UTILITIES
+  # ===========================================================================
+  colors:
+    signals:
+      - watch:
+          include: 'console_cowboy/utils/colors.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def normalize_color($$$ARGS):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Color normalization changed
+
+            The `normalize_color()` function was modified. This affects all adapters.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/utils/colors.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def $NAME($$$ARGS):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Color utility changed
+
+            A color utility function was modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+  fonts:
+    signals:
+      - watch:
+          include: 'console_cowboy/utils/fonts.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            def $NAME($$$ARGS):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Font utility changed
+
+            A font utility function was modified in `{{filePath}}`.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'console_cowboy/utils/font_registry.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            class $NAME($$$BASES):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Font registry class modified
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # TESTS
+  # ===========================================================================
+  tests:
+    signals:
+      # Pytest fixtures
+      - watch:
+          include: 'tests/*.py'
+          type: ast-grep
+          language: python
+          pattern: |
+            @pytest.fixture($$$ARGS)
+            def $NAME($$$PARAMS):
+                $$$BODY
+        report:
+          type: handlebars
+          template: |
+            # Pytest fixture modified
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # conftest changes
+      - watch:
+          include: 'tests/conftest.py'
+          type: regex
+          pattern: '.'
+        report:
+          type: handlebars
+          template: |
+            # Test configuration changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Test fixture files
+      - watch:
+          include: 'tests/fixtures/**/*'
+          type: regex
+          pattern: '.'
+        report:
+          type: handlebars
+          template: |
+            # Test fixture file changed
+
+            `{{filePath}}`
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
+  # DEPENDENCIES
+  # ===========================================================================
+  dependencies:
+    signals:
+      - watch:
+          include: 'pyproject.toml'
+          type: regex
+          pattern: 'dependencies'
+        report:
+          type: handlebars
+          template: |
+            # Dependencies changed
+
+            Project dependencies were modified.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      - watch:
+          include: 'requirements*.txt'
+          type: regex
+          pattern: '.'
+        report:
+          type: handlebars
+          template: |
+            # Requirements file changed
+
+            `{{filePath}}`
+
+            ```diff
+            {{diffText}}
+            ```
