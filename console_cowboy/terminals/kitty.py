@@ -6,7 +6,6 @@ Kitty uses a simple key-value configuration format stored in
 """
 
 from pathlib import Path
-from typing import Optional, Union
 
 from console_cowboy.ctec.schema import (
     CTEC,
@@ -80,9 +79,9 @@ class KittyAdapter(TerminalAdapter):
     @classmethod
     def parse(
         cls,
-        source: Union[str, Path],
+        source: str | Path,
         *,
-        content: Optional[str] = None,
+        content: str | None = None,
     ) -> CTEC:
         """Parse a Kitty configuration file."""
         ctec = CTEC(source_terminal="kitty")
@@ -167,7 +166,9 @@ class KittyAdapter(TerminalAdapter):
 
             # Parse cursor settings
             elif key == "cursor_shape":
-                cursor.style = cls.CURSOR_STYLE_MAP.get(value.lower(), CursorStyle.BLOCK)
+                cursor.style = cls.CURSOR_STYLE_MAP.get(
+                    value.lower(), CursorStyle.BLOCK
+                )
             elif key == "cursor_blink_interval":
                 try:
                     interval = float(value)

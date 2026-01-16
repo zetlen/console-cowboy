@@ -11,8 +11,8 @@ from console_cowboy.ctec.schema import (
     CursorConfig,
     CursorStyle,
     FontConfig,
-    FontWeight,
     FontStyle,
+    FontWeight,
     KeyBinding,
     ScrollConfig,
     TerminalSpecificSetting,
@@ -112,19 +112,23 @@ class TestColorScheme:
 
     def test_from_dict_hex_strings(self):
         """Test from_dict with hex strings (iTerm2-Color-Schemes format)."""
-        scheme = ColorScheme.from_dict({
-            "name": "Test",
-            "foreground": "#ffffff",
-        })
+        scheme = ColorScheme.from_dict(
+            {
+                "name": "Test",
+                "foreground": "#ffffff",
+            }
+        )
         assert scheme.name == "Test"
         assert scheme.foreground.r == 255
 
     def test_from_dict_rgb_dicts(self):
         """Test from_dict with RGB dicts (legacy format for backwards compatibility)."""
-        scheme = ColorScheme.from_dict({
-            "name": "Test",
-            "foreground": {"r": 255, "g": 255, "b": 255},
-        })
+        scheme = ColorScheme.from_dict(
+            {
+                "name": "Test",
+                "foreground": {"r": 255, "g": 255, "b": 255},
+            }
+        )
         assert scheme.name == "Test"
         assert scheme.foreground.r == 255
 
@@ -261,12 +265,14 @@ class TestFontConfig:
 
     def test_from_dict_with_new_fields(self):
         """Test deserialization with new fields."""
-        font = FontConfig.from_dict({
-            "family": "Fira Code",
-            "weight": "bold",
-            "style": "italic",
-            "fallback_fonts": ["Menlo", "Monaco"],
-        })
+        font = FontConfig.from_dict(
+            {
+                "family": "Fira Code",
+                "weight": "bold",
+                "style": "italic",
+                "fallback_fonts": ["Menlo", "Monaco"],
+            }
+        )
         assert font.family == "Fira Code"
         assert font.weight == FontWeight.BOLD
         assert font.style == FontStyle.ITALIC
@@ -351,10 +357,9 @@ class TestBehaviorConfig:
         assert d["bell_mode"] == "none"
 
     def test_from_dict(self):
-        behavior = BehaviorConfig.from_dict({
-            "shell": "/bin/zsh",
-            "bell_mode": "audible"
-        })
+        behavior = BehaviorConfig.from_dict(
+            {"shell": "/bin/zsh", "bell_mode": "audible"}
+        )
         assert behavior.shell == "/bin/zsh"
         assert behavior.bell_mode == BellMode.AUDIBLE
 
@@ -411,11 +416,13 @@ class TestTerminalSpecificSetting:
         assert d["value"] == "yes"
 
     def test_from_dict(self):
-        setting = TerminalSpecificSetting.from_dict({
-            "terminal": "ghostty",
-            "key": "gtk-single-instance",
-            "value": True,
-        })
+        setting = TerminalSpecificSetting.from_dict(
+            {
+                "terminal": "ghostty",
+                "key": "gtk-single-instance",
+                "value": True,
+            }
+        )
         assert setting.terminal == "ghostty"
         assert setting.key == "gtk-single-instance"
         assert setting.value is True
@@ -477,11 +484,13 @@ class TestCTEC:
         assert d["font"]["family"] == "Fira Code"
 
     def test_from_dict(self):
-        ctec = CTEC.from_dict({
-            "version": "1.0",
-            "source_terminal": "alacritty",
-            "font": {"family": "Monaco", "size": 14.0},
-        })
+        ctec = CTEC.from_dict(
+            {
+                "version": "1.0",
+                "source_terminal": "alacritty",
+                "font": {"family": "Monaco", "size": 14.0},
+            }
+        )
         assert ctec.source_terminal == "alacritty"
         assert ctec.font.family == "Monaco"
         assert ctec.font.size == 14.0

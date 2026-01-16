@@ -9,7 +9,6 @@ Color schemes can also be stored as separate .itermcolors files.
 
 import plistlib
 from pathlib import Path
-from typing import Optional, Union
 
 from console_cowboy.ctec.schema import (
     CTEC,
@@ -20,15 +19,14 @@ from console_cowboy.ctec.schema import (
     CursorConfig,
     CursorStyle,
     FontConfig,
-    KeyBinding,
     ScrollConfig,
     WindowConfig,
 )
 from console_cowboy.utils.colors import color_to_float_tuple, float_tuple_to_color
 from console_cowboy.utils.fonts import (
+    friendly_to_postscript,
     is_postscript_name,
     postscript_to_friendly,
-    friendly_to_postscript,
 )
 
 from .base import TerminalAdapter
@@ -132,8 +130,6 @@ class ITerm2Adapter(TerminalAdapter):
     @classmethod
     def _parse_profile_into_ctec(cls, profile_data: dict, ctec: CTEC) -> None:
         """Parse an iTerm2 profile's settings directly into a CTEC object."""
-        name = profile_data.get("Name", "Default")
-
         # Parse color scheme
         ctec.color_scheme = cls._parse_color_scheme(profile_data)
 
@@ -144,7 +140,9 @@ class ITerm2Adapter(TerminalAdapter):
             parts = font_str.rsplit(" ", 1)
             if len(parts) == 2:
                 font_family = parts[0]
-                font_size = float(parts[1]) if parts[1].replace(".", "").isdigit() else None
+                font_size = (
+                    float(parts[1]) if parts[1].replace(".", "").isdigit() else None
+                )
             else:
                 font_family = font_str
                 font_size = None
@@ -158,7 +156,9 @@ class ITerm2Adapter(TerminalAdapter):
                 ctec.font = FontConfig(family=font_family, size=font_size)
 
         # Handle Non-ASCII Font as fallback font
-        if "Non-ASCII Font" in profile_data and profile_data.get("Use Non-ASCII Font", False):
+        if "Non-ASCII Font" in profile_data and profile_data.get(
+            "Use Non-ASCII Font", False
+        ):
             non_ascii_str = profile_data["Non-ASCII Font"]
             non_ascii_parts = non_ascii_str.rsplit(" ", 1)
             non_ascii_family = non_ascii_parts[0] if non_ascii_parts else non_ascii_str
@@ -185,13 +185,17 @@ class ITerm2Adapter(TerminalAdapter):
             if ctec.font:
                 ctec.font.draw_powerline_glyphs = profile_data["Draw Powerline Glyphs"]
             else:
-                ctec.font = FontConfig(draw_powerline_glyphs=profile_data["Draw Powerline Glyphs"])
+                ctec.font = FontConfig(
+                    draw_powerline_glyphs=profile_data["Draw Powerline Glyphs"]
+                )
 
         # Parse cursor configuration
         cursor_config = CursorConfig()
         if "Cursor Type" in profile_data:
             cursor_type = profile_data["Cursor Type"]
-            cursor_config.style = cls.CURSOR_STYLE_MAP.get(cursor_type, CursorStyle.BLOCK)
+            cursor_config.style = cls.CURSOR_STYLE_MAP.get(
+                cursor_type, CursorStyle.BLOCK
+            )
         if "Blinking Cursor" in profile_data:
             cursor_config.blink = profile_data["Blinking Cursor"]
         ctec.cursor = cursor_config
@@ -298,10 +302,10 @@ class ITerm2Adapter(TerminalAdapter):
     @classmethod
     def parse(
         cls,
-        source: Union[str, Path],
+        source: str | Path,
         *,
-        content: Optional[str] = None,
-        profile_name: Optional[str] = None,
+        content: str | None = None,
+        profile_name: str | None = None,
     ) -> CTEC:
         """
         Parse an iTerm2 configuration file.
@@ -344,7 +348,9 @@ class ITerm2Adapter(TerminalAdapter):
                 return ctec
 
             # Build list of profile names and find default
-            profile_names = [p.get("Name", f"Profile {i}") for i, p in enumerate(profiles)]
+            profile_names = [
+                p.get("Name", f"Profile {i}") for i, p in enumerate(profiles)
+            ]
             default_profile_data = None
             default_profile_name = None
 
@@ -382,7 +388,9 @@ class ITerm2Adapter(TerminalAdapter):
 
                 # Warn if multiple profiles exist
                 if len(profiles) > 1:
-                    other_profiles = [n for n in profile_names if n != selected_profile_name]
+                    other_profiles = [
+                        n for n in profile_names if n != selected_profile_name
+                    ]
                     ctec.add_warning(
                         f"iTerm2 config contains {len(profiles)} profiles. "
                         f"Importing '{selected_profile_name}' (default). "
@@ -467,7 +475,9 @@ class ITerm2Adapter(TerminalAdapter):
         # Export cursor
         if ctec.cursor:
             if ctec.cursor.style:
-                result["Cursor Type"] = cls.CURSOR_STYLE_REVERSE_MAP.get(ctec.cursor.style, 1)
+                result["Cursor Type"] = cls.CURSOR_STYLE_REVERSE_MAP.get(
+                    ctec.cursor.style, 1
+                )
             if ctec.cursor.blink is not None:
                 result["Blinking Cursor"] = ctec.cursor.blink
 

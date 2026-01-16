@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from console_cowboy.ctec.schema import (
     CTEC,
     BellMode,
@@ -22,7 +20,6 @@ from console_cowboy.terminals import (
     TerminalRegistry,
     WeztermAdapter,
 )
-
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 

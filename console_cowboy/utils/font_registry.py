@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
 
 
 class FontFormat(Enum):
@@ -35,12 +34,12 @@ class FontInfo:
     """Information about a system font."""
 
     family: str  # Friendly family name
-    postscript_name: Optional[str] = None  # PostScript name if available
+    postscript_name: str | None = None  # PostScript name if available
     style: str = "Regular"  # Style variant (Regular, Bold, Italic, etc.)
     weight: int = 400  # Numeric weight (100-900)
     is_monospace: bool = False
-    file_path: Optional[Path] = None
-    format: Optional[FontFormat] = None
+    file_path: Path | None = None
+    format: FontFormat | None = None
 
     @property
     def is_nerd_font(self) -> bool:
@@ -68,11 +67,11 @@ class FontRegistry:
         similar = registry.find_similar_fonts("JetBrains Mono")
     """
 
-    fonts: Dict[str, FontInfo] = field(default_factory=dict)
-    _family_index: Dict[str, Set[str]] = field(
+    fonts: dict[str, FontInfo] = field(default_factory=dict)
+    _family_index: dict[str, set[str]] = field(
         default_factory=dict
     )  # family -> set of full names
-    _postscript_index: Dict[str, str] = field(
+    _postscript_index: dict[str, str] = field(
         default_factory=dict
     )  # postscript -> family
 
@@ -108,7 +107,7 @@ class FontRegistry:
             or name in self.fonts
         )
 
-    def get_font_info(self, name: str) -> Optional[FontInfo]:
+    def get_font_info(self, name: str) -> FontInfo | None:
         """Get information about a font."""
         if not name:
             return None
@@ -134,7 +133,7 @@ class FontRegistry:
 
         return None
 
-    def find_similar_fonts(self, name: str, limit: int = 5) -> List[str]:
+    def find_similar_fonts(self, name: str, limit: int = 5) -> list[str]:
         """Find fonts similar to the given name."""
         if not name:
             return []
@@ -159,15 +158,15 @@ class FontRegistry:
                 break
         return result
 
-    def get_monospace_fonts(self) -> List[str]:
+    def get_monospace_fonts(self) -> list[str]:
         """Get all monospace fonts on the system."""
         return sorted(
-            set(info.family for info in self.fonts.values() if info.is_monospace)
+            {info.family for info in self.fonts.values() if info.is_monospace}
         )
 
     def resolve_font_name(
         self, name: str, target_format: str = "friendly"
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Resolve a font name to the requested format.
 
@@ -207,9 +206,10 @@ class FontRegistry:
 
     def _similarity_score(self, a: str, b: str) -> float:
         """Calculate similarity between two normalized names."""
+
         # Simple Jaccard similarity on character n-grams
-        def ngrams(s: str, n: int = 3) -> Set[str]:
-            return set(s[i : i + n] for i in range(len(s) - n + 1))
+        def ngrams(s: str, n: int = 3) -> set[str]:
+            return {s[i : i + n] for i in range(len(s) - n + 1)}
 
         a_grams, b_grams = ngrams(a), ngrams(b)
         if not a_grams or not b_grams:
@@ -343,17 +343,17 @@ def font_exists(name: str) -> bool:
     return FontRegistry.create().font_exists(name)
 
 
-def get_font_info(name: str) -> Optional[FontInfo]:
+def get_font_info(name: str) -> FontInfo | None:
     """Get information about a font."""
     return FontRegistry.create().get_font_info(name)
 
 
-def find_similar_fonts(name: str, limit: int = 5) -> List[str]:
+def find_similar_fonts(name: str, limit: int = 5) -> list[str]:
     """Find fonts similar to the given name."""
     return FontRegistry.create().find_similar_fonts(name, limit)
 
 
-def validate_font(name: str) -> Tuple[bool, Optional[str]]:
+def validate_font(name: str) -> tuple[bool, str | None]:
     """
     Validate a font name and return suggestions if not found.
 
@@ -374,8 +374,8 @@ def validate_font(name: str) -> Tuple[bool, Optional[str]]:
 
 def resolve_font_name(
     name: str,
-    source_terminal: Optional[str] = None,
-    target_terminal: Optional[str] = None,
+    source_terminal: str | None = None,
+    target_terminal: str | None = None,
 ) -> str:
     """
     Resolve a font name from source to target terminal format.
@@ -392,7 +392,11 @@ def resolve_font_name(
         return name
 
     # Import here to avoid circular imports
-    from .fonts import is_postscript_name, postscript_to_friendly, friendly_to_postscript
+    from .fonts import (
+        friendly_to_postscript,
+        is_postscript_name,
+        postscript_to_friendly,
+    )
 
     # Terminals that use PostScript names
     postscript_terminals = {"iterm2"}
@@ -401,8 +405,8 @@ def resolve_font_name(
     friendly_terminals = {"ghostty", "alacritty", "kitty", "wezterm"}
 
     # Determine source format
-    source_is_postscript = source_terminal in postscript_terminals or is_postscript_name(
-        name
+    source_is_postscript = (
+        source_terminal in postscript_terminals or is_postscript_name(name)
     )
 
     # Determine target format needed

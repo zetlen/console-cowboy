@@ -10,7 +10,6 @@ from click.testing import CliRunner
 
 from console_cowboy.cli import cli
 
-
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
@@ -123,9 +122,7 @@ class TestExportCommand:
 
     def test_export_wezterm(self, runner):
         config_path = FIXTURES_DIR / "wezterm" / "wezterm.lua"
-        result = runner.invoke(
-            cli, ["export", "wezterm", "-i", str(config_path), "-q"]
-        )
+        result = runner.invoke(cli, ["export", "wezterm", "-i", str(config_path), "-q"])
 
         assert result.exit_code == 0
         parsed = yaml.safe_load(result.output)
@@ -140,9 +137,7 @@ class TestExportCommand:
         assert parsed["source_terminal"] == "iterm2"
 
     def test_export_nonexistent_file(self, runner):
-        result = runner.invoke(
-            cli, ["export", "ghostty", "-i", "/nonexistent/path"]
-        )
+        result = runner.invoke(cli, ["export", "ghostty", "-i", "/nonexistent/path"])
         assert result.exit_code != 0
         assert "Error" in result.output or "not found" in result.output.lower()
 
@@ -413,7 +408,9 @@ class TestRoundTrip:
             assert parsed["source_terminal"] == terminal
 
             # Import to same terminal
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".yaml", delete=False
+            ) as f:
                 f.write(export_result.output)
                 ctec_path = f.name
 

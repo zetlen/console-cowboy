@@ -22,9 +22,7 @@ class TestKittyLigaturesFix:
 
     def test_ligatures_enabled_roundtrip(self):
         """Test ligatures=True exports as disable_ligatures=never and imports back correctly."""
-        ctec = CTEC(
-            font=FontConfig(family="JetBrains Mono", ligatures=True)
-        )
+        ctec = CTEC(font=FontConfig(family="JetBrains Mono", ligatures=True))
         exported = KittyAdapter.export(ctec)
 
         # Should export as "never" (meaning ligatures are NOT disabled)
@@ -36,9 +34,7 @@ class TestKittyLigaturesFix:
 
     def test_ligatures_disabled_roundtrip(self):
         """Test ligatures=False exports as disable_ligatures=always and imports back correctly."""
-        ctec = CTEC(
-            font=FontConfig(family="JetBrains Mono", ligatures=False)
-        )
+        ctec = CTEC(font=FontConfig(family="JetBrains Mono", ligatures=False))
         exported = KittyAdapter.export(ctec)
 
         # Should export as "always" (meaning ligatures ARE disabled)
@@ -92,9 +88,7 @@ adjust-cell-width = 5%
 
     def test_cell_width_roundtrip(self):
         """Test cell_width exports and imports correctly."""
-        ctec = CTEC(
-            font=FontConfig(family="JetBrains Mono", cell_width=1.10)
-        )
+        ctec = CTEC(font=FontConfig(family="JetBrains Mono", cell_width=1.10))
         exported = GhosttyAdapter.export(ctec)
 
         # Should export as integer (10 for 10%)
@@ -122,7 +116,7 @@ class TestWeztermWeightWithFallbacks:
         # Should include both weight and fallbacks in font_with_fallback
         assert 'family = "JetBrains Mono"' in exported
         assert 'weight = "Bold"' in exported
-        assert 'Symbols Nerd Font' in exported
+        assert "Symbols Nerd Font" in exported
         assert "font_with_fallback" in exported
 
     def test_parse_weight_with_fallbacks(self):
@@ -211,7 +205,9 @@ symbol_map U+F000-U+F8FF Font Awesome
         ctec = KittyAdapter.parse("test", content=content)
         assert ctec.font.symbol_map is not None
         assert len(ctec.font.symbol_map) == 2
-        assert ctec.font.symbol_map["U+E0A0-U+E0A3,U+E0B0-U+E0B3"] == "Symbols Nerd Font"
+        assert (
+            ctec.font.symbol_map["U+E0A0-U+E0A3,U+E0B0-U+E0B3"] == "Symbols Nerd Font"
+        )
         assert ctec.font.symbol_map["U+F000-U+F8FF"] == "Font Awesome"
 
     def test_export_symbol_map(self):
@@ -260,6 +256,7 @@ class TestITerm2PowerlineGlyphs:
 
         # Parse the plist output
         import plistlib
+
         data = plistlib.loads(exported.encode())
         profile = data["New Bookmarks"][0]
         assert profile["Draw Powerline Glyphs"] is True

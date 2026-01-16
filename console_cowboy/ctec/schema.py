@@ -7,7 +7,6 @@ intermediate representation for terminal emulator settings.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class CursorStyle(Enum):
@@ -125,7 +124,9 @@ class Color:
     def __post_init__(self) -> None:
         for component, name in [(self.r, "r"), (self.g, "g"), (self.b, "b")]:
             if not 0 <= component <= 255:
-                raise ValueError(f"Color component {name} must be 0-255, got {component}")
+                raise ValueError(
+                    f"Color component {name} must be 0-255, got {component}"
+                )
 
     def to_hex(self) -> str:
         """Convert to hex color string (e.g., '#ff0000')."""
@@ -199,43 +200,43 @@ class ColorScheme:
     """
 
     # Metadata
-    name: Optional[str] = None
-    author: Optional[str] = None
-    variant: Optional[ColorVariant] = None
+    name: str | None = None
+    author: str | None = None
+    variant: ColorVariant | None = None
 
     # Core semantic colors (Gogh base format)
-    foreground: Optional[Color] = None
-    background: Optional[Color] = None
-    cursor: Optional[Color] = None
+    foreground: Color | None = None
+    background: Color | None = None
+    cursor: Color | None = None
 
     # Extended semantic colors (iTerm2-Color-Schemes YAML extensions)
-    cursor_text: Optional[Color] = None
-    selection: Optional[Color] = None
-    selection_text: Optional[Color] = None
-    bold: Optional[Color] = None
-    link: Optional[Color] = None
-    underline: Optional[Color] = None
-    cursor_guide: Optional[Color] = None
+    cursor_text: Color | None = None
+    selection: Color | None = None
+    selection_text: Color | None = None
+    bold: Color | None = None
+    link: Color | None = None
+    underline: Color | None = None
+    cursor_guide: Color | None = None
 
     # Normal colors (0-7)
-    black: Optional[Color] = None
-    red: Optional[Color] = None
-    green: Optional[Color] = None
-    yellow: Optional[Color] = None
-    blue: Optional[Color] = None
-    magenta: Optional[Color] = None
-    cyan: Optional[Color] = None
-    white: Optional[Color] = None
+    black: Color | None = None
+    red: Color | None = None
+    green: Color | None = None
+    yellow: Color | None = None
+    blue: Color | None = None
+    magenta: Color | None = None
+    cyan: Color | None = None
+    white: Color | None = None
 
     # Bright colors (8-15)
-    bright_black: Optional[Color] = None
-    bright_red: Optional[Color] = None
-    bright_green: Optional[Color] = None
-    bright_yellow: Optional[Color] = None
-    bright_blue: Optional[Color] = None
-    bright_magenta: Optional[Color] = None
-    bright_cyan: Optional[Color] = None
-    bright_white: Optional[Color] = None
+    bright_black: Color | None = None
+    bright_red: Color | None = None
+    bright_green: Color | None = None
+    bright_yellow: Color | None = None
+    bright_blue: Color | None = None
+    bright_magenta: Color | None = None
+    bright_cyan: Color | None = None
+    bright_white: Color | None = None
 
     # All color field names for iteration
     _COLOR_FIELDS = [
@@ -332,23 +333,23 @@ class FontConfig:
         _source_names: Original font names from source terminal (for round-trip)
     """
 
-    family: Optional[str] = None
-    size: Optional[float] = None
-    line_height: Optional[float] = None
-    cell_width: Optional[float] = None
-    weight: Optional[FontWeight] = None
-    style: Optional[FontStyle] = None
-    bold_font: Optional[str] = None
-    italic_font: Optional[str] = None
-    bold_italic_font: Optional[str] = None
-    ligatures: Optional[bool] = None
-    anti_aliasing: Optional[bool] = None
-    fallback_fonts: Optional[list[str]] = None
-    symbol_map: Optional[dict[str, str]] = None
-    draw_powerline_glyphs: Optional[bool] = None
-    box_drawing_scale: Optional[float] = None
+    family: str | None = None
+    size: float | None = None
+    line_height: float | None = None
+    cell_width: float | None = None
+    weight: FontWeight | None = None
+    style: FontStyle | None = None
+    bold_font: str | None = None
+    italic_font: str | None = None
+    bold_italic_font: str | None = None
+    ligatures: bool | None = None
+    anti_aliasing: bool | None = None
+    fallback_fonts: list[str] | None = None
+    symbol_map: dict[str, str] | None = None
+    draw_powerline_glyphs: bool | None = None
+    box_drawing_scale: float | None = None
     # Internal: preserve original names for lossless round-trips
-    _source_names: Optional[dict[str, str]] = field(default=None, repr=False)
+    _source_names: dict[str, str] | None = field(default=None, repr=False)
 
     def to_dict(self) -> dict:
         """Convert to dictionary representation."""
@@ -423,7 +424,7 @@ class FontConfig:
             self._source_names = {}
         self._source_names[terminal] = name
 
-    def get_source_name(self, terminal: str) -> Optional[str]:
+    def get_source_name(self, terminal: str) -> str | None:
         """Get the original font name for a specific terminal."""
         if self._source_names is None:
             return None
@@ -441,9 +442,9 @@ class CursorConfig:
         blink_interval: Blink interval in milliseconds
     """
 
-    style: Optional[CursorStyle] = None
-    blink: Optional[bool] = None
-    blink_interval: Optional[int] = None
+    style: CursorStyle | None = None
+    blink: bool | None = None
+    blink_interval: int | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary representation."""
@@ -483,15 +484,15 @@ class WindowConfig:
         dynamic_title: Whether to update window title from shell
     """
 
-    columns: Optional[int] = None
-    rows: Optional[int] = None
-    opacity: Optional[float] = None
-    blur: Optional[int] = None
-    padding_horizontal: Optional[int] = None
-    padding_vertical: Optional[int] = None
-    decorations: Optional[bool] = None
-    startup_mode: Optional[str] = None
-    dynamic_title: Optional[bool] = None
+    columns: int | None = None
+    rows: int | None = None
+    opacity: float | None = None
+    blur: int | None = None
+    padding_horizontal: int | None = None
+    padding_vertical: int | None = None
+    decorations: bool | None = None
+    startup_mode: str | None = None
+    dynamic_title: bool | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary representation."""
@@ -561,10 +562,10 @@ class ScrollConfig:
         multiplier: Scroll speed multiplier (1.0 = normal, higher = faster)
     """
 
-    unlimited: Optional[bool] = None
-    disabled: Optional[bool] = None
-    lines: Optional[int] = None
-    multiplier: Optional[float] = None
+    unlimited: bool | None = None
+    disabled: bool | None = None
+    lines: int | None = None
+    multiplier: float | None = None
 
     def get_effective_lines(self, default: int = 10000, max_lines: int = 100000) -> int:
         """
@@ -681,14 +682,14 @@ class BehaviorConfig:
         close_on_exit: Action when shell exits ('close', 'hold', 'restart')
     """
 
-    shell: Optional[str] = None
-    working_directory: Optional[str] = None
-    scrollback_lines: Optional[int] = None  # DEPRECATED: use CTEC.scroll
-    mouse_enabled: Optional[bool] = None
-    bell_mode: Optional[BellMode] = None
-    copy_on_select: Optional[bool] = None
-    confirm_close: Optional[bool] = None
-    close_on_exit: Optional[str] = None
+    shell: str | None = None
+    working_directory: str | None = None
+    scrollback_lines: int | None = None  # DEPRECATED: use CTEC.scroll
+    mouse_enabled: bool | None = None
+    bell_mode: BellMode | None = None
+    copy_on_select: bool | None = None
+    confirm_close: bool | None = None
+    close_on_exit: str | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary representation."""
@@ -806,13 +807,13 @@ class CTEC:
     """
 
     version: str = "1.0"
-    source_terminal: Optional[str] = None
-    color_scheme: Optional[ColorScheme] = None
-    font: Optional[FontConfig] = None
-    cursor: Optional[CursorConfig] = None
-    window: Optional[WindowConfig] = None
-    behavior: Optional[BehaviorConfig] = None
-    scroll: Optional[ScrollConfig] = None
+    source_terminal: str | None = None
+    color_scheme: ColorScheme | None = None
+    font: FontConfig | None = None
+    cursor: CursorConfig | None = None
+    window: WindowConfig | None = None
+    behavior: BehaviorConfig | None = None
+    scroll: ScrollConfig | None = None
     key_bindings: list[KeyBinding] = field(default_factory=list)
     terminal_specific: list[TerminalSpecificSetting] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -837,7 +838,9 @@ class CTEC:
         if self.key_bindings:
             result["key_bindings"] = [kb.to_dict() for kb in self.key_bindings]
         if self.terminal_specific:
-            result["terminal_specific"] = [ts.to_dict() for ts in self.terminal_specific]
+            result["terminal_specific"] = [
+                ts.to_dict() for ts in self.terminal_specific
+            ]
         return result
 
     @classmethod
@@ -855,10 +858,10 @@ class CTEC:
             behavior=BehaviorConfig.from_dict(data["behavior"])
             if "behavior" in data
             else None,
-            scroll=ScrollConfig.from_dict(data["scroll"])
-            if "scroll" in data
-            else None,
-            key_bindings=[KeyBinding.from_dict(kb) for kb in data.get("key_bindings", [])],
+            scroll=ScrollConfig.from_dict(data["scroll"]) if "scroll" in data else None,
+            key_bindings=[
+                KeyBinding.from_dict(kb) for kb in data.get("key_bindings", [])
+            ],
             terminal_specific=[
                 TerminalSpecificSetting.from_dict(ts)
                 for ts in data.get("terminal_specific", [])
@@ -870,9 +873,7 @@ class CTEC:
         """Add a compatibility warning."""
         self.warnings.append(warning)
 
-    def add_terminal_specific(
-        self, terminal: str, key: str, value: object
-    ) -> None:
+    def add_terminal_specific(self, terminal: str, key: str, value: object) -> None:
         """Add a terminal-specific setting."""
         self.terminal_specific.append(
             TerminalSpecificSetting(terminal=terminal, key=key, value=value)

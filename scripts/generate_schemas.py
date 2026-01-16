@@ -22,7 +22,6 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from console_cowboy.ctec.serializers import (
-    CTECSerializer,
     CTEC_JSON_SCHEMA_BUNDLED,
     ITERM2_COLOR_SCHEME_SCHEMA,
 )

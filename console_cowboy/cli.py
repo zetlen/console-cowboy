@@ -12,18 +12,15 @@ Commands:
     convert: Convert directly between terminal configuration formats
 """
 
-import sys
 from pathlib import Path
-from typing import Optional
 
 import click
 
+# Import to trigger registration
+import console_cowboy.terminals  # noqa: F401
 from console_cowboy.ctec import CTEC, CTECSerializer
 from console_cowboy.ctec.serializers import OutputFormat
 from console_cowboy.terminals import TerminalRegistry
-
-# Import to trigger registration
-import console_cowboy.terminals  # noqa: F401
 
 
 def get_terminal_choices() -> list[str]:
@@ -50,7 +47,9 @@ def print_terminal_specific(ctec: CTEC) -> None:
         )
         for setting in ctec.terminal_specific:
             click.echo(
-                click.style(f"  [{setting.terminal}] {setting.key} = {setting.value}", fg="cyan"),
+                click.style(
+                    f"  [{setting.terminal}] {setting.key} = {setting.value}", fg="cyan"
+                ),
                 err=True,
             )
 
@@ -149,10 +148,10 @@ def list_terminals():
 )
 def export_config(
     terminal: str,
-    input_path: Optional[Path],
-    output_path: Optional[Path],
+    input_path: Path | None,
+    output_path: Path | None,
     output_format: str,
-    profile_name: Optional[str],
+    profile_name: str | None,
     quiet: bool,
 ):
     """
@@ -268,8 +267,8 @@ def export_config(
 def import_config(
     input_file: Path,
     terminal: str,
-    output_path: Optional[Path],
-    input_format: Optional[str],
+    output_path: Path | None,
+    input_format: str | None,
     quiet: bool,
 ):
     """
@@ -301,8 +300,7 @@ def import_config(
             fmt = CTECSerializer.detect_format(input_file)
         except ValueError:
             raise click.ClickException(
-                f"Cannot detect format from extension. "
-                f"Please specify with -f/--format."
+                "Cannot detect format from extension. Please specify with -f/--format."
             )
 
     # Parse CTEC configuration
@@ -390,8 +388,8 @@ def convert_config(
     input_file: Path,
     from_terminal: str,
     to_terminal: str,
-    output_path: Optional[Path],
-    profile_name: Optional[str],
+    output_path: Path | None,
+    profile_name: str | None,
     quiet: bool,
 ):
     """
@@ -490,7 +488,7 @@ def convert_config(
     type=click.Choice(get_terminal_choices(), case_sensitive=False),
     help="Terminal type (if parsing native config). If not specified, assumes CTEC format.",
 )
-def show_info(input_file: Path, terminal: Optional[str]):
+def show_info(input_file: Path, terminal: str | None):
     """
     Display information about a configuration file.
 
