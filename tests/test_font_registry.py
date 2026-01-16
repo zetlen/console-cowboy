@@ -1,12 +1,10 @@
 """Tests for font registry and validation utilities."""
 
-import pytest
-
 from console_cowboy.utils.font_registry import (
     FontInfo,
     FontRegistry,
-    font_exists,
     find_similar_fonts,
+    font_exists,
     validate_font,
 )
 
@@ -60,7 +58,9 @@ class TestFontRegistry:
         registry = FontRegistry()
         # Spaces and dashes should be removed, lowercased
         assert registry._normalize_name("JetBrains Mono") == "jetbrainsmono"
-        assert registry._normalize_name("JetBrainsMono-Regular") == "jetbrainsmonoregular"
+        assert (
+            registry._normalize_name("JetBrainsMono-Regular") == "jetbrainsmonoregular"
+        )
 
     def test_similarity_score(self):
         """Test similarity scoring."""

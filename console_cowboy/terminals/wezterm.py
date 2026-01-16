@@ -10,12 +10,13 @@ Lua configuration format.
 
 import re
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 from console_cowboy.ctec.schema import (
     CTEC,
     BehaviorConfig,
     BellMode,
+    Color,
     ColorScheme,
     CursorConfig,
     CursorStyle,
@@ -59,13 +60,13 @@ class WeztermAdapter(TerminalAdapter):
     }
 
     @classmethod
-    def _extract_lua_value(cls, content: str, key: str) -> Optional[str]:
+    def _extract_lua_value(cls, content: str, key: str) -> str | None:
         """Extract a simple value from Lua config (config.key = value).
 
         Handles nested braces for function calls like wezterm.font_with_fallback({...}).
         """
         # First, find the start of the assignment
-        pattern = rf'config\.{re.escape(key)}\s*='
+        pattern = rf"config\.{re.escape(key)}\s*="
         match = re.search(pattern, content)
         if not match:
             return None
@@ -73,17 +74,19 @@ class WeztermAdapter(TerminalAdapter):
         start = match.end()
 
         # Skip whitespace
-        while start < len(content) and content[start] in ' \t':
+        while start < len(content) and content[start] in " \t":
             start += 1
 
         # If the value starts with wezterm. (a function call), extract until balanced parens
-        if content[start:].startswith('wezterm.'):
+        if content[start:].startswith("wezterm."):
             # Find opening paren
-            paren_start = content.find('(', start)
+            paren_start = content.find("(", start)
             if paren_start == -1:
                 # No paren, extract until newline
-                end = content.find('\n', start)
-                return content[start:end].strip() if end != -1 else content[start:].strip()
+                end = content.find("\n", start)
+                return (
+                    content[start:end].strip() if end != -1 else content[start:].strip()
+                )
 
             # Find matching closing paren, accounting for nested parens and braces
             depth_paren = 0
@@ -91,15 +94,15 @@ class WeztermAdapter(TerminalAdapter):
             i = paren_start
             while i < len(content):
                 c = content[i]
-                if c == '(':
+                if c == "(":
                     depth_paren += 1
-                elif c == ')':
+                elif c == ")":
                     depth_paren -= 1
                     if depth_paren == 0:
-                        return content[start:i + 1].strip()
-                elif c == '{':
+                        return content[start : i + 1].strip()
+                elif c == "{":
                     depth_brace += 1
-                elif c == '}':
+                elif c == "}":
                     depth_brace -= 1
                 i += 1
             # Didn't find matching paren
@@ -107,7 +110,7 @@ class WeztermAdapter(TerminalAdapter):
 
         # Otherwise, extract simple value until newline or comma
         end = start
-        while end < len(content) and content[end] not in '\n,':
+        while end < len(content) and content[end] not in "\n,":
             end += 1
 
         value = content[start:end].strip()
@@ -119,10 +122,10 @@ class WeztermAdapter(TerminalAdapter):
         return value
 
     @classmethod
-    def _extract_lua_table(cls, content: str, key: str) -> Optional[str]:
+    def _extract_lua_table(cls, content: str, key: str) -> str | None:
         """Extract a table value from Lua config."""
         # Match patterns like: config.colors = { ... }
-        pattern = rf'config\.{re.escape(key)}\s*=\s*\{{'
+        pattern = rf"config\.{re.escape(key)}\s*=\s*\{{"
         match = re.search(pattern, content)
         if match:
             start = match.end() - 1
@@ -171,19 +174,28 @@ class WeztermAdapter(TerminalAdapter):
                     setattr(scheme, ctec_key, color)
 
         # Parse ansi colors array
-        ansi_pattern = r'ansi\s*=\s*\{([^}]+)\}'
+        ansi_pattern = r"ansi\s*=\s*\{([^}]+)\}"
         ansi_match = re.search(ansi_pattern, table_str)
         if ansi_match:
             colors_str = ansi_match.group(1)
             colors = re.findall(r'["\']([^"\']+)["\']', colors_str)
-            ansi_names = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
-            for i, (name, color_str) in enumerate(zip(ansi_names, colors)):
+            ansi_names = [
+                "black",
+                "red",
+                "green",
+                "yellow",
+                "blue",
+                "magenta",
+                "cyan",
+                "white",
+            ]
+            for name, color_str in zip(ansi_names, colors, strict=False):
                 color = cls._parse_lua_color(color_str)
                 if color:
                     setattr(scheme, name, color)
 
         # Parse bright/brights colors array
-        brights_pattern = r'brights\s*=\s*\{([^}]+)\}'
+        brights_pattern = r"brights\s*=\s*\{([^}]+)\}"
         brights_match = re.search(brights_pattern, table_str)
         if brights_match:
             colors_str = brights_match.group(1)
@@ -198,7 +210,7 @@ class WeztermAdapter(TerminalAdapter):
                 "bright_cyan",
                 "bright_white",
             ]
-            for i, (name, color_str) in enumerate(zip(bright_names, colors)):
+            for name, color_str in zip(bright_names, colors, strict=False):
                 color = cls._parse_lua_color(color_str)
                 if color:
                     setattr(scheme, name, color)
@@ -208,9 +220,9 @@ class WeztermAdapter(TerminalAdapter):
     @classmethod
     def parse(
         cls,
-        source: Union[str, Path],
+        source: str | Path,
         *,
-        content: Optional[str] = None,
+        content: str | None = None,
     ) -> CTEC:
         """Parse a Wezterm configuration file."""
         ctec = CTEC(source_terminal="wezterm")
@@ -222,8 +234,7 @@ class WeztermAdapter(TerminalAdapter):
             content = path.read_text()
 
         ctec.add_warning(
-            "Wezterm uses Lua configuration. "
-            "Some settings may not be fully parsed."
+            "Wezterm uses Lua configuration. Some settings may not be fully parsed."
         )
 
         # Parse colors
@@ -237,7 +248,9 @@ class WeztermAdapter(TerminalAdapter):
         if font_family:
             # Check for wezterm.font_with_fallback first
             fallback_match = re.search(
-                r'wezterm\.font_with_fallback\s*\(\s*\{(.+?)\}\s*\)', font_family, re.DOTALL
+                r"wezterm\.font_with_fallback\s*\(\s*\{(.+?)\}\s*\)",
+                font_family,
+                re.DOTALL,
             )
             if fallback_match:
                 # Parse fallback fonts list - handles both table and string entries
@@ -246,7 +259,7 @@ class WeztermAdapter(TerminalAdapter):
                 # Check for table entry with weight: { family = "Name", weight = "Bold" }
                 table_match = re.search(
                     r'\{\s*family\s*=\s*["\']([^"\']+)["\']\s*,\s*weight\s*=\s*["\']?(\w+)["\']?\s*\}',
-                    fonts_str
+                    fonts_str,
                 )
                 if table_match:
                     font.family = table_match.group(1)
@@ -255,7 +268,7 @@ class WeztermAdapter(TerminalAdapter):
                     except (ValueError, KeyError):
                         ctec.add_warning(f"Unknown font weight: {table_match.group(2)}")
                     # Get remaining fallback fonts (simple strings)
-                    remaining = fonts_str[table_match.end():]
+                    remaining = fonts_str[table_match.end() :]
                     fallbacks = re.findall(r'["\']([^"\']+)["\']', remaining)
                     if fallbacks:
                         font.fallback_fonts = fallbacks
@@ -268,11 +281,15 @@ class WeztermAdapter(TerminalAdapter):
                             font.fallback_fonts = font_entries[1:]
             else:
                 # Extract font family from wezterm.font("Family", {options})
-                family_match = re.search(r'wezterm\.font\s*\(\s*["\']([^"\']+)["\']', font_family)
+                family_match = re.search(
+                    r'wezterm\.font\s*\(\s*["\']([^"\']+)["\']', font_family
+                )
                 if family_match:
                     font.family = family_match.group(1)
                     # Check for weight parameter
-                    weight_match = re.search(r'weight\s*=\s*["\']?(\w+)["\']?', font_family)
+                    weight_match = re.search(
+                        r'weight\s*=\s*["\']?(\w+)["\']?', font_family
+                    )
                     if weight_match:
                         weight_str = weight_match.group(1)
                         try:
@@ -356,8 +373,8 @@ class WeztermAdapter(TerminalAdapter):
         # Window padding
         padding_table = cls._extract_lua_table(content, "window_padding")
         if padding_table:
-            left_match = re.search(r'left\s*=\s*(\d+)', padding_table)
-            top_match = re.search(r'top\s*=\s*(\d+)', padding_table)
+            left_match = re.search(r"left\s*=\s*(\d+)", padding_table)
+            top_match = re.search(r"top\s*=\s*(\d+)", padding_table)
             if left_match:
                 window.padding_horizontal = int(left_match.group(1))
             if top_match:
@@ -369,7 +386,12 @@ class WeztermAdapter(TerminalAdapter):
             decorations = decorations.strip("'\"")
             window.decorations = decorations.upper() not in ("NONE", "RESIZE")
 
-        if window.columns or window.rows or window.opacity is not None or window.blur is not None:
+        if (
+            window.columns
+            or window.rows
+            or window.opacity is not None
+            or window.blur is not None
+        ):
             ctec.window = window
 
         # Parse behavior
@@ -402,7 +424,7 @@ class WeztermAdapter(TerminalAdapter):
 
         visual_bell = cls._extract_lua_table(content, "visual_bell")
         if visual_bell and "duration_ms" in visual_bell:
-            duration_match = re.search(r'duration_ms\s*=\s*(\d+)', visual_bell)
+            duration_match = re.search(r"duration_ms\s*=\s*(\d+)", visual_bell)
             if duration_match and int(duration_match.group(1)) > 0:
                 behavior.bell_mode = BellMode.VISUAL
 
@@ -419,7 +441,7 @@ class WeztermAdapter(TerminalAdapter):
                 mods = match.group(2).split("|")
                 action = match.group(3).strip()
                 # Simplify action for storage
-                action_match = re.search(r'act\.(\w+)', action)
+                action_match = re.search(r"act\.(\w+)", action)
                 if action_match:
                     action = action_match.group(1)
                 ctec.key_bindings.append(KeyBinding(action=action, key=key, mods=mods))
@@ -459,12 +481,21 @@ class WeztermAdapter(TerminalAdapter):
 
             # ANSI colors
             ansi_colors = []
-            for attr in ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]:
+            for attr in [
+                "black",
+                "red",
+                "green",
+                "yellow",
+                "blue",
+                "magenta",
+                "cyan",
+                "white",
+            ]:
                 color = getattr(scheme, attr, None)
                 if color:
                     ansi_colors.append(f'"{color.to_hex()}"')
             if ansi_colors:
-                lines.append(f'  ansi = {{ {", ".join(ansi_colors)} }},')
+                lines.append(f"  ansi = {{ {', '.join(ansi_colors)} }},")
 
             # Bright colors
             bright_colors = []
@@ -482,7 +513,7 @@ class WeztermAdapter(TerminalAdapter):
                 if color:
                     bright_colors.append(f'"{color.to_hex()}"')
             if bright_colors:
-                lines.append(f'  brights = {{ {", ".join(bright_colors)} }},')
+                lines.append(f"  brights = {{ {', '.join(bright_colors)} }},")
 
             lines.append("}")
             lines.append("")
@@ -501,15 +532,23 @@ class WeztermAdapter(TerminalAdapter):
                     # WezTerm supports weight in font_with_fallback via table syntax
                     if ctec.font.weight:
                         weight_name = ctec.font.weight.to_string()
-                        primary = f'{{ family = "{font_family}", weight = "{weight_name}" }}'
+                        primary = (
+                            f'{{ family = "{font_family}", weight = "{weight_name}" }}'
+                        )
                     else:
                         primary = f'"{font_family}"'
-                    fallbacks_str = ", ".join(f'"{f}"' for f in ctec.font.fallback_fonts)
-                    lines.append(f"config.font = wezterm.font_with_fallback({{ {primary}, {fallbacks_str} }})")
+                    fallbacks_str = ", ".join(
+                        f'"{f}"' for f in ctec.font.fallback_fonts
+                    )
+                    lines.append(
+                        f"config.font = wezterm.font_with_fallback({{ {primary}, {fallbacks_str} }})"
+                    )
                 elif ctec.font.weight:
                     # Use font with weight parameter
                     weight_name = ctec.font.weight.to_string()
-                    lines.append(f'config.font = wezterm.font("{font_family}", {{weight="{weight_name}"}})')
+                    lines.append(
+                        f'config.font = wezterm.font("{font_family}", {{weight="{weight_name}"}})'
+                    )
                 else:
                     lines.append(f'config.font = wezterm.font("{font_family}")')
             if ctec.font.size:
@@ -527,7 +566,9 @@ class WeztermAdapter(TerminalAdapter):
                     CursorStyle.BEAM: ("SteadyBar", "BlinkingBar"),
                     CursorStyle.UNDERLINE: ("SteadyUnderline", "BlinkingUnderline"),
                 }
-                styles = style_map.get(ctec.cursor.style, ("SteadyBlock", "BlinkingBlock"))
+                styles = style_map.get(
+                    ctec.cursor.style, ("SteadyBlock", "BlinkingBlock")
+                )
                 style = styles[1] if ctec.cursor.blink else styles[0]
                 lines.append(f'config.default_cursor_style = "{style}"')
             if ctec.cursor.blink_interval:
@@ -542,10 +583,17 @@ class WeztermAdapter(TerminalAdapter):
             if ctec.window.rows:
                 lines.append(f"config.initial_rows = {ctec.window.rows}")
             if ctec.window.opacity is not None:
-                lines.append(f"config.window_background_opacity = {ctec.window.opacity}")
+                lines.append(
+                    f"config.window_background_opacity = {ctec.window.opacity}"
+                )
             if ctec.window.blur is not None:
-                lines.append(f"config.macos_window_background_blur = {ctec.window.blur}")
-            if ctec.window.padding_horizontal is not None or ctec.window.padding_vertical is not None:
+                lines.append(
+                    f"config.macos_window_background_blur = {ctec.window.blur}"
+                )
+            if (
+                ctec.window.padding_horizontal is not None
+                or ctec.window.padding_vertical is not None
+            ):
                 h = ctec.window.padding_horizontal or 0
                 v = ctec.window.padding_vertical or 0
                 lines.append("config.window_padding = {")
@@ -583,8 +631,14 @@ class WeztermAdapter(TerminalAdapter):
         if ctec.scroll:
             lines.append("-- Scrollback")
             # Wezterm doesn't have explicit unlimited mode, use large value
-            scroll_lines = ctec.scroll.get_effective_lines(default=3500, max_lines=1000000)
-            if ctec.scroll.disabled or ctec.scroll.lines is not None or ctec.scroll.unlimited:
+            scroll_lines = ctec.scroll.get_effective_lines(
+                default=3500, max_lines=1000000
+            )
+            if (
+                ctec.scroll.disabled
+                or ctec.scroll.lines is not None
+                or ctec.scroll.unlimited
+            ):
                 lines.append(f"config.scrollback_lines = {scroll_lines}")
             lines.append("")
 
@@ -594,7 +648,9 @@ class WeztermAdapter(TerminalAdapter):
             lines.append("config.keys = {")
             for kb in ctec.key_bindings:
                 mods = "|".join(kb.mods) if kb.mods else "NONE"
-                lines.append(f'  {{ key = "{kb.key}", mods = "{mods}", action = wezterm.action.{kb.action} }},')
+                lines.append(
+                    f'  {{ key = "{kb.key}", mods = "{mods}", action = wezterm.action.{kb.action} }},'
+                )
             lines.append("}")
             lines.append("")
 

@@ -6,12 +6,10 @@ Ghostty uses a simple key=value configuration format stored in
 """
 
 from pathlib import Path
-from typing import Optional, Union
 
 from console_cowboy.ctec.schema import (
     CTEC,
     BehaviorConfig,
-    BellMode,
     ColorScheme,
     CursorConfig,
     CursorStyle,
@@ -88,9 +86,9 @@ class GhosttyAdapter(TerminalAdapter):
     @classmethod
     def parse(
         cls,
-        source: Union[str, Path],
+        source: str | Path,
         *,
-        content: Optional[str] = None,
+        content: str | None = None,
     ) -> CTEC:
         """Parse a Ghostty configuration file."""
         ctec = CTEC(source_terminal="ghostty")
@@ -171,7 +169,9 @@ class GhosttyAdapter(TerminalAdapter):
 
             # Parse cursor settings
             elif key == "cursor-style":
-                cursor.style = cls.CURSOR_STYLE_MAP.get(value.lower(), CursorStyle.BLOCK)
+                cursor.style = cls.CURSOR_STYLE_MAP.get(
+                    value.lower(), CursorStyle.BLOCK
+                )
             elif key == "cursor-style-blink":
                 cursor.blink = value.lower() == "true"
 
@@ -366,7 +366,9 @@ class GhosttyAdapter(TerminalAdapter):
             if ctec.window.startup_mode == "fullscreen":
                 lines.append("fullscreen = true")
             if ctec.window.dynamic_title is not None:
-                lines.append(f"window-title-show-all = {str(ctec.window.dynamic_title).lower()}")
+                lines.append(
+                    f"window-title-show-all = {str(ctec.window.dynamic_title).lower()}"
+                )
             lines.append("")
 
         # Export behavior settings
@@ -377,9 +379,13 @@ class GhosttyAdapter(TerminalAdapter):
             if ctec.behavior.working_directory:
                 lines.append(f"working-directory = {ctec.behavior.working_directory}")
             if ctec.behavior.copy_on_select is not None:
-                lines.append(f"copy-on-select = {str(ctec.behavior.copy_on_select).lower()}")
+                lines.append(
+                    f"copy-on-select = {str(ctec.behavior.copy_on_select).lower()}"
+                )
             if ctec.behavior.confirm_close is not None:
-                lines.append(f"confirm-close-surface = {str(ctec.behavior.confirm_close).lower()}")
+                lines.append(
+                    f"confirm-close-surface = {str(ctec.behavior.confirm_close).lower()}"
+                )
             lines.append("")
 
         # Export scroll settings (Ghostty uses bytes, not lines)

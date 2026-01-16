@@ -1,13 +1,11 @@
 """Tests for font name conversion utilities."""
 
-import pytest
-
 from console_cowboy.utils.fonts import (
-    is_postscript_name,
-    postscript_to_friendly,
-    friendly_to_postscript,
     extract_weight_from_name,
+    friendly_to_postscript,
+    is_postscript_name,
     normalize_font_family,
+    postscript_to_friendly,
 )
 
 

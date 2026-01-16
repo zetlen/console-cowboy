@@ -7,22 +7,22 @@ migration of settings between different terminal applications.
 
 from .schema import (
     CTEC,
-    ColorScheme,
-    ColorVariant,
-    Color,
-    FontConfig,
-    FontWeight,
-    FontStyle,
-    CursorConfig,
-    CursorStyle,
-    WindowConfig,
     BehaviorConfig,
     BellMode,
-    ScrollConfig,
+    Color,
+    ColorScheme,
+    ColorVariant,
+    CursorConfig,
+    CursorStyle,
+    FontConfig,
+    FontStyle,
+    FontWeight,
     KeyBinding,
+    ScrollConfig,
     TerminalSpecificSetting,
+    WindowConfig,
 )
-from .serializers import CTECSerializer, OutputFormat, CTEC_JSON_SCHEMA
+from .serializers import CTEC_JSON_SCHEMA, CTECSerializer, OutputFormat
 
 __all__ = [
     "CTEC",

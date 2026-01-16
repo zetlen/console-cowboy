@@ -16,11 +16,11 @@ from console_cowboy.ctec.schema import (
     FontConfig,
 )
 from console_cowboy.ctec.serializers import (
-    CTECSerializer,
-    OutputFormat,
     CTEC_JSON_SCHEMA,
     CTEC_JSON_SCHEMA_BUNDLED,
     ITERM2_COLOR_SCHEME_SCHEMA,
+    CTECSerializer,
+    OutputFormat,
 )
 
 
@@ -298,4 +298,7 @@ class TestJSONSchema:
     def test_unbundled_schema_has_ref(self):
         """Test that unbundled schema uses $ref for color_scheme."""
         assert "$ref" in CTEC_JSON_SCHEMA["properties"]["color_scheme"]
-        assert CTEC_JSON_SCHEMA["properties"]["color_scheme"]["$ref"] == "iterm2-color-scheme.schema.json"
+        assert (
+            CTEC_JSON_SCHEMA["properties"]["color_scheme"]["$ref"]
+            == "iterm2-color-scheme.schema.json"
+        )

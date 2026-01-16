@@ -7,7 +7,6 @@ methods to parse (import) and export configurations to/from CTEC format.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Union
 
 from console_cowboy.ctec.schema import CTEC
 
@@ -41,9 +40,9 @@ class TerminalAdapter(ABC):
     @abstractmethod
     def parse(
         cls,
-        source: Union[str, Path],
+        source: str | Path,
         *,
-        content: Optional[str] = None,
+        content: str | None = None,
     ) -> CTEC:
         """
         Parse a terminal configuration file into CTEC format.
@@ -76,7 +75,7 @@ class TerminalAdapter(ABC):
         pass
 
     @classmethod
-    def get_default_config_path(cls) -> Optional[Path]:
+    def get_default_config_path(cls) -> Path | None:
         """
         Get the default configuration file path for this terminal.
 
@@ -91,7 +90,7 @@ class TerminalAdapter(ABC):
         return None
 
     @classmethod
-    def write_config(cls, ctec: CTEC, path: Union[str, Path]) -> None:
+    def write_config(cls, ctec: CTEC, path: str | Path) -> None:
         """
         Export and write CTEC configuration to a file.
 
@@ -121,7 +120,7 @@ class TerminalRegistry:
         cls._adapters[adapter.name] = adapter
 
     @classmethod
-    def get(cls, name: str) -> Optional[type[TerminalAdapter]]:
+    def get(cls, name: str) -> type[TerminalAdapter] | None:
         """
         Get a terminal adapter by name.
 

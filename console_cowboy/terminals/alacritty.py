@@ -6,7 +6,7 @@ Alacritty uses YAML (versions < 0.13) or TOML (versions >= 0.13) format stored i
 """
 
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import tomli
 import tomli_w
@@ -16,6 +16,7 @@ from console_cowboy.ctec.schema import (
     CTEC,
     BehaviorConfig,
     BellMode,
+    Color,
     ColorScheme,
     CursorConfig,
     CursorStyle,
@@ -57,7 +58,7 @@ class AlacrittyAdapter(TerminalAdapter):
     CURSOR_STYLE_REVERSE_MAP = {v: k for k, v in CURSOR_STYLE_MAP.items()}
 
     @classmethod
-    def _parse_color(cls, color_data: Union[str, dict]) -> Optional["Color"]:
+    def _parse_color(cls, color_data: str | dict) -> Optional["Color"]:
         """Parse a color from Alacritty format."""
         if color_data is None:
             return None
@@ -126,9 +127,9 @@ class AlacrittyAdapter(TerminalAdapter):
     @classmethod
     def parse(
         cls,
-        source: Union[str, Path],
+        source: str | Path,
         *,
-        content: Optional[str] = None,
+        content: str | None = None,
     ) -> CTEC:
         """Parse an Alacritty configuration file."""
         ctec = CTEC(source_terminal="alacritty")
@@ -187,13 +188,19 @@ class AlacrittyAdapter(TerminalAdapter):
             if "style" in cursor_data:
                 style_data = cursor_data["style"]
                 if isinstance(style_data, str):
-                    cursor.style = cls.CURSOR_STYLE_MAP.get(style_data.lower(), CursorStyle.BLOCK)
+                    cursor.style = cls.CURSOR_STYLE_MAP.get(
+                        style_data.lower(), CursorStyle.BLOCK
+                    )
                 elif isinstance(style_data, dict) and "shape" in style_data:
                     cursor.style = cls.CURSOR_STYLE_MAP.get(
                         style_data["shape"].lower(), CursorStyle.BLOCK
                     )
                     if "blinking" in style_data:
-                        cursor.blink = style_data["blinking"] not in ("Off", "Never", False)
+                        cursor.blink = style_data["blinking"] not in (
+                            "Off",
+                            "Never",
+                            False,
+                        )
             if "blink_interval" in cursor_data:
                 cursor.blink_interval = cursor_data["blink_interval"]
             ctec.cursor = cursor
@@ -224,7 +231,11 @@ class AlacrittyAdapter(TerminalAdapter):
                 if "y" in padding:
                     window.padding_vertical = padding["y"]
             if "decorations" in window_data:
-                window.decorations = window_data["decorations"] not in ("None", "none", False)
+                window.decorations = window_data["decorations"] not in (
+                    "None",
+                    "none",
+                    False,
+                )
             if "startup_mode" in window_data:
                 window.startup_mode = window_data["startup_mode"].lower()
             if "dynamic_title" in window_data:
@@ -269,7 +280,11 @@ class AlacrittyAdapter(TerminalAdapter):
             # Alacritty doesn't have a single mouse enable toggle
             # but we can infer from hide_when_typing
             if "hide_when_typing" in mouse_data:
-                ctec.add_terminal_specific("alacritty", "mouse.hide_when_typing", mouse_data["hide_when_typing"])
+                ctec.add_terminal_specific(
+                    "alacritty",
+                    "mouse.hide_when_typing",
+                    mouse_data["hide_when_typing"],
+                )
 
         if "selection" in data:
             if ctec.behavior is None:
@@ -284,7 +299,9 @@ class AlacrittyAdapter(TerminalAdapter):
                     kb = KeyBinding(
                         action=binding["action"],
                         key=binding["key"],
-                        mods=binding.get("mods", "").split("+") if binding.get("mods") else [],
+                        mods=binding.get("mods", "").split("+")
+                        if binding.get("mods")
+                        else [],
                     )
                     ctec.key_bindings.append(kb)
         # Legacy format
@@ -294,12 +311,26 @@ class AlacrittyAdapter(TerminalAdapter):
                     kb = KeyBinding(
                         action=binding["action"],
                         key=binding["key"],
-                        mods=binding.get("mods", "").split("|") if binding.get("mods") else [],
+                        mods=binding.get("mods", "").split("|")
+                        if binding.get("mods")
+                        else [],
                     )
                     ctec.key_bindings.append(kb)
 
         # Store unrecognized top-level keys
-        recognized_keys = {"colors", "font", "cursor", "window", "shell", "scrolling", "bell", "mouse", "selection", "keyboard", "key_bindings"}
+        recognized_keys = {
+            "colors",
+            "font",
+            "cursor",
+            "window",
+            "shell",
+            "scrolling",
+            "bell",
+            "mouse",
+            "selection",
+            "keyboard",
+            "key_bindings",
+        }
         for key in data:
             if key not in recognized_keys:
                 ctec.add_terminal_specific("alacritty", key, data[key])
@@ -413,7 +444,9 @@ class AlacrittyAdapter(TerminalAdapter):
             cursor = {}
             style = {}
             if ctec.cursor.style:
-                style["shape"] = cls.CURSOR_STYLE_REVERSE_MAP.get(ctec.cursor.style, "Block").capitalize()
+                style["shape"] = cls.CURSOR_STYLE_REVERSE_MAP.get(
+                    ctec.cursor.style, "Block"
+                ).capitalize()
             if ctec.cursor.blink is not None:
                 style["blinking"] = "On" if ctec.cursor.blink else "Off"
             if style:
@@ -438,7 +471,10 @@ class AlacrittyAdapter(TerminalAdapter):
             if ctec.window.blur:
                 # Alacritty uses boolean blur, not radius
                 window["blur"] = True
-            if ctec.window.padding_horizontal is not None or ctec.window.padding_vertical is not None:
+            if (
+                ctec.window.padding_horizontal is not None
+                or ctec.window.padding_vertical is not None
+            ):
                 padding = {}
                 if ctec.window.padding_horizontal is not None:
                     padding["x"] = ctec.window.padding_horizontal
@@ -464,14 +500,20 @@ class AlacrittyAdapter(TerminalAdapter):
                 else:
                     result["bell"] = {"duration": 100}
             if ctec.behavior.copy_on_select is not None:
-                result["selection"] = {"save_to_clipboard": ctec.behavior.copy_on_select}
+                result["selection"] = {
+                    "save_to_clipboard": ctec.behavior.copy_on_select
+                }
 
         # Export scroll settings (Alacritty max is 100,000 lines)
         if ctec.scroll:
             scrolling = {}
             # Alacritty uses line-based scrollback with max 100,000
             lines = ctec.scroll.get_effective_lines(default=10000, max_lines=100000)
-            if ctec.scroll.disabled or ctec.scroll.lines is not None or ctec.scroll.unlimited:
+            if (
+                ctec.scroll.disabled
+                or ctec.scroll.lines is not None
+                or ctec.scroll.unlimited
+            ):
                 scrolling["history"] = lines
             if ctec.scroll.multiplier is not None:
                 scrolling["multiplier"] = int(ctec.scroll.multiplier)

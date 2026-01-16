@@ -10,12 +10,10 @@ Different terminal emulators use different color representations:
 This module provides utilities for converting between these formats.
 """
 
-from typing import Tuple, Union
-
 from console_cowboy.ctec.schema import Color
 
 
-def normalize_color(value: Union[str, dict, tuple, list, Color]) -> Color:
+def normalize_color(value: str | dict | tuple | list | Color) -> Color:
     """
     Normalize a color value from various formats to a Color object.
 
@@ -64,7 +62,7 @@ def normalize_color(value: Union[str, dict, tuple, list, Color]) -> Color:
     raise ValueError(f"Unsupported color format: {type(value)}")
 
 
-def color_to_float_tuple(color: Color) -> Tuple[float, float, float]:
+def color_to_float_tuple(color: Color) -> tuple[float, float, float]:
     """
     Convert a Color to a tuple of floats (0.0-1.0).
 
@@ -79,7 +77,7 @@ def color_to_float_tuple(color: Color) -> Tuple[float, float, float]:
     return (color.r / 255.0, color.g / 255.0, color.b / 255.0)
 
 
-def float_tuple_to_color(values: Tuple[float, float, float]) -> Color:
+def float_tuple_to_color(values: tuple[float, float, float]) -> Color:
     """
     Convert a tuple of floats (0.0-1.0) to a Color.
 

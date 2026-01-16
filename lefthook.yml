@@ -1,0 +1,24 @@
+# lefthook.yml
+# Pre-commit hooks for Console Cowboy
+# See: https://lefthook.dev/
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: ruff-format
+      run: uv run ruff format --check {staged_files}
+      glob: "*.py"
+
+    - name: ruff-lint
+      run: uv run ruff check {staged_files}
+      glob: "*.py"
+
+    - name: cli-smoke-test
+      run: uv run console-cowboy --help > /dev/null && uv run console-cowboy list > /dev/null
+      glob: "*.py"
+
+    - name: uv-lock-check
+      run: uv lock --check
+      glob:
+        - "pyproject.toml"
+        - "uv.lock"

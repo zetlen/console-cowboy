@@ -8,7 +8,7 @@ JSON is supported for programmatic use and editor validation via JSON Schema.
 import json
 from enum import Enum
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 import yaml
 
@@ -212,12 +212,28 @@ CTEC_JSON_SCHEMA: dict[str, Any] = {
             "properties": {
                 "family": {"type": "string", "description": "Primary font family"},
                 "size": {"type": "number", "description": "Font size in points"},
-                "line_height": {"type": "number", "description": "Line height multiplier"},
-                "cell_width": {"type": "number", "description": "Cell width multiplier"},
+                "line_height": {
+                    "type": "number",
+                    "description": "Line height multiplier",
+                },
+                "cell_width": {
+                    "type": "number",
+                    "description": "Cell width multiplier",
+                },
                 "weight": {
                     "type": "string",
                     "description": "Font weight",
-                    "enum": ["thin", "extralight", "light", "regular", "medium", "semibold", "bold", "extrabold", "black"],
+                    "enum": [
+                        "thin",
+                        "extralight",
+                        "light",
+                        "regular",
+                        "medium",
+                        "semibold",
+                        "bold",
+                        "extrabold",
+                        "black",
+                    ],
                 },
                 "style": {
                     "type": "string",
@@ -229,7 +245,10 @@ CTEC_JSON_SCHEMA: dict[str, Any] = {
                 "ligatures": {"type": "boolean"},
                 "anti_aliasing": {"type": "boolean"},
                 "fallback_fonts": {"type": "array", "items": {"type": "string"}},
-                "symbol_map": {"type": "object", "additionalProperties": {"type": "string"}},
+                "symbol_map": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                },
                 "draw_powerline_glyphs": {"type": "boolean"},
                 "box_drawing_scale": {"type": "number"},
             },
@@ -278,7 +297,10 @@ CTEC_JSON_SCHEMA: dict[str, Any] = {
                 "bell_mode": {"type": "string", "enum": ["none", "audible", "visual"]},
                 "copy_on_select": {"type": "boolean"},
                 "confirm_close": {"type": "boolean"},
-                "close_on_exit": {"type": "string", "enum": ["close", "hold", "restart"]},
+                "close_on_exit": {
+                    "type": "string",
+                    "enum": ["close", "hold", "restart"],
+                },
             },
             "additionalProperties": False,
         },
@@ -454,7 +476,7 @@ class CTECSerializer:
             raise ValueError(f"Unsupported format: {format}")
 
     @staticmethod
-    def detect_format(path: Union[str, Path]) -> OutputFormat:
+    def detect_format(path: str | Path) -> OutputFormat:
         """
         Detect the format based on file extension.
 
@@ -480,7 +502,7 @@ class CTECSerializer:
             )
 
     @staticmethod
-    def read_file(path: Union[str, Path], format: OutputFormat = None) -> CTEC:
+    def read_file(path: str | Path, format: OutputFormat = None) -> CTEC:
         """
         Read CTEC from a file.
 
@@ -498,9 +520,7 @@ class CTECSerializer:
         return CTECSerializer.deserialize(content, format)
 
     @staticmethod
-    def write_file(
-        ctec: CTEC, path: Union[str, Path], format: OutputFormat = None
-    ) -> None:
+    def write_file(ctec: CTEC, path: str | Path, format: OutputFormat = None) -> None:
         """
         Write CTEC to a file.
 
@@ -548,7 +568,7 @@ class CTECSerializer:
         return ITERM2_COLOR_SCHEME_SCHEMA
 
     @staticmethod
-    def write_json_schema(path: Union[str, Path], bundled: bool = True) -> None:
+    def write_json_schema(path: str | Path, bundled: bool = True) -> None:
         """
         Write the JSON Schema to a file.
 
@@ -562,7 +582,7 @@ class CTECSerializer:
         path.write_text(content)
 
     @staticmethod
-    def write_color_scheme_schema(path: Union[str, Path]) -> None:
+    def write_color_scheme_schema(path: str | Path) -> None:
         """
         Write the standalone color scheme JSON Schema to a file.
 

@@ -6,7 +6,6 @@ when fonts are not found on the system.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 from .ctec.schema import CTEC, FontConfig
 from .utils.font_registry import find_similar_fonts, validate_font
@@ -16,9 +15,9 @@ from .utils.font_registry import find_similar_fonts, validate_font
 class ValidationResult:
     """Result of configuration validation."""
 
-    warnings: List[str] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
-    suggestions: Dict[str, List[str]] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    suggestions: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def is_valid(self) -> bool:
@@ -38,7 +37,7 @@ class ValidationResult:
         """Add an error message."""
         self.errors.append(message)
 
-    def add_font_suggestion(self, font: str, alternatives: List[str]) -> None:
+    def add_font_suggestion(self, font: str, alternatives: list[str]) -> None:
         """Add font alternatives for a missing font."""
         self.suggestions[font] = alternatives
 
@@ -49,9 +48,7 @@ class ValidationResult:
         self.suggestions.update(other.suggestions)
 
 
-def _extract_fonts_from_config(
-    font: FontConfig, context: str
-) -> List[Tuple[str, str]]:
+def _extract_fonts_from_config(font: FontConfig, context: str) -> list[tuple[str, str]]:
     """Extract all font names from a FontConfig with their context."""
     fonts = []
 
@@ -87,7 +84,7 @@ def validate_fonts(ctec: CTEC) -> ValidationResult:
     """
     result = ValidationResult()
 
-    fonts_to_check: List[Tuple[str, str]] = []
+    fonts_to_check: list[tuple[str, str]] = []
 
     # Font config
     if ctec.font:
@@ -156,8 +153,7 @@ def validate_ctec(ctec: CTEC, check_fonts: bool = True) -> ValidationResult:
         if ctec.font.size is not None:
             if ctec.font.size < 4 or ctec.font.size > 72:
                 result.add_warning(
-                    f"Unusual font size: {ctec.font.size}pt. "
-                    "Expected range is 4-72pt"
+                    f"Unusual font size: {ctec.font.size}pt. Expected range is 4-72pt"
                 )
 
     return result

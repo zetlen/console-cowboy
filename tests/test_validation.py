@@ -1,7 +1,5 @@
 """Tests for CTEC validation utilities."""
 
-import pytest
-
 from console_cowboy.ctec.schema import (
     CTEC,
     FontConfig,
@@ -9,9 +7,9 @@ from console_cowboy.ctec.schema import (
 )
 from console_cowboy.validation import (
     ValidationResult,
-    validate_fonts,
-    validate_ctec,
     format_validation_result,
+    validate_ctec,
+    validate_fonts,
 )
 
 
@@ -76,9 +74,7 @@ class TestValidateFonts:
 
     def test_missing_font_warning(self):
         """Test that missing fonts generate warnings."""
-        ctec = CTEC(
-            font=FontConfig(family="NonexistentFont12345")
-        )
+        ctec = CTEC(font=FontConfig(family="NonexistentFont12345"))
         result = validate_fonts(ctec)
         # Should have a warning about the missing font
         assert result.has_warnings is True
@@ -96,12 +92,13 @@ class TestValidateCTEC:
 
     def test_scroll_config_conflicting_flags(self):
         """Test warning for conflicting scroll config."""
-        ctec = CTEC(
-            scroll=ScrollConfig(disabled=True, unlimited=True)
-        )
+        ctec = CTEC(scroll=ScrollConfig(disabled=True, unlimited=True))
         result = validate_ctec(ctec, check_fonts=False)
         assert result.has_warnings is True
-        assert any("disabled" in w.lower() and "unlimited" in w.lower() for w in result.warnings)
+        assert any(
+            "disabled" in w.lower() and "unlimited" in w.lower()
+            for w in result.warnings
+        )
 
     def test_unusual_font_size_warning(self):
         """Test warning for unusual font size."""

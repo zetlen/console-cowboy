@@ -5,10 +5,10 @@ This module provides classes for reading and writing configuration files
 for various terminal emulators.
 """
 
-from .base import TerminalAdapter, TerminalRegistry
-from .iterm2 import ITerm2Adapter
-from .ghostty import GhosttyAdapter
 from .alacritty import AlacrittyAdapter
+from .base import TerminalAdapter, TerminalRegistry
+from .ghostty import GhosttyAdapter
+from .iterm2 import ITerm2Adapter
 from .kitty import KittyAdapter
 from .wezterm import WeztermAdapter
 
