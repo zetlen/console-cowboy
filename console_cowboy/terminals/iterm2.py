@@ -64,13 +64,21 @@ class ITerm2Adapter(TerminalAdapter):
     CURSOR_STYLE_REVERSE_MAP = {v: k for k, v in CURSOR_STYLE_MAP.items()}
 
     # Color key mappings from iTerm2 to CTEC
+    # Aligned with iTerm2-Color-Schemes extended YAML format
     COLOR_KEY_MAP = {
+        # Core semantic colors
         "Foreground Color": "foreground",
         "Background Color": "background",
         "Cursor Color": "cursor",
         "Cursor Text Color": "cursor_text",
         "Selection Color": "selection",
         "Selected Text Color": "selection_text",
+        # Extended semantic colors (iTerm2-Color-Schemes YAML extensions)
+        "Bold Color": "bold",
+        "Link Color": "link",
+        "Underline Color": "underline",
+        "Cursor Guide Color": "cursor_guide",
+        # ANSI colors (0-15)
         "Ansi 0 Color": "black",
         "Ansi 1 Color": "red",
         "Ansi 2 Color": "green",

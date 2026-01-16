@@ -26,6 +26,13 @@ class BellMode(Enum):
     VISUAL = "visual"
 
 
+class ColorVariant(Enum):
+    """Color scheme variant (light or dark theme)."""
+
+    DARK = "dark"
+    LIGHT = "light"
+
+
 class FontWeight(Enum):
     """Standard font weights (CSS-style numeric values)."""
 
@@ -138,13 +145,20 @@ class Color:
             b=int(hex_str[4:6], 16),
         )
 
-    def to_dict(self) -> dict:
-        """Convert to dictionary representation."""
-        return {"r": self.r, "g": self.g, "b": self.b}
+    def to_dict(self) -> str:
+        """Convert to hex string for serialization (iTerm2-Color-Schemes format)."""
+        return self.to_hex()
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Color":
-        """Create a Color from a dictionary."""
+    def from_dict(cls, data: "str | dict") -> "Color":
+        """Create a Color from serialized data.
+
+        Accepts both:
+        - Hex string: "#ff0000" (iTerm2-Color-Schemes format)
+        - RGB dict: {"r": 255, "g": 0, "b": 0} (legacy format)
+        """
+        if isinstance(data, str):
+            return cls.from_hex(data)
         return cls(r=data["r"], g=data["g"], b=data["b"])
 
 
@@ -153,39 +167,56 @@ class ColorScheme:
     """
     Terminal color scheme with ANSI colors and semantic colors.
 
+    This schema is designed to align with the iTerm2-Color-Schemes extended YAML
+    format, which has become the de facto standard for terminal color scheme
+    interchange. See: https://github.com/mbadolato/iTerm2-Color-Schemes
+
     Attributes:
         name: Optional name for the color scheme
+        author: Optional author attribution
+        variant: Theme variant (dark or light)
+
+        # Core semantic colors (from Gogh base format)
         foreground: Default text color
         background: Default background color
         cursor: Cursor color
-        cursor_text: Text color when under cursor
-        selection: Selection highlight color
-        selection_text: Selected text color
-        black: ANSI color 0 (normal)
-        red: ANSI color 1 (normal)
-        green: ANSI color 2 (normal)
-        yellow: ANSI color 3 (normal)
-        blue: ANSI color 4 (normal)
-        magenta: ANSI color 5 (normal)
-        cyan: ANSI color 6 (normal)
-        white: ANSI color 7 (normal)
-        bright_black: ANSI color 8 (bright)
-        bright_red: ANSI color 9 (bright)
-        bright_green: ANSI color 10 (bright)
-        bright_yellow: ANSI color 11 (bright)
-        bright_blue: ANSI color 12 (bright)
-        bright_magenta: ANSI color 13 (bright)
-        bright_cyan: ANSI color 14 (bright)
-        bright_white: ANSI color 15 (bright)
+
+        # Extended semantic colors (from iTerm2-Color-Schemes YAML)
+        cursor_text: Text color when under cursor (default: foreground)
+        selection: Selection highlight color (default: foreground)
+        selection_text: Selected text color (default: background)
+        bold: Bold text color (default: foreground)
+        link: Hyperlink/URL color
+        underline: Underlined text color
+        cursor_guide: Cursor guide/highlight color (default: cursor)
+
+        # ANSI colors 0-7 (normal)
+        black, red, green, yellow, blue, magenta, cyan, white
+
+        # ANSI colors 8-15 (bright)
+        bright_black, bright_red, bright_green, bright_yellow,
+        bright_blue, bright_magenta, bright_cyan, bright_white
     """
 
+    # Metadata
     name: Optional[str] = None
+    author: Optional[str] = None
+    variant: Optional[ColorVariant] = None
+
+    # Core semantic colors (Gogh base format)
     foreground: Optional[Color] = None
     background: Optional[Color] = None
     cursor: Optional[Color] = None
+
+    # Extended semantic colors (iTerm2-Color-Schemes YAML extensions)
     cursor_text: Optional[Color] = None
     selection: Optional[Color] = None
     selection_text: Optional[Color] = None
+    bold: Optional[Color] = None
+    link: Optional[Color] = None
+    underline: Optional[Color] = None
+    cursor_guide: Optional[Color] = None
+
     # Normal colors (0-7)
     black: Optional[Color] = None
     red: Optional[Color] = None
@@ -195,6 +226,7 @@ class ColorScheme:
     magenta: Optional[Color] = None
     cyan: Optional[Color] = None
     white: Optional[Color] = None
+
     # Bright colors (8-15)
     bright_black: Optional[Color] = None
     bright_red: Optional[Color] = None
@@ -205,36 +237,48 @@ class ColorScheme:
     bright_cyan: Optional[Color] = None
     bright_white: Optional[Color] = None
 
+    # All color field names for iteration
+    _COLOR_FIELDS = [
+        "foreground",
+        "background",
+        "cursor",
+        "cursor_text",
+        "selection",
+        "selection_text",
+        "bold",
+        "link",
+        "underline",
+        "cursor_guide",
+        "black",
+        "red",
+        "green",
+        "yellow",
+        "blue",
+        "magenta",
+        "cyan",
+        "white",
+        "bright_black",
+        "bright_red",
+        "bright_green",
+        "bright_yellow",
+        "bright_blue",
+        "bright_magenta",
+        "bright_cyan",
+        "bright_white",
+    ]
+
     def to_dict(self) -> dict:
         """Convert to dictionary representation."""
         result = {}
+        # Metadata fields
         if self.name is not None:
             result["name"] = self.name
-        color_fields = [
-            "foreground",
-            "background",
-            "cursor",
-            "cursor_text",
-            "selection",
-            "selection_text",
-            "black",
-            "red",
-            "green",
-            "yellow",
-            "blue",
-            "magenta",
-            "cyan",
-            "white",
-            "bright_black",
-            "bright_red",
-            "bright_green",
-            "bright_yellow",
-            "bright_blue",
-            "bright_magenta",
-            "bright_cyan",
-            "bright_white",
-        ]
-        for field_name in color_fields:
+        if self.author is not None:
+            result["author"] = self.author
+        if self.variant is not None:
+            result["variant"] = self.variant.value
+        # Color fields
+        for field_name in self._COLOR_FIELDS:
             color = getattr(self, field_name)
             if color is not None:
                 result[field_name] = color.to_dict()
@@ -244,33 +288,15 @@ class ColorScheme:
     def from_dict(cls, data: dict) -> "ColorScheme":
         """Create a ColorScheme from a dictionary."""
         kwargs = {}
+        # Metadata fields
         if "name" in data:
             kwargs["name"] = data["name"]
-        color_fields = [
-            "foreground",
-            "background",
-            "cursor",
-            "cursor_text",
-            "selection",
-            "selection_text",
-            "black",
-            "red",
-            "green",
-            "yellow",
-            "blue",
-            "magenta",
-            "cyan",
-            "white",
-            "bright_black",
-            "bright_red",
-            "bright_green",
-            "bright_yellow",
-            "bright_blue",
-            "bright_magenta",
-            "bright_cyan",
-            "bright_white",
-        ]
-        for field_name in color_fields:
+        if "author" in data:
+            kwargs["author"] = data["author"]
+        if "variant" in data:
+            kwargs["variant"] = ColorVariant(data["variant"])
+        # Color fields
+        for field_name in cls._COLOR_FIELDS:
             if field_name in data:
                 kwargs[field_name] = Color.from_dict(data[field_name])
         return cls(**kwargs)

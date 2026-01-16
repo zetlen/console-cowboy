@@ -8,6 +8,7 @@ migration of settings between different terminal applications.
 from .schema import (
     CTEC,
     ColorScheme,
+    ColorVariant,
     Color,
     FontConfig,
     FontWeight,
@@ -21,11 +22,12 @@ from .schema import (
     KeyBinding,
     TerminalSpecificSetting,
 )
-from .serializers import CTECSerializer
+from .serializers import CTECSerializer, OutputFormat, CTEC_JSON_SCHEMA
 
 __all__ = [
     "CTEC",
     "ColorScheme",
+    "ColorVariant",
     "Color",
     "FontConfig",
     "FontWeight",
@@ -39,4 +41,6 @@ __all__ = [
     "KeyBinding",
     "TerminalSpecificSetting",
     "CTECSerializer",
+    "OutputFormat",
+    "CTEC_JSON_SCHEMA",
 ]

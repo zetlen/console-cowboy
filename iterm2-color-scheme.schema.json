@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zetlen/console-cowboy/iterm2-color-scheme.schema.json",
+  "title": "Terminal Color Scheme",
+  "description": "Terminal color scheme format compatible with iTerm2-Color-Schemes YAML. See: https://github.com/mbadolato/iTerm2-Color-Schemes",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Color scheme name"
+    },
+    "author": {
+      "type": "string",
+      "description": "Color scheme author"
+    },
+    "variant": {
+      "type": "string",
+      "enum": [
+        "dark",
+        "light"
+      ],
+      "description": "Theme variant (dark or light)"
+    },
+    "foreground": {
+      "$ref": "#/$defs/hexColor",
+      "description": "Default text color"
+    },
+    "background": {
+      "$ref": "#/$defs/hexColor",
+      "description": "Default background color"
+    },
+    "cursor": {
+      "$ref": "#/$defs/hexColor",
+      "description": "Cursor color"
+    },
+    "cursor_text": {
+      "$ref": "#/$defs/hexColor",
+      "description": "Text color when under cursor (default: foreground)"
+    },
+    "selection": {
+      "$ref": "#/$defs/hexColor",
+      "description": "Selection highlight color (default: foreground)"
+    },
+    "selection_text": {
+      "$ref": "#/$defs/hexColor",
+      "description": "Selected text color (default: background)"
+    },
+    "bold": {
+      "$ref": "#/$defs/hexColor",
+      "description": "Bold text color (default: foreground)"
+    },
+    "link": {
+      "$ref": "#/$defs/hexColor",
+      "description": "Hyperlink/URL color"
+    },
+    "underline": {
+      "$ref": "#/$defs/hexColor",
+      "description": "Underlined text color"
+    },
+    "cursor_guide": {
+      "$ref": "#/$defs/hexColor",
+      "description": "Cursor guide/highlight color (default: cursor)"
+    },
+    "black": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 0 (normal black)"
+    },
+    "red": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 1 (normal red)"
+    },
+    "green": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 2 (normal green)"
+    },
+    "yellow": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 3 (normal yellow)"
+    },
+    "blue": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 4 (normal blue)"
+    },
+    "magenta": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 5 (normal magenta)"
+    },
+    "cyan": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 6 (normal cyan)"
+    },
+    "white": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 7 (normal white)"
+    },
+    "bright_black": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 8 (bright black)"
+    },
+    "bright_red": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 9 (bright red)"
+    },
+    "bright_green": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 10 (bright green)"
+    },
+    "bright_yellow": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 11 (bright yellow)"
+    },
+    "bright_blue": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 12 (bright blue)"
+    },
+    "bright_magenta": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 13 (bright magenta)"
+    },
+    "bright_cyan": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 14 (bright cyan)"
+    },
+    "bright_white": {
+      "$ref": "#/$defs/hexColor",
+      "description": "ANSI color 15 (bright white)"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "hexColor": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "description": "Hex color string (e.g., '#ff0000')",
+      "examples": [
+        "#ffffff",
+        "#000000",
+        "#c5c8c6"
+      ]
+    }
+  }
+}

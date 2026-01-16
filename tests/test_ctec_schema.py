@@ -66,10 +66,19 @@ class TestColor:
             Color.from_hex("invalid")
 
     def test_to_dict(self):
+        """Test that to_dict returns hex string for iTerm2-Color-Schemes format."""
         color = Color(r=255, g=128, b=0)
-        assert color.to_dict() == {"r": 255, "g": 128, "b": 0}
+        assert color.to_dict() == "#ff8000"
 
-    def test_from_dict(self):
+    def test_from_dict_hex_string(self):
+        """Test from_dict with hex string (iTerm2-Color-Schemes format)."""
+        color = Color.from_dict("#ff8000")
+        assert color.r == 255
+        assert color.g == 128
+        assert color.b == 0
+
+    def test_from_dict_rgb_dict(self):
+        """Test from_dict with RGB dict (legacy format for backwards compatibility)."""
         color = Color.from_dict({"r": 255, "g": 128, "b": 0})
         assert color.r == 255
         assert color.g == 128
@@ -99,9 +108,19 @@ class TestColorScheme:
         )
         d = scheme.to_dict()
         assert d["name"] == "Test"
-        assert d["foreground"] == {"r": 255, "g": 255, "b": 255}
+        assert d["foreground"] == "#ffffff"
 
-    def test_from_dict(self):
+    def test_from_dict_hex_strings(self):
+        """Test from_dict with hex strings (iTerm2-Color-Schemes format)."""
+        scheme = ColorScheme.from_dict({
+            "name": "Test",
+            "foreground": "#ffffff",
+        })
+        assert scheme.name == "Test"
+        assert scheme.foreground.r == 255
+
+    def test_from_dict_rgb_dicts(self):
+        """Test from_dict with RGB dicts (legacy format for backwards compatibility)."""
         scheme = ColorScheme.from_dict({
             "name": "Test",
             "foreground": {"r": 255, "g": 255, "b": 255},
