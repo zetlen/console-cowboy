@@ -16,10 +16,15 @@ from console_cowboy.ctec.schema import (
     FontConfig,
     KeyBinding,
     KeyBindingScope,
+    NewTabPosition,
+    PaneConfig,
     QuickTerminalConfig,
     QuickTerminalPosition,
     QuickTerminalScreen,
     ScrollConfig,
+    TabBarPosition,
+    TabBarVisibility,
+    TabConfig,
     WindowConfig,
 )
 from console_cowboy.utils.colors import normalize_color
@@ -85,6 +90,37 @@ class GhosttyAdapter(TerminalAdapter):
     QUICK_TERMINAL_SCREEN_REVERSE_MAP = {
         v: k for k, v in QUICK_TERMINAL_SCREEN_MAP.items()
     }
+
+    # Tab bar visibility mapping
+    TAB_VISIBILITY_MAP = {
+        "always": TabBarVisibility.ALWAYS,
+        "auto": TabBarVisibility.AUTO,
+        "never": TabBarVisibility.NEVER,
+    }
+
+    TAB_VISIBILITY_REVERSE_MAP = {v: k for k, v in TAB_VISIBILITY_MAP.items()}
+
+    # Tab position mapping (GTK-specific)
+    TAB_POSITION_MAP = {
+        "top": TabBarPosition.TOP,
+        "bottom": TabBarPosition.BOTTOM,
+        "left": TabBarPosition.TOP,  # Map left to top (closest equivalent)
+        "right": TabBarPosition.BOTTOM,  # Map right to bottom (closest equivalent)
+    }
+
+    # Reverse map - prefer canonical top/bottom values over left/right
+    TAB_POSITION_REVERSE_MAP = {
+        TabBarPosition.TOP: "top",
+        TabBarPosition.BOTTOM: "bottom",
+    }
+
+    # New tab position mapping
+    NEW_TAB_POSITION_MAP = {
+        "current": NewTabPosition.CURRENT,
+        "end": NewTabPosition.END,
+    }
+
+    NEW_TAB_POSITION_REVERSE_MAP = {v: k for k, v in NEW_TAB_POSITION_MAP.items()}
 
     @classmethod
     def can_parse(cls, content: str) -> bool:
@@ -319,6 +355,8 @@ class GhosttyAdapter(TerminalAdapter):
         window = WindowConfig()
         behavior = BehaviorConfig()
         quick_terminal = QuickTerminalConfig()
+        tabs = TabConfig()
+        panes = PaneConfig()
 
         if content is None:
             path = Path(source)
@@ -477,6 +515,36 @@ class GhosttyAdapter(TerminalAdapter):
                         f"Invalid quick-terminal-animation-duration: {value}"
                     )
 
+            # Parse tab settings
+            elif key == "window-show-tab-bar":
+                tabs.visibility = cls.TAB_VISIBILITY_MAP.get(
+                    value.lower(), TabBarVisibility.AUTO
+                )
+            elif key == "gtk-tabs-location":
+                # GTK-specific tab position
+                tabs.position = cls.TAB_POSITION_MAP.get(
+                    value.lower(), TabBarPosition.TOP
+                )
+            elif key == "window-new-tab-position":
+                tabs.new_tab_position = cls.NEW_TAB_POSITION_MAP.get(
+                    value.lower(), NewTabPosition.CURRENT
+                )
+            elif key == "window-inherit-working-directory":
+                tabs.inherit_working_directory = value.lower() == "true"
+
+            # Parse pane settings
+            elif key == "unfocused-split-opacity":
+                try:
+                    panes.inactive_dim_factor = float(value)
+                except ValueError:
+                    ctec.add_warning(f"Invalid unfocused-split-opacity: {value}")
+            elif key == "unfocused-split-fill":
+                panes.inactive_dim_color = normalize_color(value)
+            elif key == "split-divider-color":
+                panes.divider_color = normalize_color(value)
+            elif key == "focus-follows-mouse":
+                panes.focus_follows_mouse = value.lower() == "true"
+
             # Parse keybindings
             elif key == "keybind":
                 kb = cls._parse_keybind(value, ctec)
@@ -515,6 +583,28 @@ class GhosttyAdapter(TerminalAdapter):
             ctec.behavior = behavior
         if quick_terminal.enabled:
             ctec.quick_terminal = quick_terminal
+        # Add tabs if any tab settings were configured
+        if any(
+            getattr(tabs, f) is not None
+            for f in [
+                "visibility",
+                "position",
+                "new_tab_position",
+                "inherit_working_directory",
+            ]
+        ):
+            ctec.tabs = tabs
+        # Add panes if any pane settings were configured
+        if any(
+            getattr(panes, f) is not None
+            for f in [
+                "inactive_dim_factor",
+                "inactive_dim_color",
+                "divider_color",
+                "focus_follows_mouse",
+            ]
+        ):
+            ctec.panes = panes
 
         return ctec
 
@@ -668,6 +758,99 @@ class GhosttyAdapter(TerminalAdapter):
                 # Ghostty uses fractional seconds, convert from milliseconds
                 duration_sec = ctec.quick_terminal.animation_duration / 1000.0
                 lines.append(f"quick-terminal-animation-duration = {duration_sec}")
+            lines.append("")
+
+        # Export tab settings
+        if ctec.tabs:
+            lines.append("# Tab Bar")
+            if ctec.tabs.visibility is not None:
+                visibility = cls.TAB_VISIBILITY_REVERSE_MAP.get(
+                    ctec.tabs.visibility, "auto"
+                )
+                lines.append(f"window-show-tab-bar = {visibility}")
+            if ctec.tabs.position is not None:
+                position = cls.TAB_POSITION_REVERSE_MAP.get(ctec.tabs.position, "top")
+                lines.append(f"gtk-tabs-location = {position}")
+            if ctec.tabs.new_tab_position is not None:
+                new_pos = cls.NEW_TAB_POSITION_REVERSE_MAP.get(
+                    ctec.tabs.new_tab_position, "current"
+                )
+                lines.append(f"window-new-tab-position = {new_pos}")
+            if ctec.tabs.inherit_working_directory is not None:
+                lines.append(
+                    f"window-inherit-working-directory = "
+                    f"{str(ctec.tabs.inherit_working_directory).lower()}"
+                )
+            # Warn about unsupported tab features
+            unsupported = []
+            if ctec.tabs.alignment is not None:
+                unsupported.append("alignment")
+            if ctec.tabs.style is not None:
+                unsupported.append("style")
+            if ctec.tabs.close_strategy is not None:
+                unsupported.append("close_strategy")
+            if ctec.tabs.min_tabs_to_show is not None:
+                unsupported.append("min_tabs_to_show")
+            if ctec.tabs.max_width is not None:
+                unsupported.append("max_width")
+            if ctec.tabs.show_index is not None:
+                unsupported.append("show_index")
+            if any(
+                getattr(ctec.tabs, f) is not None
+                for f in [
+                    "active_foreground",
+                    "active_background",
+                    "inactive_foreground",
+                    "inactive_background",
+                    "bar_background",
+                ]
+            ):
+                unsupported.append("tab colors")
+            if unsupported:
+                ctec.add_warning(
+                    f"Ghostty does not support: {', '.join(unsupported)}. "
+                    "These tab settings will not be exported."
+                )
+            lines.append("")
+
+        # Export pane settings
+        if ctec.panes:
+            lines.append("# Pane Settings")
+            if ctec.panes.inactive_dim_factor is not None:
+                # Ghostty minimum is 0.15, clamp values
+                dim = max(0.15, ctec.panes.inactive_dim_factor)
+                if dim != ctec.panes.inactive_dim_factor:
+                    ctec.add_warning(
+                        f"Ghostty minimum unfocused-split-opacity is 0.15. "
+                        f"Value {ctec.panes.inactive_dim_factor} was clamped to 0.15."
+                    )
+                lines.append(f"unfocused-split-opacity = {dim}")
+            if ctec.panes.inactive_dim_color is not None:
+                lines.append(
+                    f"unfocused-split-fill = {ctec.panes.inactive_dim_color.to_hex()}"
+                )
+            if ctec.panes.divider_color is not None:
+                lines.append(
+                    f"split-divider-color = {ctec.panes.divider_color.to_hex()}"
+                )
+            if ctec.panes.focus_follows_mouse is not None:
+                lines.append(
+                    f"focus-follows-mouse = "
+                    f"{str(ctec.panes.focus_follows_mouse).lower()}"
+                )
+            # Warn about unsupported pane features
+            unsupported = []
+            if ctec.panes.border_width is not None:
+                unsupported.append("border_width")
+            if ctec.panes.active_border_color is not None:
+                unsupported.append("active_border_color")
+            if ctec.panes.inactive_border_color is not None:
+                unsupported.append("inactive_border_color")
+            if unsupported:
+                ctec.add_warning(
+                    f"Ghostty does not support: {', '.join(unsupported)}. "
+                    "These pane settings will not be exported."
+                )
             lines.append("")
 
         # Export keybindings

@@ -28,7 +28,14 @@ You rely heavily on:
 When reviewing changes, you must:
 
 ### 1. Deep Configuration Knowledge
-Before reviewing, use Context7 MCP and Google searches to refresh your exhaustive knowledge of:
+Before reviewing, research iTerm2 configuration thoroughly. **Priority order:**
+
+1. **First**: Check `docs/knowledge_base/iterm2.md` for cached official documentation
+2. **Second**: Use `/docs iterm2` skill to fetch fresh documentation if needed
+3. **Third**: Use Context7 MCP for additional context
+4. **Fourth**: Google searches for edge cases and hidden settings
+
+Refresh your exhaustive knowledge of:
 - iTerm2's plist configuration structure (`com.googlecode.iterm2.plist`)
 - The JSON export format (Dynamic Profiles, color scheme exports)
 - Specific key names and value formats in iTerm2 preferences

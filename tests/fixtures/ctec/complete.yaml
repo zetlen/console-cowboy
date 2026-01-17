@@ -1,4 +1,5 @@
 # Complete CTEC configuration example
+# This fixture exercises EVERY part of the schema to the maximum degree
 version: "1.0"
 source_terminal: ghostty
 
@@ -28,6 +29,24 @@ color_scheme:
     r: 197
     g: 200
     b: 198
+  # Extended semantic colors
+  bold:
+    r: 255
+    g: 255
+    b: 255
+  link:
+    r: 100
+    g: 150
+    b: 255
+  underline:
+    r: 200
+    g: 200
+    b: 100
+  cursor_guide:
+    r: 50
+    g: 50
+    b: 80
+  # Base ANSI colors
   black:
     r: 29
     g: 31
@@ -60,6 +79,7 @@ color_scheme:
     r: 197
     g: 200
     b: 198
+  # Bright ANSI colors
   bright_black:
     r: 150
     g: 152
@@ -96,15 +116,27 @@ color_scheme:
 font:
   family: JetBrains Mono
   size: 14.0
+  weight: regular
+  style: normal
   line_height: 1.1
   bold_font: JetBrains Mono Bold
   italic_font: JetBrains Mono Italic
+  bold_italic_font: JetBrains Mono Bold Italic
   ligatures: true
+  fallback_fonts:
+    - Symbols Nerd Font
+    - Noto Color Emoji
+  anti_aliasing: true
+  draw_powerline_glyphs: true
 
 cursor:
   style: block
   blink: true
   blink_interval: 500
+  color:
+    r: 255
+    g: 200
+    b: 100
 
 window:
   columns: 120
@@ -114,16 +146,117 @@ window:
   padding_horizontal: 10
   padding_vertical: 10
   decorations: true
+  startup_mode: normal
   dynamic_title: true
 
 behavior:
   shell: /bin/zsh
+  working_directory: "~"
   scrollback_lines: 10000
   bell_mode: visual
   copy_on_select: true
   confirm_close: true
+  mouse_enabled: true
 
+scroll:
+  lines: 10000
+  unlimited: false
+  disabled: false
+  multiplier: 3.0
+
+# Tab bar configuration (Ghostty, Kitty, WezTerm, iTerm2)
+tabs:
+  position: top
+  visibility: auto
+  alignment: left
+  style: native
+  auto_hide_single: true
+  new_tab_position: current
+  close_strategy: previous
+  min_tabs_to_show: 2
+  max_width: 25
+  show_index: true
+  inherit_working_directory: true
+  # Tab bar colors
+  active_foreground:
+    r: 255
+    g: 255
+    b: 255
+  active_background:
+    r: 40
+    g: 44
+    b: 52
+  inactive_foreground:
+    r: 150
+    g: 150
+    b: 150
+  inactive_background:
+    r: 33
+    g: 37
+    b: 43
+  bar_background:
+    r: 25
+    g: 28
+    b: 34
+
+# Split pane configuration (Ghostty, Kitty, WezTerm, iTerm2)
+panes:
+  inactive_dim_factor: 0.8
+  inactive_dim_color:
+    r: 30
+    g: 30
+    b: 40
+  border_width: 1.5
+  active_border_color:
+    r: 100
+    g: 200
+    b: 100
+  inactive_border_color:
+    r: 80
+    g: 80
+    b: 80
+  divider_color:
+    r: 60
+    g: 60
+    b: 70
+  focus_follows_mouse: true
+
+# Quick terminal / hotkey window configuration
+quick_terminal:
+  enabled: true
+  position: top
+  screen: main
+  size_percent: 50.0
+  animation_duration: 200
+  floating: true
+  hide_on_focus_loss: true
+  hotkey: "`"
+  hotkey_key_code: 50
+  hotkey_modifiers: 256
+
+# Text hints / pattern detection configuration
+text_hints:
+  enabled: true
+  alphabet: "asdfjkl;"
+  rules:
+    - regex: "(https?://)[\\w\\-._~:/?#\\[\\]@!$&'()*+,;=%]+"
+      notes: URL pattern
+      action: open_url
+      hyperlinks: true
+    - regex: "[\\w.]+@[\\w.]+"
+      notes: Email pattern
+      action: copy
+      precision: normal
+    - regex: "/[\\w./\\-]+"
+      notes: File path pattern
+      action: open_file
+      command: "open"
+      command_args:
+        - "-R"
+
+# Key bindings
 key_bindings:
+  # Basic clipboard operations
   - action: Copy
     key: c
     mods:
@@ -134,8 +267,107 @@ key_bindings:
     mods:
       - ctrl
       - shift
+  # Tab operations
+  - action: new_tab
+    key: t
+    mods:
+      - ctrl
+      - shift
+  - action: close_tab
+    key: w
+    mods:
+      - ctrl
+      - shift
+  - action: next_tab
+    key: "Tab"
+    mods:
+      - ctrl
+  - action: previous_tab
+    key: "Tab"
+    mods:
+      - ctrl
+      - shift
+  # Pane operations
+  - action: new_split:right
+    key: d
+    mods:
+      - ctrl
+      - shift
+    scope: application
+  - action: new_split:down
+    key: "Return"
+    mods:
+      - ctrl
+      - shift
+  - action: close_pane
+    key: x
+    mods:
+      - ctrl
+      - shift
+  # Font size
+  - action: increase_font_size:1
+    key: "="
+    mods:
+      - ctrl
+  - action: decrease_font_size:1
+    key: "-"
+    mods:
+      - ctrl
+  - action: reset_font_size
+    key: "0"
+    mods:
+      - ctrl
+  # Scrollback
+  - action: scroll_page_up
+    key: "PageUp"
+    mods: []
+  - action: scroll_page_down
+    key: "PageDown"
+    mods: []
+  # Key sequence example
+  - action: goto_tab:1
+    key: "1"
+    key_sequence:
+      - "Space"
+      - "1"
+    mods:
+      - ctrl
+    scope: application
+  # Global keybinding
+  - action: toggle_quick_terminal
+    key: "`"
+    mods:
+      - ctrl
+    scope: global
 
+# Profile support
+profiles:
+  - name: Default
+    is_default: true
+  - name: SSH
+    is_default: false
+
+# Terminal-specific settings (for round-trip preservation)
 terminal_specific:
   - terminal: ghostty
     key: gtk-single-instance
     value: true
+  - terminal: ghostty
+    key: window-decoration
+    value: server
+  - terminal: kitty
+    key: enabled_layouts
+    value: "splits:split_axis=horizontal,tall,fat,grid"
+  - terminal: wezterm
+    key: leader
+    value:
+      key: Space
+      mods: CTRL
+      timeout_milliseconds: 1000
+  - terminal: iterm2
+    key: DimInactiveSplitPanes
+    value: true
+
+# Conversion warnings
+warnings:
+  - "Some Ghostty-specific features may not be available in other terminals"

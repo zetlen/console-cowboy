@@ -19,4 +19,8 @@ gha-creds-*.json
 
 # Knowledge base documentation (fetched on demand via /docs command)
 docs/knowledge_base/
+
+# Coverage reports
 .coverage
+coverage.xml
+htmlcov/

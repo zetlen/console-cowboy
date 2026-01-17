@@ -17,9 +17,16 @@ from console_cowboy.ctec.schema import (
     FontConfig,
     KeyBinding,
     KeyBindingScope,
+    PaneConfig,
     QuickTerminalConfig,
     QuickTerminalPosition,
     ScrollConfig,
+    TabBarAlignment,
+    TabBarPosition,
+    TabBarStyle,
+    TabBarVisibility,
+    TabCloseStrategy,
+    TabConfig,
     WindowConfig,
 )
 from console_cowboy.utils.colors import normalize_color
@@ -92,6 +99,44 @@ class KittyAdapter(TerminalAdapter):
 
     QUICK_TERMINAL_EDGE_REVERSE_MAP = {v: k for k, v in QUICK_TERMINAL_EDGE_MAP.items()}
 
+    # Tab bar position mapping
+    TAB_POSITION_MAP = {
+        "top": TabBarPosition.TOP,
+        "bottom": TabBarPosition.BOTTOM,
+    }
+
+    TAB_POSITION_REVERSE_MAP = {v: k for k, v in TAB_POSITION_MAP.items()}
+
+    # Tab bar style mapping
+    TAB_STYLE_MAP = {
+        "fade": TabBarStyle.FADE,
+        "powerline": TabBarStyle.POWERLINE,
+        "slant": TabBarStyle.SLANT,
+        "separator": TabBarStyle.SEPARATOR,
+        # hidden means visibility=NEVER, not a style
+    }
+
+    TAB_STYLE_REVERSE_MAP = {v: k for k, v in TAB_STYLE_MAP.items()}
+
+    # Tab bar alignment mapping
+    TAB_ALIGNMENT_MAP = {
+        "left": TabBarAlignment.LEFT,
+        "center": TabBarAlignment.CENTER,
+        "right": TabBarAlignment.RIGHT,
+    }
+
+    TAB_ALIGNMENT_REVERSE_MAP = {v: k for k, v in TAB_ALIGNMENT_MAP.items()}
+
+    # Tab switch/close strategy mapping
+    TAB_CLOSE_STRATEGY_MAP = {
+        "previous": TabCloseStrategy.PREVIOUS,
+        "left": TabCloseStrategy.LEFT,
+        "right": TabCloseStrategy.RIGHT,
+        "last": TabCloseStrategy.LAST,
+    }
+
+    TAB_CLOSE_STRATEGY_REVERSE_MAP = {v: k for k, v in TAB_CLOSE_STRATEGY_MAP.items()}
+
     @classmethod
     def can_parse(cls, content: str) -> bool:
         """Check if content looks like a Kitty config."""
@@ -133,6 +178,8 @@ class KittyAdapter(TerminalAdapter):
         window = WindowConfig()
         behavior = BehaviorConfig()
         quick_terminal = QuickTerminalConfig()
+        tabs = TabConfig()
+        panes = PaneConfig()
 
         if content is None:
             path = Path(source)
@@ -352,6 +399,66 @@ class KittyAdapter(TerminalAdapter):
                             KeyBinding(action=action, key=actual_key, mods=mods)
                         )
 
+            # Parse tab settings
+            elif key == "tab_bar_edge":
+                tabs.position = cls.TAB_POSITION_MAP.get(
+                    value.lower(), TabBarPosition.TOP
+                )
+            elif key == "tab_bar_style":
+                if value.lower() == "hidden":
+                    tabs.visibility = TabBarVisibility.NEVER
+                else:
+                    tabs.style = cls.TAB_STYLE_MAP.get(value.lower())
+            elif key == "tab_bar_align":
+                tabs.alignment = cls.TAB_ALIGNMENT_MAP.get(
+                    value.lower(), TabBarAlignment.LEFT
+                )
+            elif key == "tab_bar_min_tabs":
+                try:
+                    min_tabs = int(value)
+                    tabs.min_tabs_to_show = min_tabs
+                    # 1 = always show, 2 = show when 2+ tabs (auto)
+                    if min_tabs <= 1:
+                        tabs.visibility = TabBarVisibility.ALWAYS
+                    else:
+                        tabs.auto_hide_single = True
+                except ValueError:
+                    ctec.add_warning(f"Invalid tab_bar_min_tabs: {value}")
+            elif key == "tab_switch_strategy":
+                tabs.close_strategy = cls.TAB_CLOSE_STRATEGY_MAP.get(
+                    value.lower(), TabCloseStrategy.PREVIOUS
+                )
+            elif key == "active_tab_foreground":
+                tabs.active_foreground = normalize_color(value)
+            elif key == "active_tab_background":
+                tabs.active_background = normalize_color(value)
+            elif key == "inactive_tab_foreground":
+                tabs.inactive_foreground = normalize_color(value)
+            elif key == "inactive_tab_background":
+                tabs.inactive_background = normalize_color(value)
+            elif key == "tab_bar_background":
+                tabs.bar_background = normalize_color(value)
+
+            # Parse pane settings
+            elif key == "inactive_text_alpha":
+                try:
+                    panes.inactive_dim_factor = float(value)
+                except ValueError:
+                    ctec.add_warning(f"Invalid inactive_text_alpha: {value}")
+            elif key == "active_border_color":
+                panes.active_border_color = normalize_color(value)
+            elif key == "inactive_border_color":
+                panes.inactive_border_color = normalize_color(value)
+            elif key == "window_border_width":
+                try:
+                    # Kitty uses pt units, we store as float
+                    val_str = value.replace("pt", "").strip()
+                    panes.border_width = float(val_str)
+                except ValueError:
+                    ctec.add_warning(f"Invalid window_border_width: {value}")
+            elif key == "focus_follows_mouse":
+                panes.focus_follows_mouse = value.lower() == "yes"
+
             # Parse quick-access-terminal kitten settings (Kitty 0.42+)
             # These are typically in quick-access-terminal.conf but we support
             # them in main config for cross-terminal compatibility
@@ -386,6 +493,36 @@ class KittyAdapter(TerminalAdapter):
             ctec.behavior = behavior
         if quick_terminal.enabled:
             ctec.quick_terminal = quick_terminal
+        # Add tabs if any tab settings were configured
+        if any(
+            getattr(tabs, f) is not None
+            for f in [
+                "position",
+                "visibility",
+                "alignment",
+                "style",
+                "min_tabs_to_show",
+                "close_strategy",
+                "active_foreground",
+                "active_background",
+                "inactive_foreground",
+                "inactive_background",
+                "bar_background",
+            ]
+        ):
+            ctec.tabs = tabs
+        # Add panes if any pane settings were configured
+        if any(
+            getattr(panes, f) is not None
+            for f in [
+                "inactive_dim_factor",
+                "border_width",
+                "active_border_color",
+                "inactive_border_color",
+                "focus_follows_mouse",
+            ]
+        ):
+            ctec.panes = panes
 
         return ctec
 
@@ -538,6 +675,106 @@ class KittyAdapter(TerminalAdapter):
                 else:
                     action = kb.action
                 lines.append(f"map {keys} {action}")
+            lines.append("")
+
+        # Export tab settings
+        if ctec.tabs:
+            lines.append("# Tab Bar")
+            if ctec.tabs.position is not None:
+                position = cls.TAB_POSITION_REVERSE_MAP.get(ctec.tabs.position, "top")
+                lines.append(f"tab_bar_edge {position}")
+            # Handle visibility - Kitty uses tab_bar_style=hidden or tab_bar_min_tabs
+            if ctec.tabs.visibility == TabBarVisibility.NEVER:
+                lines.append("tab_bar_style hidden")
+            elif ctec.tabs.visibility == TabBarVisibility.ALWAYS:
+                lines.append("tab_bar_min_tabs 1")
+            elif ctec.tabs.auto_hide_single:
+                lines.append("tab_bar_min_tabs 2")
+            elif ctec.tabs.min_tabs_to_show is not None:
+                lines.append(f"tab_bar_min_tabs {ctec.tabs.min_tabs_to_show}")
+            # Export style (only if visibility != hidden)
+            if (
+                ctec.tabs.style is not None
+                and ctec.tabs.visibility != TabBarVisibility.NEVER
+            ):
+                style = cls.TAB_STYLE_REVERSE_MAP.get(ctec.tabs.style)
+                if style:
+                    lines.append(f"tab_bar_style {style}")
+            if ctec.tabs.alignment is not None:
+                alignment = cls.TAB_ALIGNMENT_REVERSE_MAP.get(
+                    ctec.tabs.alignment, "left"
+                )
+                lines.append(f"tab_bar_align {alignment}")
+            if ctec.tabs.close_strategy is not None:
+                strategy = cls.TAB_CLOSE_STRATEGY_REVERSE_MAP.get(
+                    ctec.tabs.close_strategy, "previous"
+                )
+                lines.append(f"tab_switch_strategy {strategy}")
+            # Tab colors
+            if ctec.tabs.active_foreground is not None:
+                lines.append(
+                    f"active_tab_foreground {ctec.tabs.active_foreground.to_hex()}"
+                )
+            if ctec.tabs.active_background is not None:
+                lines.append(
+                    f"active_tab_background {ctec.tabs.active_background.to_hex()}"
+                )
+            if ctec.tabs.inactive_foreground is not None:
+                lines.append(
+                    f"inactive_tab_foreground {ctec.tabs.inactive_foreground.to_hex()}"
+                )
+            if ctec.tabs.inactive_background is not None:
+                lines.append(
+                    f"inactive_tab_background {ctec.tabs.inactive_background.to_hex()}"
+                )
+            if ctec.tabs.bar_background is not None:
+                lines.append(f"tab_bar_background {ctec.tabs.bar_background.to_hex()}")
+            # Warn about unsupported tab features
+            unsupported = []
+            if ctec.tabs.new_tab_position is not None:
+                unsupported.append("new_tab_position")
+            if ctec.tabs.max_width is not None:
+                unsupported.append("max_width")
+            if ctec.tabs.show_index is not None:
+                unsupported.append("show_index")
+            if ctec.tabs.inherit_working_directory is not None:
+                unsupported.append("inherit_working_directory")
+            if unsupported:
+                ctec.add_warning(
+                    f"Kitty does not support: {', '.join(unsupported)}. "
+                    "These tab settings will not be exported."
+                )
+            lines.append("")
+
+        # Export pane settings
+        if ctec.panes:
+            lines.append("# Pane Settings")
+            if ctec.panes.inactive_dim_factor is not None:
+                lines.append(f"inactive_text_alpha {ctec.panes.inactive_dim_factor}")
+            if ctec.panes.border_width is not None:
+                lines.append(f"window_border_width {ctec.panes.border_width}pt")
+            if ctec.panes.active_border_color is not None:
+                lines.append(
+                    f"active_border_color {ctec.panes.active_border_color.to_hex()}"
+                )
+            if ctec.panes.inactive_border_color is not None:
+                lines.append(
+                    f"inactive_border_color {ctec.panes.inactive_border_color.to_hex()}"
+                )
+            if ctec.panes.focus_follows_mouse is not None:
+                val = "yes" if ctec.panes.focus_follows_mouse else "no"
+                lines.append(f"focus_follows_mouse {val}")
+            # Warn about unsupported pane features
+            unsupported = []
+            if ctec.panes.inactive_dim_color is not None:
+                unsupported.append("inactive_dim_color")
+            if ctec.panes.divider_color is not None:
+                unsupported.append("divider_color")
+            if unsupported:
+                ctec.add_warning(
+                    f"Kitty does not support: {', '.join(unsupported)}. "
+                    "These pane settings will not be exported."
+                )
             lines.append("")
 
         # Export quick-access-terminal settings (Kitty 0.42+ kitten)

@@ -215,6 +215,81 @@ class TextHintPrecision(Enum):
     VERY_HIGH = "very_high"
 
 
+class TabBarVisibility(Enum):
+    """
+    When the tab bar is shown (distinct from position).
+
+    Supported by: Ghostty, Kitty, WezTerm, iTerm2.
+    Note: Alacritty does not support native tabs.
+    """
+
+    ALWAYS = "always"  # Always show tab bar
+    AUTO = "auto"  # Show when multiple tabs exist
+    NEVER = "never"  # Never show (hidden)
+
+
+class TabBarPosition(Enum):
+    """
+    Where the tab bar appears (when visible).
+
+    Supported by: Ghostty (GTK), Kitty, WezTerm.
+    """
+
+    TOP = "top"
+    BOTTOM = "bottom"
+
+
+class TabBarAlignment(Enum):
+    """
+    Horizontal alignment of tabs within the bar.
+
+    Supported by: Kitty, WezTerm.
+    """
+
+    LEFT = "left"
+    CENTER = "center"
+    RIGHT = "right"
+
+
+class TabBarStyle(Enum):
+    """
+    Tab bar visual style.
+
+    Supported by: Kitty, WezTerm.
+    """
+
+    NATIVE = "native"  # Platform native
+    FANCY = "fancy"  # Enhanced (WezTerm use_fancy_tab_bar)
+    FADE = "fade"  # Kitty fade style
+    POWERLINE = "powerline"  # Kitty powerline
+    SLANT = "slant"  # Kitty slant
+    SEPARATOR = "separator"  # Kitty separator
+
+
+class NewTabPosition(Enum):
+    """
+    Where new tabs are created.
+
+    Supported by: Ghostty, Kitty.
+    """
+
+    CURRENT = "current"  # After current tab
+    END = "end"  # At end of tab bar
+
+
+class TabCloseStrategy(Enum):
+    """
+    Which tab to focus when current tab is closed.
+
+    Supported by: Kitty.
+    """
+
+    PREVIOUS = "previous"  # Focus previously active
+    LEFT = "left"  # Focus tab to left
+    RIGHT = "right"  # Focus tab to right
+    LAST = "last"  # Focus last tab
+
+
 @dataclass
 class Color:
     """
@@ -1013,6 +1088,215 @@ class QuickTerminalConfig:
 
 
 @dataclass
+class TabConfig:
+    """
+    Tab bar configuration.
+
+    Supported by: Ghostty, Kitty, WezTerm, iTerm2.
+    Note: Alacritty does not support native tabs.
+
+    Attributes:
+        position: Where the tab bar appears (top/bottom)
+        visibility: When the tab bar is shown (always/auto/never)
+        alignment: Horizontal alignment of tabs within the bar (left/center/right)
+        style: Tab bar visual style (native/fancy/fade/powerline/slant/separator)
+        auto_hide_single: Hide tab bar when only one tab exists
+        new_tab_position: Where new tabs are created (current/end)
+        close_strategy: Which tab to focus when current is closed
+        min_tabs_to_show: Minimum tabs before showing bar
+        max_width: Maximum tab width in cells
+        show_index: Show tab numbers
+        inherit_working_directory: New tabs inherit cwd
+        active_foreground: Active tab text color
+        active_background: Active tab background color
+        inactive_foreground: Inactive tab text color
+        inactive_background: Inactive tab background color
+        bar_background: Tab bar background color
+    """
+
+    # Tab bar layout
+    position: TabBarPosition | None = None
+    visibility: TabBarVisibility | None = None
+    alignment: TabBarAlignment | None = None
+    style: TabBarStyle | None = None
+
+    # Tab behavior
+    auto_hide_single: bool | None = None
+    new_tab_position: NewTabPosition | None = None
+    close_strategy: TabCloseStrategy | None = None
+    min_tabs_to_show: int | None = None
+    max_width: int | None = None
+    show_index: bool | None = None
+    inherit_working_directory: bool | None = None
+
+    # Tab bar colors
+    active_foreground: Color | None = None
+    active_background: Color | None = None
+    inactive_foreground: Color | None = None
+    inactive_background: Color | None = None
+    bar_background: Color | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary representation."""
+        result = {}
+        # Enum fields
+        if self.position is not None:
+            result["position"] = self.position.value
+        if self.visibility is not None:
+            result["visibility"] = self.visibility.value
+        if self.alignment is not None:
+            result["alignment"] = self.alignment.value
+        if self.style is not None:
+            result["style"] = self.style.value
+        if self.new_tab_position is not None:
+            result["new_tab_position"] = self.new_tab_position.value
+        if self.close_strategy is not None:
+            result["close_strategy"] = self.close_strategy.value
+        # Simple fields
+        for field_name in [
+            "auto_hide_single",
+            "min_tabs_to_show",
+            "max_width",
+            "show_index",
+            "inherit_working_directory",
+        ]:
+            value = getattr(self, field_name)
+            if value is not None:
+                result[field_name] = value
+        # Color fields
+        for field_name in [
+            "active_foreground",
+            "active_background",
+            "inactive_foreground",
+            "inactive_background",
+            "bar_background",
+        ]:
+            color = getattr(self, field_name)
+            if color is not None:
+                result[field_name] = color.to_dict()
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "TabConfig":
+        """Create a TabConfig from a dictionary."""
+        return cls(
+            position=TabBarPosition(data["position"]) if "position" in data else None,
+            visibility=TabBarVisibility(data["visibility"])
+            if "visibility" in data
+            else None,
+            alignment=TabBarAlignment(data["alignment"])
+            if "alignment" in data
+            else None,
+            style=TabBarStyle(data["style"]) if "style" in data else None,
+            auto_hide_single=data.get("auto_hide_single"),
+            new_tab_position=NewTabPosition(data["new_tab_position"])
+            if "new_tab_position" in data
+            else None,
+            close_strategy=TabCloseStrategy(data["close_strategy"])
+            if "close_strategy" in data
+            else None,
+            min_tabs_to_show=data.get("min_tabs_to_show"),
+            max_width=data.get("max_width"),
+            show_index=data.get("show_index"),
+            inherit_working_directory=data.get("inherit_working_directory"),
+            active_foreground=Color.from_dict(data["active_foreground"])
+            if "active_foreground" in data
+            else None,
+            active_background=Color.from_dict(data["active_background"])
+            if "active_background" in data
+            else None,
+            inactive_foreground=Color.from_dict(data["inactive_foreground"])
+            if "inactive_foreground" in data
+            else None,
+            inactive_background=Color.from_dict(data["inactive_background"])
+            if "inactive_background" in data
+            else None,
+            bar_background=Color.from_dict(data["bar_background"])
+            if "bar_background" in data
+            else None,
+        )
+
+
+@dataclass
+class PaneConfig:
+    """
+    Split pane configuration.
+
+    Supported by: Ghostty, Kitty, WezTerm, iTerm2.
+    Note: Alacritty does not support native panes.
+
+    Attributes:
+        inactive_dim_factor: Brightness multiplier for inactive panes (0.0-1.0,
+            where 1.0 = full brightness, 0.0 = completely dimmed).
+            Ghostty minimum is 0.15, values will be clamped on export.
+        inactive_dim_color: Fill color for dimmed inactive panes
+        border_width: Pane border width (Kitty)
+        active_border_color: Border color for active pane (Kitty)
+        inactive_border_color: Border color for inactive panes (Kitty)
+        divider_color: Color of pane dividers (Ghostty, WezTerm)
+        focus_follows_mouse: Focus pane under mouse cursor (Ghostty, WezTerm)
+    """
+
+    # Inactive pane appearance
+    inactive_dim_factor: float | None = None
+    inactive_dim_color: Color | None = None
+
+    # Pane borders
+    border_width: float | None = None
+    active_border_color: Color | None = None
+    inactive_border_color: Color | None = None
+    divider_color: Color | None = None
+
+    # Behavior
+    focus_follows_mouse: bool | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary representation."""
+        result = {}
+        # Simple fields
+        for field_name in [
+            "inactive_dim_factor",
+            "border_width",
+            "focus_follows_mouse",
+        ]:
+            value = getattr(self, field_name)
+            if value is not None:
+                result[field_name] = value
+        # Color fields
+        for field_name in [
+            "inactive_dim_color",
+            "active_border_color",
+            "inactive_border_color",
+            "divider_color",
+        ]:
+            color = getattr(self, field_name)
+            if color is not None:
+                result[field_name] = color.to_dict()
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "PaneConfig":
+        """Create a PaneConfig from a dictionary."""
+        return cls(
+            inactive_dim_factor=data.get("inactive_dim_factor"),
+            inactive_dim_color=Color.from_dict(data["inactive_dim_color"])
+            if "inactive_dim_color" in data
+            else None,
+            border_width=data.get("border_width"),
+            active_border_color=Color.from_dict(data["active_border_color"])
+            if "active_border_color" in data
+            else None,
+            inactive_border_color=Color.from_dict(data["inactive_border_color"])
+            if "inactive_border_color" in data
+            else None,
+            divider_color=Color.from_dict(data["divider_color"])
+            if "divider_color" in data
+            else None,
+            focus_follows_mouse=data.get("focus_follows_mouse"),
+        )
+
+
+@dataclass
 class TerminalSpecificSetting:
     """
     A setting specific to a particular terminal emulator that cannot
@@ -1258,6 +1542,8 @@ class CTEC:
         window: Window configuration
         behavior: Terminal behavior configuration
         scroll: Scrollback and scroll behavior configuration
+        tabs: Tab bar configuration
+        panes: Split pane configuration
         quick_terminal: Quick terminal / hotkey window configuration
         text_hints: Text pattern detection and hint configuration
         key_bindings: List of keyboard shortcuts
@@ -1273,6 +1559,8 @@ class CTEC:
     window: WindowConfig | None = None
     behavior: BehaviorConfig | None = None
     scroll: ScrollConfig | None = None
+    tabs: TabConfig | None = None
+    panes: PaneConfig | None = None
     quick_terminal: QuickTerminalConfig | None = None
     text_hints: TextHintConfig | None = None
     key_bindings: list[KeyBinding] = field(default_factory=list)
@@ -1296,6 +1584,10 @@ class CTEC:
             result["behavior"] = self.behavior.to_dict()
         if self.scroll is not None:
             result["scroll"] = self.scroll.to_dict()
+        if self.tabs is not None:
+            result["tabs"] = self.tabs.to_dict()
+        if self.panes is not None:
+            result["panes"] = self.panes.to_dict()
         if self.quick_terminal is not None:
             result["quick_terminal"] = self.quick_terminal.to_dict()
         if self.text_hints is not None:
@@ -1324,6 +1616,8 @@ class CTEC:
             if "behavior" in data
             else None,
             scroll=ScrollConfig.from_dict(data["scroll"]) if "scroll" in data else None,
+            tabs=TabConfig.from_dict(data["tabs"]) if "tabs" in data else None,
+            panes=PaneConfig.from_dict(data["panes"]) if "panes" in data else None,
             quick_terminal=QuickTerminalConfig.from_dict(data["quick_terminal"])
             if "quick_terminal" in data
             else None,

@@ -40,6 +40,15 @@ You keep seeing articles and hearing colleagues rave about how newer terminal em
    - "Is the learning curve worth it for someone with basic needs?"
    - "What's the minimum I need to configure to get started?"
 
+**Research Protocol:**
+
+When you need to understand what default terminal emulators support (to compare with the new terminal's features):
+1. Check `docs/knowledge_base/macos_terminal.md` for macOS Terminal.app documentation (if available)
+2. Use `/docs macos_terminal` skill to fetch fresh documentation if needed
+3. Web search for gnome-terminal capabilities if comparing to Linux defaults
+
+This helps you accurately represent what basic terminal users have access to.
+
 **Review Approach:**
 
 - Read through all changes in the pull request carefully

@@ -19,6 +19,7 @@ from console_cowboy.ctec.schema import (
     CursorConfig,
     CursorStyle,
     FontConfig,
+    PaneConfig,
     QuickTerminalConfig,
     QuickTerminalPosition,
     ScrollConfig,
@@ -708,12 +709,36 @@ class ITerm2Adapter(TerminalAdapter):
                 window.rows = data["Default Bookmark Window Height"]
             ctec.window = window
 
+        # Parse pane settings from global config
+        panes = PaneConfig()
+        if "SplitPaneDimmingAmount" in data:
+            try:
+                # iTerm2: 0 = no dimming (full brightness), 1 = full dimming
+                # CTEC: 1 = full brightness, 0 = fully dimmed
+                dimming_amount = float(data["SplitPaneDimmingAmount"])
+                panes.inactive_dim_factor = 1.0 - dimming_amount
+            except (ValueError, TypeError):
+                pass
+
+        # Track other pane-related settings as terminal-specific
+        if data.get("DimInactiveSplitPanes", False):
+            ctec.add_terminal_specific("iterm2", "DimInactiveSplitPanes", True)
+        if "DimOnlyText" in data:
+            ctec.add_terminal_specific("iterm2", "DimOnlyText", data["DimOnlyText"])
+        if "DimBackgroundWindows" in data:
+            ctec.add_terminal_specific(
+                "iterm2", "DimBackgroundWindows", data["DimBackgroundWindows"]
+            )
+
+        # Add panes if any pane settings were configured
+        if panes.inactive_dim_factor is not None:
+            ctec.panes = panes
+
         # Parse global settings
         global_specific_keys = [
             "TabStyleWithAutomaticOption",
             "HideTab",
             "HideMenuBarInFullscreen",
-            "SplitPaneDimmingAmount",
             "UseBorder",
             "HideScrollbar",
             "PromptOnQuit",
@@ -931,16 +956,50 @@ class ITerm2Adapter(TerminalAdapter):
             if ctec.window.rows:
                 result["Default Bookmark Window Height"] = ctec.window.rows
 
+        # Export pane settings
+        if ctec.panes:
+            if ctec.panes.inactive_dim_factor is not None:
+                # Convert CTEC (1 = full brightness) to iTerm2 (0 = no dimming)
+                result["SplitPaneDimmingAmount"] = 1.0 - ctec.panes.inactive_dim_factor
+            # Warn about unsupported pane features
+            unsupported = []
+            if ctec.panes.inactive_dim_color is not None:
+                unsupported.append("inactive_dim_color")
+            if ctec.panes.border_width is not None:
+                unsupported.append("border_width")
+            if ctec.panes.active_border_color is not None:
+                unsupported.append("active_border_color")
+            if ctec.panes.inactive_border_color is not None:
+                unsupported.append("inactive_border_color")
+            if ctec.panes.divider_color is not None:
+                unsupported.append("divider_color")
+            if ctec.panes.focus_follows_mouse is not None:
+                unsupported.append("focus_follows_mouse")
+            if unsupported:
+                ctec.add_warning(
+                    f"iTerm2 does not support: {', '.join(unsupported)}. "
+                    "These pane settings will not be exported."
+                )
+
+        # Warn about unsupported tab features
+        if ctec.tabs:
+            ctec.add_warning(
+                "iTerm2 does not support tab bar configuration via plist export. "
+                "Tab settings must be configured in Preferences > Appearance."
+            )
+
         # Restore terminal-specific global settings
         global_keys = [
             "TabStyleWithAutomaticOption",
             "HideTab",
             "HideMenuBarInFullscreen",
-            "SplitPaneDimmingAmount",
             "UseBorder",
             "HideScrollbar",
             "PromptOnQuit",
             "OnlyWhenMoreTabs",
+            "DimInactiveSplitPanes",
+            "DimOnlyText",
+            "DimBackgroundWindows",
         ]
         for setting in ctec.get_terminal_specific("iterm2"):
             if setting.key in global_keys:
