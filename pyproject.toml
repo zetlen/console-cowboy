@@ -1,6 +1,6 @@
 [project]
 name = "console-cowboy"
-version = "0.2.0"
+version = "0.3.0"
 description = "Hop terminals like you hop linux distributions."
 readme = "README.md"
 authors = [{name = "zetlen"}]

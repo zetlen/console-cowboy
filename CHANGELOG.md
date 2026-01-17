@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/zetlen/console-cowboy/compare/v0.2.0...v0.3.0) (2026-01-17)
+
+
+### Features
+
+* add knowledge base builder and /docs command ([#33](https://github.com/zetlen/console-cowboy/issues/33)) ([d723a7e](https://github.com/zetlen/console-cowboy/commit/d723a7ed7358618a9562dd038e32088dcac84b37))
+* **cli:** redesign CLI with unified --from/--to interface ([#30](https://github.com/zetlen/console-cowboy/issues/30)) ([af74ee1](https://github.com/zetlen/console-cowboy/commit/af74ee1f2d4e0edd24e23193ab9fb94aa5eceec0))
+* **keybindings:** add comprehensive keybinding support across terminals ([#32](https://github.com/zetlen/console-cowboy/issues/32)) ([93f4613](https://github.com/zetlen/console-cowboy/commit/93f4613564514f93960f89adcb0dfcb911c8c936)), closes [#18](https://github.com/zetlen/console-cowboy/issues/18)
+* **schema:** add TabConfig and PaneConfig for cross-terminal tab/pane settings ([#36](https://github.com/zetlen/console-cowboy/issues/36)) ([a4fce12](https://github.com/zetlen/console-cowboy/commit/a4fce12b224003d7baab7f9ed1c7c8455de49012))
+* **wezterm:** replace regex parsing with Lua interpreter ([#34](https://github.com/zetlen/console-cowboy/issues/34)) ([13fdb3b](https://github.com/zetlen/console-cowboy/commit/13fdb3bf84b6ed0fac6eb4b011d31d3b2b46d590))
+
 ## [0.2.0](https://github.com/zetlen/console-cowboy/compare/v0.1.2...v0.2.0) (2026-01-17)
 
 
