@@ -23,7 +23,12 @@ from console_cowboy.ctec.schema import (
     FontWeight,
     KeyBinding,
     KeyBindingScope,
+    PaneConfig,
     ScrollConfig,
+    TabBarPosition,
+    TabBarStyle,
+    TabBarVisibility,
+    TabConfig,
     TerminalSpecificSetting,
     TextHintAction,
     TextHintConfig,
@@ -420,6 +425,141 @@ class WeztermAdapter(TerminalAdapter):
 
         if behavior.shell or behavior.scrollback_lines or behavior.bell_mode:
             ctec.behavior = behavior
+
+        # Parse tab settings
+        tabs = TabConfig()
+        if "enable_tab_bar" in config:
+            enable_tab_bar = config["enable_tab_bar"]
+            if isinstance(enable_tab_bar, bool) and not enable_tab_bar:
+                tabs.visibility = TabBarVisibility.NEVER
+            elif str(enable_tab_bar).lower() == "false":
+                tabs.visibility = TabBarVisibility.NEVER
+
+        if "tab_bar_at_bottom" in config:
+            tab_bar_at_bottom = config["tab_bar_at_bottom"]
+            if isinstance(tab_bar_at_bottom, bool):
+                tabs.position = (
+                    TabBarPosition.BOTTOM if tab_bar_at_bottom else TabBarPosition.TOP
+                )
+            elif str(tab_bar_at_bottom).lower() == "true":
+                tabs.position = TabBarPosition.BOTTOM
+            else:
+                tabs.position = TabBarPosition.TOP
+
+        if "use_fancy_tab_bar" in config:
+            use_fancy = config["use_fancy_tab_bar"]
+            if isinstance(use_fancy, bool):
+                tabs.style = TabBarStyle.FANCY if use_fancy else TabBarStyle.NATIVE
+            elif str(use_fancy).lower() == "true":
+                tabs.style = TabBarStyle.FANCY
+            else:
+                tabs.style = TabBarStyle.NATIVE
+
+        if "hide_tab_bar_if_only_one_tab" in config:
+            hide_single = config["hide_tab_bar_if_only_one_tab"]
+            if isinstance(hide_single, bool):
+                tabs.auto_hide_single = hide_single
+            elif str(hide_single).lower() == "true":
+                tabs.auto_hide_single = True
+
+        if "tab_max_width" in config:
+            try:
+                tabs.max_width = int(config["tab_max_width"])
+            except (ValueError, TypeError):
+                pass
+
+        if "show_tab_index_in_tab_bar" in config:
+            show_index = config["show_tab_index_in_tab_bar"]
+            if isinstance(show_index, bool):
+                tabs.show_index = show_index
+            elif str(show_index).lower() == "true":
+                tabs.show_index = True
+
+        # Parse tab colors from colors.tab_bar
+        if "colors" in config:
+            colors = config["colors"]
+            if isinstance(colors, dict):
+                if "tab_bar" in colors:
+                    tab_bar = colors["tab_bar"]
+                    if isinstance(tab_bar, dict):
+                        if "background" in tab_bar:
+                            tabs.bar_background = cls._parse_lua_color(
+                                tab_bar["background"]
+                            )
+                        if "active_tab" in tab_bar:
+                            active_tab = tab_bar["active_tab"]
+                            if isinstance(active_tab, dict):
+                                if "bg_color" in active_tab:
+                                    tabs.active_background = cls._parse_lua_color(
+                                        active_tab["bg_color"]
+                                    )
+                                if "fg_color" in active_tab:
+                                    tabs.active_foreground = cls._parse_lua_color(
+                                        active_tab["fg_color"]
+                                    )
+                        if "inactive_tab" in tab_bar:
+                            inactive_tab = tab_bar["inactive_tab"]
+                            if isinstance(inactive_tab, dict):
+                                if "bg_color" in inactive_tab:
+                                    tabs.inactive_background = cls._parse_lua_color(
+                                        inactive_tab["bg_color"]
+                                    )
+                                if "fg_color" in inactive_tab:
+                                    tabs.inactive_foreground = cls._parse_lua_color(
+                                        inactive_tab["fg_color"]
+                                    )
+
+        # Add tabs if any tab settings were configured
+        if any(
+            getattr(tabs, f) is not None
+            for f in [
+                "visibility",
+                "position",
+                "style",
+                "auto_hide_single",
+                "max_width",
+                "show_index",
+                "active_foreground",
+                "active_background",
+                "inactive_foreground",
+                "inactive_background",
+                "bar_background",
+            ]
+        ):
+            ctec.tabs = tabs
+
+        # Parse pane settings
+        panes = PaneConfig()
+        if "inactive_pane_hsb" in config:
+            hsb = config["inactive_pane_hsb"]
+            if isinstance(hsb, dict) and "brightness" in hsb:
+                try:
+                    panes.inactive_dim_factor = float(hsb["brightness"])
+                except (ValueError, TypeError):
+                    pass
+
+        if "pane_focus_follows_mouse" in config:
+            focus_follows = config["pane_focus_follows_mouse"]
+            if isinstance(focus_follows, bool):
+                panes.focus_follows_mouse = focus_follows
+            elif str(focus_follows).lower() == "true":
+                panes.focus_follows_mouse = True
+
+        # Check for divider color from colors.split parsed above
+        if "colors" in config and isinstance(config["colors"], dict):
+            if "split" in config["colors"]:
+                panes.divider_color = cls._parse_lua_color(config["colors"]["split"])
+
+        # Add panes if any pane settings were configured
+        if any(
+            getattr(panes, f) is not None
+            for f in [
+                "inactive_dim_factor",
+                "divider_color",
+                "focus_follows_mouse",
+            ]
+        ):
+            ctec.panes = panes
 
         # Parse leader key
         if "leader" in config:
@@ -825,6 +965,130 @@ class WeztermAdapter(TerminalAdapter):
             ):
                 lines.append(f"config.scrollback_lines = {scroll_lines}")
             lines.append("")
+
+        # Export tab settings
+        if ctec.tabs:
+            lines.append("-- Tab Bar")
+            if ctec.tabs.visibility == TabBarVisibility.NEVER:
+                lines.append("config.enable_tab_bar = false")
+            else:
+                lines.append("config.enable_tab_bar = true")
+            if ctec.tabs.position is not None:
+                if ctec.tabs.position == TabBarPosition.BOTTOM:
+                    lines.append("config.tab_bar_at_bottom = true")
+                else:
+                    lines.append("config.tab_bar_at_bottom = false")
+            if ctec.tabs.style is not None:
+                if ctec.tabs.style == TabBarStyle.FANCY:
+                    lines.append("config.use_fancy_tab_bar = true")
+                elif ctec.tabs.style == TabBarStyle.NATIVE:
+                    lines.append("config.use_fancy_tab_bar = false")
+                else:
+                    ctec.add_warning(
+                        f"WezTerm only supports native/fancy tab styles. "
+                        f"Style '{ctec.tabs.style.value}' will be exported as native."
+                    )
+                    lines.append("config.use_fancy_tab_bar = false")
+            if ctec.tabs.auto_hide_single is not None:
+                val = "true" if ctec.tabs.auto_hide_single else "false"
+                lines.append(f"config.hide_tab_bar_if_only_one_tab = {val}")
+            if ctec.tabs.max_width is not None:
+                lines.append(f"config.tab_max_width = {ctec.tabs.max_width}")
+            if ctec.tabs.show_index is not None:
+                val = "true" if ctec.tabs.show_index else "false"
+                lines.append(f"config.show_tab_index_in_tab_bar = {val}")
+            lines.append("")
+
+            # Tab colors need to be added to config.colors
+            has_tab_colors = any(
+                getattr(ctec.tabs, f) is not None
+                for f in [
+                    "active_foreground",
+                    "active_background",
+                    "inactive_foreground",
+                    "inactive_background",
+                    "bar_background",
+                ]
+            )
+            if has_tab_colors:
+                lines.append("-- Tab colors")
+                lines.append("config.colors = config.colors or {}")
+                lines.append("config.colors.tab_bar = {")
+                if ctec.tabs.bar_background is not None:
+                    lines.append(
+                        f'  background = "{ctec.tabs.bar_background.to_hex()}",'
+                    )
+                if (
+                    ctec.tabs.active_foreground is not None
+                    or ctec.tabs.active_background is not None
+                ):
+                    lines.append("  active_tab = {")
+                    if ctec.tabs.active_foreground is not None:
+                        lines.append(
+                            f'    fg_color = "{ctec.tabs.active_foreground.to_hex()}",'
+                        )
+                    if ctec.tabs.active_background is not None:
+                        lines.append(
+                            f'    bg_color = "{ctec.tabs.active_background.to_hex()}",'
+                        )
+                    lines.append("  },")
+                if (
+                    ctec.tabs.inactive_foreground is not None
+                    or ctec.tabs.inactive_background is not None
+                ):
+                    lines.append("  inactive_tab = {")
+                    if ctec.tabs.inactive_foreground is not None:
+                        lines.append(
+                            f'    fg_color = "{ctec.tabs.inactive_foreground.to_hex()}",'
+                        )
+                    if ctec.tabs.inactive_background is not None:
+                        lines.append(
+                            f'    bg_color = "{ctec.tabs.inactive_background.to_hex()}",'
+                        )
+                    lines.append("  },")
+                lines.append("}")
+                lines.append("")
+
+            # Warn about unsupported tab features
+            unsupported = []
+            if ctec.tabs.new_tab_position is not None:
+                unsupported.append("new_tab_position")
+            if ctec.tabs.inherit_working_directory is not None:
+                unsupported.append("inherit_working_directory")
+            if unsupported:
+                ctec.add_warning(
+                    f"WezTerm does not support: {', '.join(unsupported)}. "
+                    "These tab settings will not be exported."
+                )
+
+        # Export pane settings
+        if ctec.panes:
+            lines.append("-- Pane Settings")
+            if ctec.panes.inactive_dim_factor is not None:
+                lines.append("config.inactive_pane_hsb = {")
+                lines.append("  saturation = 1.0,")
+                lines.append("  hue = 1.0,")
+                lines.append(f"  brightness = {ctec.panes.inactive_dim_factor},")
+                lines.append("}")
+            if ctec.panes.focus_follows_mouse is not None:
+                val = "true" if ctec.panes.focus_follows_mouse else "false"
+                lines.append(f"config.pane_focus_follows_mouse = {val}")
+            if ctec.panes.divider_color is not None:
+                lines.append("config.colors = config.colors or {}")
+                lines.append(
+                    f'config.colors.split = "{ctec.panes.divider_color.to_hex()}"'
+                )
+            lines.append("")
+
+            # Warn about unsupported pane features
+            unsupported = []
+            if ctec.panes.inactive_dim_color is not None:
+                unsupported.append("inactive_dim_color")
+            if unsupported:
+                ctec.add_warning(
+                    f"WezTerm does not support: {', '.join(unsupported)}. "
+                    "These pane settings will not be exported."
+                )
 
         # Export leader key (from terminal-specific settings)
         leader_setting = None

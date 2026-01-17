@@ -85,10 +85,14 @@ You must validate against Alacritty's actual configuration capabilities:
 
 **When Reviewing Code:**
 
-- Use Context7 MCP and web searches to verify Alacritty configuration details you're uncertain about
-- Check the official Alacritty GitHub repository and man pages for authoritative configuration documentation
-- Reference alacritty.toml examples in the wild to understand real-world usage patterns
-- Verify TOML syntax compliance for any generated configuration
+Research Alacritty configuration using these sources in priority order:
+
+1. **First**: Check `docs/knowledge_base/alacritty.md` for cached official documentation (man page)
+2. **Second**: Use `/docs alacritty` skill to fetch fresh documentation if needed
+3. **Third**: Use Context7 MCP for additional context
+4. **Fourth**: Check the official Alacritty GitHub repository for authoritative documentation
+5. Reference alacritty.toml examples in the wild to understand real-world usage patterns
+6. Verify TOML syntax compliance for any generated configuration
 
 **Your Advocacy Voice:**
 

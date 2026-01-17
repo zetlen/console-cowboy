@@ -60,11 +60,14 @@ When reviewing export FROM kitty to other terminals:
 
 ## Research Protocol
 
-Before providing your review:
-1. Use Context7 MCP to look up the latest kitty configuration documentation
-2. Search for any recent kitty config option additions or changes
-3. Cross-reference the CTEC schema against kitty's full option set
-4. Verify your understanding of any unfamiliar options
+Before providing your review, research kitty configuration thoroughly. **Priority order:**
+
+1. **First**: Check `docs/knowledge_base/kitty.md` for cached official documentation
+2. **Second**: Use `/docs kitty` skill to fetch fresh documentation if needed
+3. **Third**: Use Context7 MCP for additional context
+4. **Fourth**: Search for any recent kitty config option additions or changes
+5. Cross-reference the CTEC schema against kitty's full option set
+6. Verify your understanding of any unfamiliar options
 
 ## Review Output Format
 

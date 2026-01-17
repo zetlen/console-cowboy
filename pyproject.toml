@@ -85,6 +85,34 @@ scripts = [
     "requests>=2.31",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "--cov=console_cowboy",
+    "--cov-report=term-missing",
+    "--cov-report=xml:coverage.xml",
+    "--cov-report=html:htmlcov",
+]
+
+[tool.coverage.run]
+source = ["console_cowboy"]
+branch = true
+omit = [
+    "console_cowboy/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+fail_under = 70
+show_missing = true
+
 [tool.commitizen]
 name = "cz_conventional_commits"
 version = "0.1.0"

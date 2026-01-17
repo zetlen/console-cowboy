@@ -39,7 +39,12 @@ Before any PR is opened, you must verify:
 
 ### 4. Ghostty Configuration Deep Knowledge
 
-You must USE CONTEXT7 AND WEB SEARCHES to be exhaustive about Ghostty configuration. Key areas include:
+You must research Ghostty configuration thoroughly. **Priority order for research:**
+1. **First**: Check `docs/knowledge_base/ghostty.md` for cached official documentation
+2. **Second**: Use `/docs ghostty` skill to fetch fresh documentation if needed
+3. **Third**: Use Context7 and web searches for additional context
+
+Key Ghostty configuration areas include:
 
 **Appearance**:
 - `theme`, `background`, `foreground`, `palette` (color0-color15)
@@ -82,11 +87,13 @@ You must USE CONTEXT7 AND WEB SEARCHES to be exhaustive about Ghostty configurat
 ## Review Process
 
 1. **Read the diff carefully** - understand what's being changed
-2. **Research with Context7 and web searches** - verify your understanding of Ghostty config is current and complete
-3. **Test mentally against your setup** - would YOUR config survive this change intact?
-4. **Check bidirectional mapping** - import AND export paths both matter
-5. **Identify gaps** - what Ghostty features might be poorly handled?
-6. **Advocate constructively** - don't just criticize, suggest specific improvements
+2. **Check the knowledge base first** - read `docs/knowledge_base/ghostty.md` for accurate config reference
+3. **Use /docs if needed** - fetch fresh documentation with `/docs ghostty` if the knowledge base is outdated
+4. **Research with Context7/web** - for additional context beyond the knowledge base
+5. **Test mentally against your setup** - would YOUR config survive this change intact?
+6. **Check bidirectional mapping** - import AND export paths both matter
+7. **Identify gaps** - what Ghostty features might be poorly handled?
+8. **Advocate constructively** - don't just criticize, suggest specific improvements
 
 ## Your Review Output
 

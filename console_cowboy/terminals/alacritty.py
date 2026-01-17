@@ -711,6 +711,18 @@ class AlacrittyAdapter(TerminalAdapter):
                     "save_to_clipboard": ctec.behavior.copy_on_select
                 }
 
+        # Warn about unsupported tabs and panes
+        if ctec.tabs:
+            ctec.add_warning(
+                "Alacritty does not support native tabs. Tab configuration will not be exported. "
+                "Consider using a terminal multiplexer like tmux or zellij for tab functionality."
+            )
+        if ctec.panes:
+            ctec.add_warning(
+                "Alacritty does not support native split panes. Pane configuration will not be exported. "
+                "Consider using a terminal multiplexer like tmux or zellij for pane functionality."
+            )
+
         # Export scroll settings (Alacritty max is 100,000 lines)
         if ctec.scroll:
             scrolling = {}
@@ -728,10 +740,52 @@ class AlacrittyAdapter(TerminalAdapter):
                 result["scrolling"] = scrolling
 
         # Export key bindings
+        # Keybinding actions that involve tabs/panes (not supported in Alacritty)
+        tab_pane_actions = {
+            "new_tab",
+            "newtab",
+            "close_tab",
+            "closetab",
+            "next_tab",
+            "nexttab",
+            "previous_tab",
+            "previoustab",
+            "tab:",  # prefix for tab actions
+            "goto_tab",
+            "gototab",
+            "move_tab",
+            "movetab",
+            "new_split",
+            "newsplit",
+            "split_horizontal",
+            "splithorizontal",
+            "split_vertical",
+            "splitvertical",
+            "close_pane",
+            "closepane",
+            "focus_pane",
+            "focuspane",
+            "resize_pane",
+            "resizepane",
+            "toggle_split_zoom",
+        }
+
         if ctec.key_bindings:
             bindings = []
             skipped_count = 0
+            tab_pane_kb_warned = False
             for kb in ctec.key_bindings:
+                # Check if keybinding is for tab/pane functionality
+                action_lower = (kb.action or "").lower()
+                if any(action_lower.startswith(ta) for ta in tab_pane_actions):
+                    if not tab_pane_kb_warned:
+                        ctec.add_warning(
+                            "Keybindings for tab/pane operations cannot be exported to Alacritty "
+                            "as it does not support native tabs or panes."
+                        )
+                        tab_pane_kb_warned = True
+                    skipped_count += 1
+                    continue
                 # Check for unsupported features
                 if kb.key_sequence:
                     ctec.add_warning(
