@@ -5,25 +5,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Development Commands
 
 ```bash
-# Install with test dependencies
-pip install -e '.[test]'
+# Install dependencies (uses uv for dependency management)
+uv sync
 
 # Run all tests
-python -m pytest
+uv run python -m pytest
 
 # Run tests with coverage
-python -m pytest --cov=console_cowboy
+uv run python -m pytest --cov=console_cowboy
 
 # Run a single test file
-python -m pytest tests/test_terminals.py
+uv run python -m pytest tests/test_terminals.py
 
 # Run a specific test
-python -m pytest tests/test_terminals.py::test_ghostty_parse
+uv run python -m pytest tests/test_terminals.py::test_ghostty_parse
 
 # Run CLI directly
-console-cowboy export ghostty -o config.toml
-console-cowboy import config.toml -t alacritty
-python -m console_cowboy [command]
+uv run console-cowboy export ghostty -o config.toml
+uv run console-cowboy import config.toml -t alacritty
+
+# Or use mise tasks
+mise run test
+mise run sync
 ```
 
 ## Architecture

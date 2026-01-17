@@ -467,7 +467,7 @@ concerns:
       - watch:
           include: 'tests/fixtures/ghostty*'
           type: regex
-          pattern: '.'
+          pattern: '^.+$'
         report:
           type: handlebars
           template: |
@@ -565,7 +565,7 @@ concerns:
       - watch:
           include: 'tests/fixtures/alacritty*'
           type: regex
-          pattern: '.'
+          pattern: '^.+$'
         report:
           type: handlebars
           template: |
@@ -663,7 +663,7 @@ concerns:
       - watch:
           include: 'tests/fixtures/iterm2*'
           type: regex
-          pattern: '.'
+          pattern: '^.+$'
         report:
           type: handlebars
           template: |
@@ -761,7 +761,7 @@ concerns:
       - watch:
           include: 'tests/fixtures/wezterm*'
           type: regex
-          pattern: '.'
+          pattern: '^.+$'
         report:
           type: handlebars
           template: |
@@ -859,7 +859,7 @@ concerns:
       - watch:
           include: 'tests/fixtures/vscode*'
           type: regex
-          pattern: '.'
+          pattern: '^.+$'
         report:
           type: handlebars
           template: |
@@ -957,7 +957,7 @@ concerns:
       - watch:
           include: 'tests/fixtures/terminal_app*'
           type: regex
-          pattern: '.'
+          pattern: '^.+$'
         report:
           type: handlebars
           template: |
@@ -1092,7 +1092,7 @@ concerns:
       - watch:
           include: 'console_cowboy/terminals/__init__.py'
           type: regex
-          pattern: '.'
+          pattern: '^.+$'
         report:
           type: handlebars
           template: |
@@ -1208,7 +1208,7 @@ concerns:
       - watch:
           include: 'tests/conftest.py'
           type: regex
-          pattern: '.'
+          pattern: '^.+$'
         report:
           type: handlebars
           template: |
@@ -1222,7 +1222,7 @@ concerns:
       - watch:
           include: 'tests/fixtures/**/*'
           type: regex
-          pattern: '.'
+          pattern: '^.+$'
         report:
           type: handlebars
           template: |
@@ -1257,7 +1257,7 @@ concerns:
       - watch:
           include: 'requirements*.txt'
           type: regex
-          pattern: '.'
+          pattern: '^.+$'
         report:
           type: handlebars
           template: |
