@@ -31,7 +31,7 @@ from console_cowboy.utils.nsarchive import (
     encode_nsfont_data,
 )
 
-from ..base import TerminalAdapter
+from .base import TerminalAdapter
 
 
 class TerminalAppAdapter(TerminalAdapter):
