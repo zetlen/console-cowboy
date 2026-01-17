@@ -24,6 +24,9 @@ from console_cowboy.ctec.schema import (
     FontWeight,
     KeyBinding,
     ScrollConfig,
+    TextHintAction,
+    TextHintConfig,
+    TextHintRule,
     WindowConfig,
 )
 from console_cowboy.utils.colors import normalize_color
@@ -446,6 +449,43 @@ class WeztermAdapter(TerminalAdapter):
                     action = action_match.group(1)
                 ctec.key_bindings.append(KeyBinding(action=action, key=key, mods=mods))
 
+        # Parse hyperlink_rules (WezTerm's equivalent to text hints)
+        # Note: This is best-effort parsing of Lua. A proper solution would use
+        # a Lua interpreter with a mock wezterm object. See issue for future work.
+        hyperlink_table = cls._extract_lua_table(content, "hyperlink_rules")
+        if hyperlink_table:
+            hints = TextHintConfig(enabled=True)
+            # Match patterns like { regex = [[...]], format = "..." }
+            # Lua uses [[ ]] for raw strings, but also supports regular quotes
+            # Pattern 1: Lua raw string [[...]]
+            rule_pattern_raw = (
+                r"\{\s*regex\s*=\s*\[\[([^\]]*(?:\][^\]])*)\]\]"
+                r'\s*,\s*format\s*=\s*["\']([^"\']+)["\']'
+            )
+            # Pattern 2: Regular quoted string "..." or '...'
+            rule_pattern_quoted = (
+                r'\{\s*regex\s*=\s*["\']([^"\']+)["\']'
+                r'\s*,\s*format\s*=\s*["\']([^"\']+)["\']'
+            )
+
+            for pattern in [rule_pattern_raw, rule_pattern_quoted]:
+                for match in re.finditer(pattern, hyperlink_table):
+                    regex = match.group(1)
+                    url_format = match.group(2)
+                    rule = TextHintRule(
+                        regex=regex,
+                        action=TextHintAction.OPEN,
+                        # Store format as parameter for round-trip
+                        parameter=url_format,
+                    )
+                    # Detect if it's a URL pattern
+                    if "http" in url_format.lower() or "mailto" in url_format.lower():
+                        rule.hyperlinks = True
+                    hints.rules.append(rule)
+
+            if hints.rules:
+                ctec.text_hints = hints
+
         return ctec
 
     @classmethod
@@ -666,6 +706,63 @@ class WeztermAdapter(TerminalAdapter):
                     value = str(value).lower()
                 lines.append(f"config.{setting.key} = {value}")
             lines.append("")
+
+        # Export text hints as hyperlink_rules
+        if ctec.text_hints and ctec.text_hints.rules:
+            # Filter rules that can be converted to hyperlink_rules
+            # WezTerm hyperlink_rules require a URL format, so only OPEN/OPEN_URL actions work
+            exportable_rules = []
+            non_exportable_count = 0
+
+            for rule in ctec.text_hints.rules:
+                if rule.regex:
+                    # Check if this rule can be expressed as a hyperlink
+                    if (
+                        rule.action
+                        in (
+                            TextHintAction.OPEN,
+                            TextHintAction.OPEN_URL,
+                            TextHintAction.OPEN_FILE,
+                            None,
+                        )
+                        or rule.hyperlinks
+                    ):
+                        exportable_rules.append(rule)
+                    else:
+                        non_exportable_count += 1
+
+            if exportable_rules:
+                lines.append("-- Hyperlink rules (from text hints)")
+                lines.append(
+                    "config.hyperlink_rules = wezterm.default_hyperlink_rules()"
+                )
+                lines.append("")
+                for rule in exportable_rules:
+                    # Determine the format string
+                    if rule.parameter:
+                        # Use stored format from WezTerm round-trip
+                        url_format = rule.parameter
+                    elif rule.command:
+                        # Use command as format if it looks like a URL
+                        url_format = rule.command
+                    else:
+                        # Default: use the full match as URL
+                        url_format = "$0"
+
+                    # Escape the regex for Lua bracket notation
+                    lua_regex = rule.regex.replace("\\", "\\\\")
+                    lines.append("table.insert(config.hyperlink_rules, {")
+                    lines.append(f"  regex = [[{lua_regex}]],")
+                    lines.append(f'  format = "{url_format}",')
+                    lines.append("})")
+                lines.append("")
+
+            if non_exportable_count > 0:
+                ctec.add_warning(
+                    f"WezTerm hyperlink_rules only support URL actions. "
+                    f"{non_exportable_count} rule(s) with Copy/Paste/other actions "
+                    "could not be exported."
+                )
 
         lines.append("return config")
         return "\n".join(lines)

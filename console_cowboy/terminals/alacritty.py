@@ -24,6 +24,11 @@ from console_cowboy.ctec.schema import (
     FontStyle,
     KeyBinding,
     ScrollConfig,
+    TextHintAction,
+    TextHintBinding,
+    TextHintConfig,
+    TextHintMouseBinding,
+    TextHintRule,
     WindowConfig,
 )
 from console_cowboy.utils.colors import normalize_color
@@ -56,6 +61,16 @@ class AlacrittyAdapter(TerminalAdapter):
     }
 
     CURSOR_STYLE_REVERSE_MAP = {v: k for k, v in CURSOR_STYLE_MAP.items()}
+
+    # Alacritty hint action mapping to CTEC
+    HINT_ACTION_MAP = {
+        "Copy": TextHintAction.COPY,
+        "Paste": TextHintAction.PASTE,
+        "Select": TextHintAction.SELECT,
+        "MoveViModeCursor": TextHintAction.MOVE_VI_CURSOR,
+    }
+
+    HINT_ACTION_REVERSE_MAP = {v: k for k, v in HINT_ACTION_MAP.items()}
 
     @classmethod
     def _parse_color(cls, color_data: str | dict) -> Optional["Color"]:
@@ -123,6 +138,78 @@ class AlacrittyAdapter(TerminalAdapter):
                     setattr(scheme, ctec_key, cls._parse_color(bright[alac_key]))
 
         return scheme
+
+    @classmethod
+    def _parse_hints(cls, hints_data: dict, ctec: CTEC) -> None:
+        """Parse Alacritty [hints] section into CTEC TextHintConfig."""
+        config = TextHintConfig()
+
+        # Parse alphabet setting
+        if "alphabet" in hints_data:
+            config.alphabet = hints_data["alphabet"]
+
+        # Parse enabled hints array
+        if "enabled" in hints_data:
+            for hint_entry in hints_data["enabled"]:
+                rule = TextHintRule()
+
+                # Parse pattern matching
+                if "regex" in hint_entry:
+                    rule.regex = hint_entry["regex"]
+                if "hyperlinks" in hint_entry:
+                    rule.hyperlinks = hint_entry["hyperlinks"]
+
+                # Parse action
+                if "action" in hint_entry:
+                    action_str = hint_entry["action"]
+                    if action_str in cls.HINT_ACTION_MAP:
+                        rule.action = cls.HINT_ACTION_MAP[action_str]
+                    else:
+                        ctec.add_warning(f"Unknown hint action: {action_str}")
+
+                # Parse command
+                if "command" in hint_entry:
+                    cmd = hint_entry["command"]
+                    if isinstance(cmd, str):
+                        rule.command = cmd
+                    elif isinstance(cmd, dict):
+                        rule.command = cmd.get("program")
+                        if "args" in cmd:
+                            rule.command_args = cmd["args"]
+
+                # Parse post-processing and persist
+                if "post_processing" in hint_entry:
+                    rule.post_processing = hint_entry["post_processing"]
+                if "persist" in hint_entry:
+                    rule.persist = hint_entry["persist"]
+
+                # Parse keyboard binding
+                if "binding" in hint_entry:
+                    binding_data = hint_entry["binding"]
+                    rule.binding = TextHintBinding(
+                        key=binding_data.get("key"),
+                        mods=binding_data.get("mods", "").split("+")
+                        if binding_data.get("mods")
+                        else [],
+                        mode=binding_data.get("mode"),
+                    )
+
+                # Parse mouse binding
+                if "mouse" in hint_entry:
+                    mouse_data = hint_entry["mouse"]
+                    rule.mouse = TextHintMouseBinding(
+                        mods=mouse_data.get("mods", "").split("+")
+                        if mouse_data.get("mods")
+                        else [],
+                        enabled=mouse_data.get("enabled"),
+                    )
+
+                config.rules.append(rule)
+
+        # Only set if we have any content
+        if config.alphabet or config.rules:
+            config.enabled = True
+            ctec.text_hints = config
 
     @classmethod
     def parse(
@@ -317,6 +404,10 @@ class AlacrittyAdapter(TerminalAdapter):
                     )
                     ctec.key_bindings.append(kb)
 
+        # Parse hints section (regex-based pattern detection)
+        if "hints" in data:
+            cls._parse_hints(data["hints"], ctec)
+
         # Store unrecognized top-level keys
         recognized_keys = {
             "colors",
@@ -330,6 +421,7 @@ class AlacrittyAdapter(TerminalAdapter):
             "selection",
             "keyboard",
             "key_bindings",
+            "hints",
         }
         for key in data:
             if key not in recognized_keys:
@@ -529,6 +621,78 @@ class AlacrittyAdapter(TerminalAdapter):
                     binding["mods"] = "+".join(kb.mods)
                 bindings.append(binding)
             result["keyboard"] = {"bindings": bindings}
+
+        # Export hints (text pattern detection)
+        if ctec.text_hints and ctec.text_hints.rules:
+            hints: dict = {}
+            if ctec.text_hints.alphabet:
+                hints["alphabet"] = ctec.text_hints.alphabet
+
+            enabled_hints = []
+            for rule in ctec.text_hints.rules:
+                hint_entry: dict = {}
+
+                # Export pattern matching
+                if rule.regex:
+                    hint_entry["regex"] = rule.regex
+                if rule.hyperlinks is not None:
+                    hint_entry["hyperlinks"] = rule.hyperlinks
+
+                # Export action
+                if rule.action:
+                    alac_action = cls.HINT_ACTION_REVERSE_MAP.get(rule.action)
+                    if alac_action:
+                        hint_entry["action"] = alac_action
+                    elif rule.action == TextHintAction.OPEN:
+                        # Default open command varies by platform
+                        pass  # Let command handle it
+
+                # Export command
+                if rule.command:
+                    if rule.command_args:
+                        hint_entry["command"] = {
+                            "program": rule.command,
+                            "args": rule.command_args,
+                        }
+                    else:
+                        hint_entry["command"] = rule.command
+
+                # Export post-processing and persist
+                if rule.post_processing is not None:
+                    hint_entry["post_processing"] = rule.post_processing
+                if rule.persist is not None:
+                    hint_entry["persist"] = rule.persist
+
+                # Export keyboard binding
+                if rule.binding:
+                    binding_dict: dict = {}
+                    if rule.binding.key:
+                        binding_dict["key"] = rule.binding.key
+                    if rule.binding.mods:
+                        binding_dict["mods"] = "+".join(rule.binding.mods)
+                    if rule.binding.mode:
+                        binding_dict["mode"] = rule.binding.mode
+                    if binding_dict:
+                        hint_entry["binding"] = binding_dict
+
+                # Export mouse binding
+                if rule.mouse:
+                    mouse_dict: dict = {}
+                    if rule.mouse.mods:
+                        mouse_dict["mods"] = "+".join(rule.mouse.mods)
+                    if rule.mouse.enabled is not None:
+                        mouse_dict["enabled"] = rule.mouse.enabled
+                    if mouse_dict:
+                        hint_entry["mouse"] = mouse_dict
+
+                if hint_entry:
+                    enabled_hints.append(hint_entry)
+
+            if enabled_hints:
+                hints["enabled"] = enabled_hints
+
+            if hints:
+                result["hints"] = hints
 
         # Restore terminal-specific settings
         for setting in ctec.get_terminal_specific("alacritty"):

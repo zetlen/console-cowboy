@@ -147,6 +147,54 @@ class QuickTerminalScreen(Enum):
     ALL = "all"
 
 
+class TextHintAction(Enum):
+    """
+    Actions that can be triggered when a text hint pattern matches.
+
+    Common across terminals:
+    - Alacritty: action field (Copy, Paste, Select, MoveViModeCursor) or command
+    - iTerm2: Smart Selection action types (Open File, Open URL, Run Command, etc.)
+    """
+
+    # Copy matched text to clipboard
+    COPY = "copy"
+    # Paste/insert matched text into terminal
+    PASTE = "paste"
+    # Select/highlight the matched text
+    SELECT = "select"
+    # Open using system default handler (URL -> browser, file -> app)
+    OPEN = "open"
+    # Open specifically as a URL
+    OPEN_URL = "open_url"
+    # Open specifically as a file path
+    OPEN_FILE = "open_file"
+    # Run a command with the matched text
+    RUN_COMMAND = "run_command"
+    # Send text to the terminal (iTerm2)
+    SEND_TEXT = "send_text"
+    # Run command in a new window (iTerm2)
+    RUN_COMMAND_IN_WINDOW = "run_command_in_window"
+    # Run as coprocess (iTerm2)
+    RUN_COPROCESS = "run_coprocess"
+    # Move vi mode cursor to hint (Alacritty)
+    MOVE_VI_CURSOR = "move_vi_cursor"
+
+
+class TextHintPrecision(Enum):
+    """
+    Precision levels for hint matching priority.
+
+    Used by iTerm2 Smart Selection to determine which rule takes precedence
+    when multiple patterns match the same text.
+    """
+
+    VERY_LOW = "very_low"
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
+    VERY_HIGH = "very_high"
+
+
 @dataclass
 class Color:
     """
@@ -910,6 +958,208 @@ class TerminalSpecificSetting:
 
 
 @dataclass
+class TextHintBinding:
+    """
+    Keyboard binding for triggering a text hint action.
+
+    Attributes:
+        key: The key to press (e.g., 'O', 'U')
+        mods: Modifier keys (e.g., ['ctrl', 'shift'])
+        mode: Terminal mode restriction (Alacritty-specific, e.g., '~Vi')
+    """
+
+    key: str | None = None
+    mods: list[str] = field(default_factory=list)
+    mode: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary representation."""
+        result = {}
+        if self.key is not None:
+            result["key"] = self.key
+        if self.mods:
+            result["mods"] = self.mods
+        if self.mode is not None:
+            result["mode"] = self.mode
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "TextHintBinding":
+        """Create a TextHintBinding from a dictionary."""
+        return cls(
+            key=data.get("key"),
+            mods=data.get("mods", []),
+            mode=data.get("mode"),
+        )
+
+
+@dataclass
+class TextHintMouseBinding:
+    """
+    Mouse binding configuration for text hint interaction.
+
+    Attributes:
+        mods: Modifier keys required for mouse hover highlight
+        enabled: Whether mouse interaction is enabled for this hint
+    """
+
+    mods: list[str] = field(default_factory=list)
+    enabled: bool | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary representation."""
+        result = {}
+        if self.mods:
+            result["mods"] = self.mods
+        if self.enabled is not None:
+            result["enabled"] = self.enabled
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "TextHintMouseBinding":
+        """Create a TextHintMouseBinding from a dictionary."""
+        return cls(
+            mods=data.get("mods", []),
+            enabled=data.get("enabled"),
+        )
+
+
+@dataclass
+class TextHintRule:
+    """
+    A text pattern matching rule for hints/smart selection.
+
+    This is a unified representation of:
+    - Alacritty hints.enabled[] entries
+    - iTerm2 Smart Selection Rules
+
+    Attributes:
+        regex: Regular expression pattern to match
+        hyperlinks: Include OSC 8 escape sequence hyperlinks (Alacritty)
+        action: The action to perform when triggered
+        command: Command to run (for RUN_COMMAND action)
+        command_args: Command arguments
+        post_processing: Apply heuristics to trim trailing chars (Alacritty)
+        persist: Keep hints visible after selection (Alacritty)
+        binding: Keyboard binding to trigger this hint
+        mouse: Mouse binding settings
+        precision: Match priority level (iTerm2)
+        notes: Description of this rule (iTerm2)
+        parameter: Action parameter string (iTerm2)
+    """
+
+    regex: str | None = None
+    hyperlinks: bool | None = None
+    action: TextHintAction | None = None
+    command: str | None = None
+    command_args: list[str] | None = None
+    post_processing: bool | None = None
+    persist: bool | None = None
+    binding: TextHintBinding | None = None
+    mouse: TextHintMouseBinding | None = None
+    precision: TextHintPrecision | None = None
+    notes: str | None = None
+    parameter: str | None = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary representation."""
+        result = {}
+        if self.regex is not None:
+            result["regex"] = self.regex
+        if self.hyperlinks is not None:
+            result["hyperlinks"] = self.hyperlinks
+        if self.action is not None:
+            result["action"] = self.action.value
+        if self.command is not None:
+            result["command"] = self.command
+        if self.command_args is not None:
+            result["command_args"] = self.command_args
+        if self.post_processing is not None:
+            result["post_processing"] = self.post_processing
+        if self.persist is not None:
+            result["persist"] = self.persist
+        if self.binding is not None:
+            result["binding"] = self.binding.to_dict()
+        if self.mouse is not None:
+            result["mouse"] = self.mouse.to_dict()
+        if self.precision is not None:
+            result["precision"] = self.precision.value
+        if self.notes is not None:
+            result["notes"] = self.notes
+        if self.parameter is not None:
+            result["parameter"] = self.parameter
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "TextHintRule":
+        """Create a TextHintRule from a dictionary."""
+        return cls(
+            regex=data.get("regex"),
+            hyperlinks=data.get("hyperlinks"),
+            action=TextHintAction(data["action"]) if "action" in data else None,
+            command=data.get("command"),
+            command_args=data.get("command_args"),
+            post_processing=data.get("post_processing"),
+            persist=data.get("persist"),
+            binding=TextHintBinding.from_dict(data["binding"])
+            if "binding" in data
+            else None,
+            mouse=TextHintMouseBinding.from_dict(data["mouse"])
+            if "mouse" in data
+            else None,
+            precision=TextHintPrecision(data["precision"])
+            if "precision" in data
+            else None,
+            notes=data.get("notes"),
+            parameter=data.get("parameter"),
+        )
+
+
+@dataclass
+class TextHintConfig:
+    """
+    Configuration for text pattern detection and action hints.
+
+    This represents the unified concept of regex-based text detection
+    and associated actions, known by different names across terminals:
+    - Alacritty: [hints] section with regex patterns and commands
+    - iTerm2: Smart Selection Rules with regex patterns and actions
+    - Kitty: open_url_with and url detection (limited)
+    - Ghostty: No native support
+    - WezTerm: Hyperlink detection (limited)
+
+    Attributes:
+        enabled: Whether hints are enabled (None = use terminal default)
+        alphabet: Characters used for hint labels (Alacritty)
+        rules: List of hint rules/patterns
+    """
+
+    enabled: bool | None = None
+    alphabet: str | None = None
+    rules: list[TextHintRule] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary representation."""
+        result = {}
+        if self.enabled is not None:
+            result["enabled"] = self.enabled
+        if self.alphabet is not None:
+            result["alphabet"] = self.alphabet
+        if self.rules:
+            result["rules"] = [rule.to_dict() for rule in self.rules]
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "TextHintConfig":
+        """Create a TextHintConfig from a dictionary."""
+        return cls(
+            enabled=data.get("enabled"),
+            alphabet=data.get("alphabet"),
+            rules=[TextHintRule.from_dict(r) for r in data.get("rules", [])],
+        )
+
+
+@dataclass
 class CTEC:
     """
     Common Terminal Emulator Configuration.
@@ -928,6 +1178,7 @@ class CTEC:
         behavior: Terminal behavior configuration
         scroll: Scrollback and scroll behavior configuration
         quick_terminal: Quick terminal / hotkey window configuration
+        text_hints: Text pattern detection and hint configuration
         key_bindings: List of keyboard shortcuts
         terminal_specific: Settings that cannot be mapped to common CTEC fields
         warnings: Compatibility warnings generated during import/export
@@ -942,6 +1193,7 @@ class CTEC:
     behavior: BehaviorConfig | None = None
     scroll: ScrollConfig | None = None
     quick_terminal: QuickTerminalConfig | None = None
+    text_hints: TextHintConfig | None = None
     key_bindings: list[KeyBinding] = field(default_factory=list)
     terminal_specific: list[TerminalSpecificSetting] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -965,6 +1217,8 @@ class CTEC:
             result["scroll"] = self.scroll.to_dict()
         if self.quick_terminal is not None:
             result["quick_terminal"] = self.quick_terminal.to_dict()
+        if self.text_hints is not None:
+            result["text_hints"] = self.text_hints.to_dict()
         if self.key_bindings:
             result["key_bindings"] = [kb.to_dict() for kb in self.key_bindings]
         if self.terminal_specific:
@@ -991,6 +1245,9 @@ class CTEC:
             scroll=ScrollConfig.from_dict(data["scroll"]) if "scroll" in data else None,
             quick_terminal=QuickTerminalConfig.from_dict(data["quick_terminal"])
             if "quick_terminal" in data
+            else None,
+            text_hints=TextHintConfig.from_dict(data["text_hints"])
+            if "text_hints" in data
             else None,
             key_bindings=[
                 KeyBinding.from_dict(kb) for kb in data.get("key_bindings", [])

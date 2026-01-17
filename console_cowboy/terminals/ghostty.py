@@ -480,4 +480,23 @@ class GhosttyAdapter(TerminalAdapter):
                 lines.append(f"{setting.key} = {value}")
             lines.append("")
 
+        # Handle text hints - Ghostty has limited support via link-url
+        if ctec.text_hints and ctec.text_hints.rules:
+            # Check if any rules look like URL patterns
+            has_url_patterns = any(
+                rule.hyperlinks or (rule.regex and "http" in rule.regex.lower())
+                for rule in ctec.text_hints.rules
+            )
+            if has_url_patterns:
+                # Ghostty's link-url enables basic URL detection by default
+                lines.append("# URL detection (Ghostty has built-in URL matching)")
+                lines.append("link-url = true")
+                lines.append("")
+            ctec.add_warning(
+                f"Ghostty has limited text hint support. "
+                f"{len(ctec.text_hints.rules)} custom rule(s) cannot be fully exported. "
+                "Ghostty's built-in 'link-url' setting provides basic URL detection. "
+                "Custom regex patterns via the 'link' config are planned but not yet available."
+            )
+
         return "\n".join(lines)

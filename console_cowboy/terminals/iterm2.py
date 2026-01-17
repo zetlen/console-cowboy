@@ -22,6 +22,10 @@ from console_cowboy.ctec.schema import (
     QuickTerminalConfig,
     QuickTerminalPosition,
     ScrollConfig,
+    TextHintAction,
+    TextHintConfig,
+    TextHintPrecision,
+    TextHintRule,
     WindowConfig,
 )
 from console_cowboy.utils.colors import color_to_float_tuple, float_tuple_to_color
@@ -144,6 +148,35 @@ class ITerm2Adapter(TerminalAdapter):
     # 10: Left of Screen
     # 11: Right of Screen
 
+    # iTerm2 Smart Selection action mapping to CTEC
+    # iTerm2 action titles from Preferences > Profiles > Advanced > Smart Selection
+    SMART_SELECTION_ACTION_MAP = {
+        "Open File": TextHintAction.OPEN_FILE,
+        "Open URL": TextHintAction.OPEN_URL,
+        "Run Command...": TextHintAction.RUN_COMMAND,
+        "Run Coprocess...": TextHintAction.RUN_COPROCESS,
+        "Send Text...": TextHintAction.SEND_TEXT,
+        "Run Command in Window...": TextHintAction.RUN_COMMAND_IN_WINDOW,
+        "Copy": TextHintAction.COPY,
+    }
+
+    SMART_SELECTION_ACTION_REVERSE_MAP = {
+        v: k for k, v in SMART_SELECTION_ACTION_MAP.items()
+    }
+
+    # iTerm2 Smart Selection precision mapping
+    SMART_SELECTION_PRECISION_MAP = {
+        0: TextHintPrecision.VERY_LOW,
+        1: TextHintPrecision.LOW,
+        2: TextHintPrecision.NORMAL,
+        3: TextHintPrecision.HIGH,
+        4: TextHintPrecision.VERY_HIGH,
+    }
+
+    SMART_SELECTION_PRECISION_REVERSE_MAP = {
+        v: k for k, v in SMART_SELECTION_PRECISION_MAP.items()
+    }
+
     @classmethod
     def _parse_iterm_color(cls, color_dict: dict) -> Color:
         """Parse an iTerm2 color dictionary to a Color object."""
@@ -173,6 +206,58 @@ class ITerm2Adapter(TerminalAdapter):
                 color = cls._parse_iterm_color(profile[iterm_key])
                 setattr(scheme, ctec_key, color)
         return scheme
+
+    @classmethod
+    def _parse_smart_selection_rules(cls, rules_data: list, ctec: CTEC) -> None:
+        """Parse iTerm2 Smart Selection Rules into CTEC TextHintConfig.
+
+        iTerm2 Smart Selection Rules are a list of dictionaries with:
+        - regex: The pattern to match (ICU regex syntax)
+        - precision: Match priority (0=very_low to 4=very_high)
+        - notes: Description of the rule
+        - actions: List of action dictionaries with 'title' and 'action' (parameter)
+        """
+        if not rules_data:
+            return
+
+        config = TextHintConfig(enabled=True)
+
+        for rule_data in rules_data:
+            rule = TextHintRule()
+
+            # Parse regex pattern
+            if "regex" in rule_data:
+                rule.regex = rule_data["regex"]
+
+            # Parse precision level
+            if "precision" in rule_data:
+                precision_val = rule_data["precision"]
+                if precision_val in cls.SMART_SELECTION_PRECISION_MAP:
+                    rule.precision = cls.SMART_SELECTION_PRECISION_MAP[precision_val]
+
+            # Parse notes (description)
+            if "notes" in rule_data:
+                rule.notes = rule_data["notes"]
+
+            # Parse actions - iTerm2 can have multiple actions per rule
+            # We'll use the first action as the primary action
+            if "actions" in rule_data and rule_data["actions"]:
+                actions = rule_data["actions"]
+                if actions:
+                    first_action = actions[0]
+                    action_title = first_action.get("title", "")
+                    if action_title in cls.SMART_SELECTION_ACTION_MAP:
+                        rule.action = cls.SMART_SELECTION_ACTION_MAP[action_title]
+                    # Store the action parameter (command/text to send)
+                    if "action" in first_action:
+                        rule.parameter = first_action["action"]
+
+            # Only add if we have at least a regex
+            if rule.regex:
+                config.rules.append(rule)
+
+        if config.rules:
+            ctec.text_hints = config
 
     @classmethod
     def _parse_profile_into_ctec(cls, profile_data: dict, ctec: CTEC) -> None:
@@ -350,6 +435,12 @@ class ITerm2Adapter(TerminalAdapter):
 
             ctec.quick_terminal = quick
 
+        # Parse Smart Selection Rules into CTEC text_hints
+        if "Smart Selection Rules" in profile_data:
+            cls._parse_smart_selection_rules(
+                profile_data["Smart Selection Rules"], ctec
+            )
+
         # Store iTerm2-specific settings for round-trip preservation
         # These are settings that either:
         # 1. Have no CTEC equivalent, or
@@ -368,7 +459,7 @@ class ITerm2Adapter(TerminalAdapter):
             "Minimum Contrast",
             # Advanced features (iTerm2-only, no equivalent in other terminals)
             "Triggers",
-            "Smart Selection Rules",
+            # Note: Smart Selection Rules are now parsed into CTEC text_hints
             "Semantic History",
             "Bound Hosts",  # Automatic Profile Switching rules
             # Badge settings
@@ -742,6 +833,47 @@ class ITerm2Adapter(TerminalAdapter):
                 result["Hotkey Modifier Flags"] = ctec.quick_terminal.hotkey_modifiers
             if ctec.quick_terminal.hotkey is not None:
                 result["Hotkey Characters"] = ctec.quick_terminal.hotkey
+
+        # Export text hints as Smart Selection Rules
+        if ctec.text_hints and ctec.text_hints.rules:
+            smart_selection_rules = []
+            for rule in ctec.text_hints.rules:
+                rule_dict: dict = {}
+
+                # Export regex pattern
+                if rule.regex:
+                    rule_dict["regex"] = rule.regex
+
+                # Export precision level (default to NORMAL if not specified)
+                precision_val = cls.SMART_SELECTION_PRECISION_REVERSE_MAP.get(
+                    rule.precision,
+                    2,  # NORMAL
+                )
+                rule_dict["precision"] = precision_val
+
+                # Export notes (description)
+                if rule.notes:
+                    rule_dict["notes"] = rule.notes
+
+                # Export action
+                if rule.action:
+                    action_title = cls.SMART_SELECTION_ACTION_REVERSE_MAP.get(
+                        rule.action
+                    )
+                    if action_title:
+                        action_entry = {"title": action_title}
+                        if rule.parameter:
+                            action_entry["action"] = rule.parameter
+                        elif rule.command:
+                            # Use command as the action parameter
+                            action_entry["action"] = rule.command
+                        rule_dict["actions"] = [action_entry]
+
+                if rule_dict.get("regex"):
+                    smart_selection_rules.append(rule_dict)
+
+            if smart_selection_rules:
+                result["Smart Selection Rules"] = smart_selection_rules
 
         # Restore terminal-specific settings (no longer profile-prefixed)
         for setting in ctec.get_terminal_specific("iterm2"):
