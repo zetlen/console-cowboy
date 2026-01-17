@@ -214,6 +214,61 @@ class TestAlacrittyAdapter:
         )
         assert copy_binding is not None
 
+    def test_parse_modern_terminal_shell(self):
+        """Test parsing shell from modern [terminal.shell] location (Alacritty 0.13+)."""
+        config = """
+[terminal.shell]
+program = "/usr/local/bin/fish"
+"""
+        ctec = AlacrittyAdapter.parse("test.toml", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.shell == "/usr/local/bin/fish"
+
+    def test_parse_legacy_shell_fallback(self):
+        """Test parsing shell from legacy [shell] location still works."""
+        config = """
+[shell]
+program = "/bin/bash"
+"""
+        ctec = AlacrittyAdapter.parse("test.toml", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.shell == "/bin/bash"
+
+    def test_parse_modern_shell_takes_precedence(self):
+        """Modern [terminal.shell] takes precedence over legacy [shell]."""
+        config = """
+[terminal.shell]
+program = "/usr/local/bin/fish"
+
+[shell]
+program = "/bin/bash"
+"""
+        ctec = AlacrittyAdapter.parse("test.toml", content=config)
+        assert ctec.behavior.shell == "/usr/local/bin/fish"
+
+    def test_export_toml_uses_modern_terminal_shell(self):
+        """Export to TOML should use modern [terminal.shell] location."""
+        from console_cowboy.ctec.schema import BehaviorConfig
+
+        ctec = CTEC(behavior=BehaviorConfig(shell="/bin/zsh"))
+        output = AlacrittyAdapter.export(ctec, use_toml=True)
+
+        assert "[terminal.shell]" in output or 'terminal.shell' in output
+        assert "program" in output
+        assert "/bin/zsh" in output
+
+    def test_export_yaml_uses_legacy_shell(self):
+        """Export to YAML should use legacy [shell] location for backwards compatibility."""
+        from console_cowboy.ctec.schema import BehaviorConfig
+
+        ctec = CTEC(behavior=BehaviorConfig(shell="/bin/zsh"))
+        output = AlacrittyAdapter.export(ctec, use_toml=False)
+
+        # YAML format should use legacy shell key
+        assert "shell:" in output
+        assert "program:" in output
+        assert "/bin/zsh" in output
+
 
 class TestKittyAdapter:
     """Tests for the Kitty adapter."""
@@ -2444,8 +2499,8 @@ args = ["-l", "-i"]
             )
         )
         output = AlacrittyAdapter.export(ctec)
-        # Check as TOML output
-        assert "[shell]" in output
+        # Check as TOML output - uses modern [terminal.shell] location
+        assert "[terminal.shell]" in output
         assert '"program"' in output or "program" in output
         assert '["-l"]' in output or '"-l"' in output
         assert "[env]" in output

@@ -465,8 +465,6 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
                 ctec.add_terminal_specific("ghostty", key, value.lower() == "true")
 
             # Parse quick terminal settings
-
-            # Parse quick terminal settings
             elif key == "quick-terminal-position":
                 quick_terminal.enabled = True
                 quick_terminal.position = cls.QUICK_TERMINAL_POSITION_MAP.get(

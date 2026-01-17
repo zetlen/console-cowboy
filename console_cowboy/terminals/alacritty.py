@@ -94,13 +94,16 @@ class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
             "[cursor]",
             "[window]",
             "[shell]",
+            "[terminal]",
             "[keyboard]",
             "[hints]",
+            "[general]",
             "colors:",
             "font:",
             "cursor:",
             "window:",
             "shell:",
+            "terminal:",
         ]
         # Also check for Alacritty-specific nested keys
         alacritty_keys = [
@@ -351,7 +354,10 @@ class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
 
         # Parse window
         window = WindowConfig()
-        
+
+        def on_error(k: str, v, e: Exception) -> None:
+            ctec.add_warning(f"Invalid window config {k}: {v}")
+
         # Handle blur separately as it has custom logic
         if "window" in data and "blur" in data["window"]:
             blur_val = data["window"]["blur"]
@@ -361,16 +367,23 @@ class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
                 window.blur = blur_val if blur_val > 0 else None
 
         # Apply standard mappings
-        if cls.apply_key_mapping(data, window, cls.WINDOW_MAPPING):
+        if cls.apply_key_mapping(data, window, cls.WINDOW_MAPPING, on_error):
             ctec.window = window
         elif window.blur is not None:
             # If only blur was set
             ctec.window = window
 
-        # Parse shell/behavior
-        if "shell" in data:
-            behavior = BehaviorConfig()
+        # Parse shell/behavior - check modern [terminal.shell] first, then legacy [shell]
+        shell_data = None
+        if "terminal" in data and isinstance(data["terminal"], dict):
+            if "shell" in data["terminal"]:
+                shell_data = data["terminal"]["shell"]
+        if shell_data is None and "shell" in data:
+            # Legacy fallback
             shell_data = data["shell"]
+
+        if shell_data is not None:
+            behavior = BehaviorConfig()
             if isinstance(shell_data, str):
                 behavior.shell = shell_data
             elif isinstance(shell_data, dict):
@@ -532,6 +545,7 @@ class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
             "window",
             "shell",
             "env",
+            "terminal",
             "scrolling",
             "bell",
             "mouse",
@@ -539,6 +553,7 @@ class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
             "keyboard",
             "key_bindings",
             "hints",
+            "general",
         }
         for key in data:
             if key not in recognized_keys:
@@ -699,7 +714,7 @@ class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
             if window:
                 result["window"] = window
 
-        # Export behavior
+        # Export behavior - use modern [terminal.shell] for TOML format
         if ctec.behavior:
             if ctec.behavior.shell or ctec.behavior.shell_args:
                 shell_config: dict = {}
@@ -708,7 +723,14 @@ class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
                 if ctec.behavior.shell_args:
                     shell_config["args"] = ctec.behavior.shell_args
                 if shell_config:
-                    result["shell"] = shell_config
+                    if use_toml:
+                        # Modern Alacritty (0.13+) uses [terminal.shell]
+                        if "terminal" not in result:
+                            result["terminal"] = {}
+                        result["terminal"]["shell"] = shell_config
+                    else:
+                        # Legacy YAML format uses [shell]
+                        result["shell"] = shell_config
             if ctec.behavior.environment_variables:
                 result["env"] = ctec.behavior.environment_variables
             if ctec.behavior.bell_mode is not None:
