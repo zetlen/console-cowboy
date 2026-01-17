@@ -92,6 +92,32 @@ class KittyAdapter(TerminalAdapter):
     QUICK_TERMINAL_EDGE_REVERSE_MAP = {v: k for k, v in QUICK_TERMINAL_EDGE_MAP.items()}
 
     @classmethod
+    def can_parse(cls, content: str) -> bool:
+        """Check if content looks like a Kitty config."""
+        # Kitty uses space-separated key value format with specific keys
+        kitty_keys = [
+            "font_family",
+            "font_size",
+            "cursor_shape",
+            "cursor_blink_interval",
+            "background_opacity",
+            "window_padding_width",
+            "scrollback_lines",
+            "enable_audio_bell",
+            "color0",
+            "color1",
+        ]
+        lines = content.splitlines()
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split(None, 1)
+            if parts and parts[0] in kitty_keys:
+                return True
+        return False
+
+    @classmethod
     def parse(
         cls,
         source: str | Path,

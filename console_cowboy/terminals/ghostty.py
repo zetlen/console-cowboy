@@ -85,6 +85,31 @@ class GhosttyAdapter(TerminalAdapter):
     }
 
     @classmethod
+    def can_parse(cls, content: str) -> bool:
+        """Check if content looks like a Ghostty config."""
+        # Ghostty uses key=value format with specific keys
+        ghostty_keys = [
+            "font-family",
+            "font-size",
+            "cursor-color",
+            "cursor-style",
+            "palette",
+            "background-opacity",
+            "window-padding-x",
+            "quick-terminal-position",
+        ]
+        lines = content.splitlines()
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key = line.split("=")[0].strip()
+                if key in ghostty_keys:
+                    return True
+        return False
+
+    @classmethod
     def _parse_palette_color(cls, index: int, value: str, scheme: ColorScheme) -> None:
         """Parse a palette color from Ghostty format (index=color)."""
         color = normalize_color(value)

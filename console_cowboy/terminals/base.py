@@ -37,6 +37,40 @@ class TerminalAdapter(ABC):
     default_config_paths: list[str] = []
 
     @classmethod
+    def can_parse(cls, content: str) -> bool:
+        """
+        Check if this adapter can likely parse the given content.
+
+        Override this in subclasses to provide format detection.
+        Returns True if the content looks like this terminal's config format.
+
+        Args:
+            content: The file content to check
+
+        Returns:
+            True if this adapter can likely parse the content
+        """
+        return False
+
+    @classmethod
+    def get_default_config_path_for_platform(cls) -> Path | None:
+        """
+        Get the default configuration file path for this terminal on the current platform.
+
+        This returns the expected path even if the file doesn't exist,
+        which is useful for writing new config files.
+
+        Returns:
+            Path to the default config location, or None if not applicable
+        """
+        if not cls.default_config_paths:
+            return None
+
+        home = Path.home()
+        # Return the first path (preferred location) even if it doesn't exist
+        return home / cls.default_config_paths[0]
+
+    @classmethod
     @abstractmethod
     def parse(
         cls,
@@ -151,3 +185,110 @@ class TerminalRegistry:
             List of terminal names
         """
         return list(cls._adapters.keys())
+
+    @classmethod
+    def detect_terminal_type(cls, content: str) -> type[TerminalAdapter] | None:
+        """
+        Detect which terminal adapter can parse the given content.
+
+        Tries each registered adapter's can_parse method to find a match.
+
+        Args:
+            content: The file content to check
+
+        Returns:
+            The adapter class that can parse this content, or None if no match
+        """
+        for adapter in cls._adapters.values():
+            if adapter.can_parse(content):
+                return adapter
+        return None
+
+    @classmethod
+    def detect_from_file(cls, path: Path) -> type[TerminalAdapter] | None:
+        """
+        Detect which terminal adapter can parse a file.
+
+        First checks file extension hints, then content detection.
+
+        Args:
+            path: Path to the file to check
+
+        Returns:
+            The adapter class that can parse this file, or None if no match
+        """
+        if not path.exists():
+            return None
+
+        content = path.read_text()
+        return cls.detect_terminal_type(content)
+
+    @classmethod
+    def is_ctec_file(cls, content: str) -> bool:
+        """
+        Check if the content appears to be a CTEC configuration file.
+
+        Args:
+            content: The file content to check
+
+        Returns:
+            True if the content looks like CTEC format
+        """
+        # CTEC files are YAML with a version field
+        import yaml
+
+        try:
+            data = yaml.safe_load(content)
+            if isinstance(data, dict):
+                # CTEC must have a version field
+                if "version" in data:
+                    # And typically has ctec-specific fields
+                    ctec_fields = {
+                        "source_terminal",
+                        "color_scheme",
+                        "font",
+                        "cursor",
+                        "window",
+                        "behavior",
+                        "scroll",
+                        "key_bindings",
+                        "terminal_specific",
+                    }
+                    return bool(ctec_fields & set(data.keys()))
+        except Exception:
+            pass
+        return False
+
+    @classmethod
+    def get_default_config_path(cls, terminal_name: str) -> Path | None:
+        """
+        Get the default config path for a terminal that exists on disk.
+
+        Args:
+            terminal_name: The terminal name (e.g., 'ghostty', 'iterm2')
+
+        Returns:
+            Path to the existing config file, or None if not found
+        """
+        adapter = cls.get(terminal_name)
+        if adapter:
+            return adapter.get_default_config_path()
+        return None
+
+    @classmethod
+    def get_default_config_path_for_write(cls, terminal_name: str) -> Path | None:
+        """
+        Get the default config path for writing to a terminal.
+
+        Returns the expected location even if it doesn't exist yet.
+
+        Args:
+            terminal_name: The terminal name (e.g., 'ghostty', 'iterm2')
+
+        Returns:
+            Path to the config location, or None if not applicable
+        """
+        adapter = cls.get(terminal_name)
+        if adapter:
+            return adapter.get_default_config_path_for_platform()
+        return None

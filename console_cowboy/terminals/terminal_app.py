@@ -94,6 +94,21 @@ class TerminalAppAdapter(TerminalAdapter):
 
     COLOR_KEY_REVERSE_MAP = {v: k for k, v in COLOR_KEY_MAP.items()}
 
+    @classmethod
+    def can_parse(cls, content: str) -> bool:
+        """Check if content looks like a Terminal.app plist config."""
+        # Terminal.app uses plist format with specific keys
+        if "<!DOCTYPE plist" in content or "<plist" in content:
+            terminal_markers = [
+                "Window Settings",
+                "TextColor",
+                "BackgroundColor",
+                "ANSIBlackColor",
+                "com.apple.Terminal",
+            ]
+            return any(marker in content for marker in terminal_markers)
+        return False
+
     # Keys to preserve as terminal-specific settings for round-trip conversion
     TERMINAL_SPECIFIC_KEYS = [
         # Profile metadata
