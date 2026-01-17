@@ -298,8 +298,8 @@ class TestWeztermAdapter:
         ctec = WeztermAdapter.parse(config_path)
 
         assert ctec.color_scheme is not None
-        # Wezterm parsing may have warnings about Lua complexity
-        assert len(ctec.warnings) > 0  # Expected warning about Lua
+        # With proper Lua execution, we no longer need warnings about complexity
+        assert len(ctec.warnings) == 0
 
     def test_parse_cursor(self):
         config_path = FIXTURES_DIR / "wezterm" / "wezterm.lua"
@@ -344,6 +344,109 @@ class TestWeztermAdapter:
         assert "local wezterm = require 'wezterm'" in output
         assert "local config = wezterm.config_builder()" in output
         assert "return config" in output
+
+    def test_parse_color_scheme_name(self):
+        """Test parsing config.color_scheme = 'Dracula'."""
+        content = """
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+config.color_scheme = 'Dracula'
+
+return config
+"""
+        ctec = WeztermAdapter.parse("test.lua", content=content)
+
+        assert ctec.color_scheme is not None
+        assert ctec.color_scheme.name == "Dracula"
+
+    def test_export_color_scheme_name(self):
+        """Test exporting color scheme by name."""
+        ctec = CTEC(color_scheme=ColorScheme(name="Gruvbox Dark"))
+        output = WeztermAdapter.export(ctec)
+
+        assert 'config.color_scheme = "Gruvbox Dark"' in output
+
+    def test_parse_harfbuzz_features_disables_ligatures(self):
+        """Test that harfbuzz_features with liga=0 sets ligatures=False."""
+        content = """
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+config.font = wezterm.font("JetBrains Mono", {
+    harfbuzz_features = { "liga=0", "calt=0" }
+})
+
+return config
+"""
+        ctec = WeztermAdapter.parse("test.lua", content=content)
+
+        assert ctec.font is not None
+        assert ctec.font.ligatures is False
+
+    def test_parse_leader_key(self):
+        """Test parsing config.leader configuration."""
+        content = """
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+config.leader = { key = 'a', mods = 'CTRL', timeout_milliseconds = 1000 }
+
+return config
+"""
+        ctec = WeztermAdapter.parse("test.lua", content=content)
+
+        leader_settings = [s for s in ctec.terminal_specific if s.key == "leader"]
+        assert len(leader_settings) == 1
+        assert leader_settings[0].value["key"] == "a"
+        assert leader_settings[0].value["mods"] == "CTRL"
+
+    def test_parse_event_callbacks_warning(self):
+        """Test that wezterm.on() callbacks generate a warning."""
+        content = """
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+wezterm.on('update-right-status', function(window, pane)
+    window:set_right_status('test')
+end)
+
+return config
+"""
+        ctec = WeztermAdapter.parse("test.lua", content=content)
+
+        assert any("event callbacks" in w.lower() for w in ctec.warnings)
+        assert any("update-right-status" in w for w in ctec.warnings)
+
+    def test_export_action_syntax_copyto(self):
+        """Test that CopyTo action exports with correct syntax."""
+        ctec = CTEC(
+            key_bindings=[
+                KeyBinding(
+                    action="CopyTo", key="c", mods=["CTRL"], action_param="Clipboard"
+                )
+            ]
+        )
+        output = WeztermAdapter.export(ctec)
+
+        assert 'wezterm.action.CopyTo("Clipboard")' in output
+
+    def test_export_action_syntax_split_horizontal(self):
+        """Test that SplitHorizontal action exports with table syntax."""
+        ctec = CTEC(
+            key_bindings=[
+                KeyBinding(
+                    action="SplitHorizontal",
+                    key="s",
+                    mods=["CTRL"],
+                    action_param="CurrentPaneDomain",
+                )
+            ]
+        )
+        output = WeztermAdapter.export(ctec)
+
+        assert "SplitHorizontal" in output
+        assert "domain" in output
 
 
 class TestITerm2Adapter:
@@ -1186,9 +1289,7 @@ post_processing = true
     def test_wezterm_parses_hyperlink_rules(self):
         """Test that WezTerm parses hyperlink_rules into text hints.
 
-        Note: WezTerm uses Lua configuration which is complex to fully parse.
-        This test uses simple patterns that work with regex-based parsing.
-        A proper implementation would use a Lua interpreter with a mock wezterm object.
+        Uses a Lua interpreter with a mock wezterm object for accurate parsing.
         """
         content = """
 local wezterm = require 'wezterm'

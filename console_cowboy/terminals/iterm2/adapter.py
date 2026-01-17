@@ -35,7 +35,7 @@ from console_cowboy.utils.fonts import (
     postscript_to_friendly,
 )
 
-from .base import TerminalAdapter
+from ..base import TerminalAdapter
 
 
 class ITerm2Adapter(TerminalAdapter):

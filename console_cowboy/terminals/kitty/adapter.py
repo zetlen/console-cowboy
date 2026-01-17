@@ -24,7 +24,7 @@ from console_cowboy.ctec.schema import (
 )
 from console_cowboy.utils.colors import normalize_color
 
-from .base import TerminalAdapter
+from ..base import TerminalAdapter
 
 
 class KittyAdapter(TerminalAdapter):

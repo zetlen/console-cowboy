@@ -145,7 +145,8 @@ return config
         exported = WeztermAdapter.export(ctec)
 
         # Should use simple font with weight parameter
-        assert 'wezterm.font("JetBrains Mono", {weight="Bold"})' in exported
+        assert 'wezterm.font("JetBrains Mono"' in exported
+        assert 'weight = "Bold"' in exported
 
 
 class TestAlacrittyFontStyle:
