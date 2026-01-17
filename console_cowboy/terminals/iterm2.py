@@ -178,6 +178,22 @@ class ITerm2Adapter(TerminalAdapter):
     }
 
     @classmethod
+    def can_parse(cls, content: str) -> bool:
+        """Check if content looks like an iTerm2 plist config."""
+        # iTerm2 uses plist format
+        # Check for plist markers and iTerm2-specific keys
+        if "<!DOCTYPE plist" in content or "<plist" in content:
+            # Look for iTerm2-specific keys
+            iterm_markers = [
+                "New Bookmarks",
+                "Ansi 0 Color",
+                "Foreground Color",
+                "Background Color",
+            ]
+            return any(marker in content for marker in iterm_markers)
+        return False
+
+    @classmethod
     def _parse_iterm_color(cls, color_dict: dict) -> Color:
         """Parse an iTerm2 color dictionary to a Color object."""
         # iTerm2 uses "Color Space" and RGB component keys

@@ -20,9 +20,11 @@ Console Cowboy is a CLI tool for making terminal configurations portable across 
   - Wezterm
   - Terminal.app (macOS)
   - VS Code (integrated terminal)
+- **Automatic Format Detection**: Detects terminal config formats automatically from file contents
+- **Smart Path Resolution**: Use terminal names to read/write to default config locations
 - **iTerm2-Color-Schemes Compatible**: Color schemes use the same YAML format as the popular [iTerm2-Color-Schemes](https://github.com/mbadolato/iTerm2-Color-Schemes) project
 - **Quick Terminal Support**: Migrate quake-style dropdown terminal settings between iTerm2, Ghostty, and Kitty
-- **Output Formats**: CTEC files can be stored as YAML (default) or JSON
+- **Stdin/Stdout Support**: Pipe configs through shell pipelines
 - **Incompatibility Reporting**: Clearly reports which settings cannot be converted between terminals
 - **Terminal-Specific Settings**: Preserves terminal-specific settings that don't have equivalents in other terminals
 
@@ -48,90 +50,132 @@ pipx install console-cowboy
 
 ## Quick Start
 
-### Export your current terminal config
+### Convert between terminals
 
 ```bash
-# Export Ghostty config to CTEC format (YAML by default)
-console-cowboy export ghostty -o my-config.yaml
+# Convert iTerm2 settings directly to Ghostty config
+console-cowboy --from iterm2 --to ghostty
 
-# Export iTerm2 config
-console-cowboy export iterm2 -o my-config.yaml
+# Convert from a specific file to a terminal's default location
+console-cowboy --from ~/path/to/config --to ghostty
 
-# Export to JSON format
-console-cowboy export kitty -o my-config.json -f json
+# Convert between specific files
+console-cowboy --from config.lua --from-type wezterm --to config.toml --to-type alacritty
 ```
 
-### Import into a different terminal
+### Export to portable CTEC format
 
 ```bash
-# Import CTEC config into Alacritty format
-console-cowboy import my-config.yaml -t alacritty -o ~/.config/alacritty/alacritty.toml
+# Export iTerm2 config to CTEC (outputs to stdout)
+console-cowboy --from iterm2
 
-# Import into Wezterm
-console-cowboy import my-config.yaml -t wezterm -o ~/.wezterm.lua
+# Export to a file
+console-cowboy export --from kitty --to my-config.yaml
 
-# Preview output without saving
-console-cowboy import my-config.yaml -t ghostty
+# Export a specific iTerm2 profile
+console-cowboy export --from iterm2 --profile "Development"
 ```
 
-### Convert directly between terminals
+### Import from CTEC format
 
 ```bash
-# Convert Kitty config to Ghostty
-console-cowboy convert ~/.config/kitty/kitty.conf -f kitty -t ghostty -o ~/.config/ghostty/config
+# Import CTEC to a terminal's default location
+console-cowboy import --from my-config.yaml --to ghostty
 
-# Convert iTerm2 to Alacritty
-console-cowboy convert ~/Library/Preferences/com.googlecode.iterm2.plist -f iterm2 -t alacritty
+# Import to a specific file
+console-cowboy import --from my-config.yaml --to ~/.config/alacritty/alacritty.toml --to-type alacritty
+
+# Preview import without saving (output to stdout)
+console-cowboy import --from my-config.yaml --to-type wezterm
 ```
 
-## Commands
+### Use with pipes
+
+```bash
+# Pipe between commands
+console-cowboy --from iterm2 | console-cowboy import --from - --to ghostty
+
+# Read from stdin
+cat my-config.yaml | console-cowboy --from - --from-type ctec --to-type kitty
+```
+
+## CLI Reference
+
+Console Cowboy uses `--from` and `--to` flags for all operations. The implicit command is conversion; explicit `export`, `import`, and `convert` commands are also available.
+
+### Default Command (Convert)
+
+```bash
+console-cowboy [--from SOURCE] [--from-type TYPE] [--to DEST] [--to-type TYPE] [--profile NAME] [--quiet]
+```
+
+The `--from` and `--to` arguments accept:
+- **Terminal name**: `iterm2`, `ghostty`, `alacritty`, `kitty`, `wezterm`, `vscode`, `terminal_app` - reads from/writes to the terminal's default config location
+- **File path**: Path to a config file
+- **`-`**: Read from stdin / write to stdout
+
+Type detection:
+- If a terminal name is given, that format is used
+- If a file path is given, the format is auto-detected from content
+- Use `--from-type` or `--to-type` to override: `ctec` or a terminal name
+
+Behavior:
+- `--from` without `--to`: Outputs CTEC to stdout
+- `--from` with `--to`: Converts and writes to destination
+- `--to-type` without `--to`: Outputs that format to stdout
+
+Options:
+- `--from`: Source (terminal name, file path, or `-` for stdin)
+- `--from-type`: Explicit source type (`ctec` or terminal name)
+- `--to`: Destination (terminal name, file path, or `-` for stdout)
+- `--to-type`: Explicit destination type (`ctec` or terminal name)
+- `--profile`: Profile name (iTerm2/Terminal.app only)
+- `--quiet`: Suppress warnings and informational output
 
 ### `export`
 
-Export a terminal's configuration to CTEC format.
+Export a terminal's configuration to CTEC format (always YAML).
 
 ```bash
-console-cowboy export TERMINAL [-i INPUT] [-o OUTPUT] [-f FORMAT] [-p PROFILE] [-q]
+console-cowboy export --from SOURCE [--from-type TYPE] [--to OUTPUT] [--profile NAME] [--quiet]
 ```
 
 Options:
-- `TERMINAL`: Source terminal (iterm2, ghostty, alacritty, kitty, wezterm, vscode, terminal_app)
-- `-i, --input`: Input config file (defaults to terminal's standard location)
-- `-o, --output`: Output file (defaults to stdout)
-- `-f, --format`: Output format: yaml, json (default: yaml)
-- `-p, --profile`: Profile name to export (iTerm2 and Terminal.app only)
-- `-q, --quiet`: Suppress warnings and informational output
+- `--from`: Source terminal or config file (required)
+- `--from-type`: Explicit source type (terminal name)
+- `--to`: Output file (defaults to stdout)
+- `--profile`: Profile name (iTerm2/Terminal.app only)
+- `--quiet`: Suppress warnings
 
 ### `import`
 
 Import a CTEC configuration into a terminal's native format.
 
 ```bash
-console-cowboy import INPUT_FILE -t TERMINAL [-o OUTPUT] [-f FORMAT] [-q]
+console-cowboy import --from CTEC_FILE [--to DEST] [--to-type TYPE] [--quiet]
 ```
 
 Options:
-- `INPUT_FILE`: Path to CTEC configuration file (.yaml or .json)
-- `-t, --terminal`: Target terminal (required)
-- `-o, --output`: Output file (defaults to stdout)
-- `-f, --format`: Input format override (auto-detected from extension)
-- `-q, --quiet`: Suppress warnings
+- `--from`: CTEC file path or `-` for stdin (required)
+- `--to`: Destination terminal or file
+- `--to-type`: Explicit destination type (terminal name, required if `--to` is a file)
+- `--quiet`: Suppress warnings
 
 ### `convert`
 
 Convert directly between terminal configuration formats.
 
 ```bash
-console-cowboy convert INPUT_FILE -f FROM_TERMINAL -t TO_TERMINAL [-o OUTPUT] [-p PROFILE] [-q]
+console-cowboy convert --from SOURCE --to DEST [--from-type TYPE] [--to-type TYPE] [--profile NAME] [--quiet]
 ```
 
 Options:
-- `INPUT_FILE`: Path to source terminal configuration file
-- `-f, --from`: Source terminal (required)
-- `-t, --to`: Target terminal (required)
-- `-o, --output`: Output file (defaults to stdout)
-- `-p, --profile`: Profile name to convert (iTerm2 and Terminal.app source only)
-- `-q, --quiet`: Suppress warnings
+- `--from`: Source terminal or config file (required)
+- `--to`: Destination terminal or file (required)
+- `--from-type`: Explicit source type
+- `--to-type`: Explicit destination type
+- `--profile`: Profile name (iTerm2/Terminal.app source only)
+- `--quiet`: Suppress warnings
 
 ### `list`
 
@@ -146,12 +190,47 @@ console-cowboy list
 Display information about a configuration file.
 
 ```bash
-console-cowboy info INPUT_FILE [-t TERMINAL]
+console-cowboy info --from SOURCE [--from-type TYPE]
+```
+
+## Example Workflows
+
+### Migrate from iTerm2 to Ghostty
+
+```bash
+# Direct conversion to Ghostty's default config location
+console-cowboy --from iterm2 --to ghostty
+```
+
+### Backup your terminal config
+
+```bash
+# Export to a portable format
+console-cowboy export --from ghostty --to ~/backups/terminal-config.yaml
+```
+
+### Test a config on another terminal
+
+```bash
+# Preview how your config would look in Kitty
+console-cowboy --from ~/.config/alacritty/alacritty.toml --to-type kitty
+
+# Or pipe it for processing
+console-cowboy --from wezterm | less
+```
+
+### Use in scripts
+
+```bash
+# Convert multiple terminals in a script
+for terminal in ghostty alacritty kitty; do
+  console-cowboy --from iterm2 --to-type $terminal > ~/configs/$terminal-config
+done
 ```
 
 ## CTEC Format
 
-The Common Terminal Emulator Configuration (CTEC) format is a portable representation of terminal settings. It captures:
+The Common Terminal Emulator Configuration (CTEC) format is a portable YAML representation of terminal settings. It captures:
 
 ### Color Scheme
 - Foreground and background colors

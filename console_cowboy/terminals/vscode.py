@@ -89,6 +89,21 @@ class VSCodeAdapter(TerminalAdapter):
 
     COLOR_KEY_REVERSE_MAP = {v: k for k, v in COLOR_KEY_MAP.items()}
 
+    @classmethod
+    def can_parse(cls, content: str) -> bool:
+        """Check if content looks like VSCode settings.json."""
+        # VSCode uses JSON with terminal.integrated.* keys
+        vscode_markers = [
+            '"terminal.integrated.',
+            '"workbench.colorCustomizations"',
+            '"terminal.ansiBlack"',
+            '"terminal.foreground"',
+        ]
+        for marker in vscode_markers:
+            if marker in content:
+                return True
+        return False
+
     # Keys we explicitly handle (not stored as terminal_specific)
     _RECOGNIZED_KEYS = {
         "terminal.integrated.fontFamily",

@@ -73,6 +73,41 @@ class AlacrittyAdapter(TerminalAdapter):
     HINT_ACTION_REVERSE_MAP = {v: k for k, v in HINT_ACTION_MAP.items()}
 
     @classmethod
+    def can_parse(cls, content: str) -> bool:
+        """Check if content looks like an Alacritty config."""
+        # Alacritty uses TOML or YAML with specific section names
+        alacritty_markers = [
+            "[colors]",
+            "[font]",
+            "[cursor]",
+            "[window]",
+            "[shell]",
+            "[keyboard]",
+            "[hints]",
+            "colors:",
+            "font:",
+            "cursor:",
+            "window:",
+            "shell:",
+        ]
+        # Also check for Alacritty-specific nested keys
+        alacritty_keys = [
+            "colors.primary",
+            "colors.normal",
+            "colors.bright",
+            "font.normal",
+            "window.dimensions",
+        ]
+        content_lower = content.lower()
+        for marker in alacritty_markers:
+            if marker.lower() in content_lower:
+                return True
+        for key in alacritty_keys:
+            if key in content:
+                return True
+        return False
+
+    @classmethod
     def _parse_color(cls, color_data: str | dict) -> Optional["Color"]:
         """Parse a color from Alacritty format."""
         if color_data is None:
@@ -228,8 +263,22 @@ class AlacrittyAdapter(TerminalAdapter):
             content = path.read_text()
             is_toml = path.suffix == ".toml"
         else:
-            # Try to detect format
-            is_toml = content.strip().startswith("[") or "=" in content.split("\n")[0]
+            # Try to detect format from content
+            # Check source path suffix if available
+            source_path = Path(source) if source else None
+            if source_path and source_path.suffix == ".toml":
+                is_toml = True
+            else:
+                # Content-based detection: look for TOML patterns
+                # Skip comment lines and blank lines at the start
+                is_toml = False
+                for line in content.splitlines():
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith("#"):
+                        continue
+                    # First non-comment line - check for TOML patterns
+                    is_toml = stripped.startswith("[") or "=" in stripped
+                    break
 
         if is_toml:
             data = tomli.loads(content)

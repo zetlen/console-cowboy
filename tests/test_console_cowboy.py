@@ -1,6 +1,5 @@
 """Tests for the console-cowboy CLI."""
 
-import json
 import tempfile
 from pathlib import Path
 
@@ -49,7 +48,10 @@ class TestExportCommand:
 
     def test_export_ghostty_to_stdout(self, runner):
         config_path = FIXTURES_DIR / "ghostty" / "config"
-        result = runner.invoke(cli, ["export", "ghostty", "-i", str(config_path), "-q"])
+        result = runner.invoke(
+            cli,
+            ["export", "--from", str(config_path), "--from-type", "ghostty", "--quiet"],
+        )
 
         assert result.exit_code == 0
         # Should be valid YAML by default
@@ -63,7 +65,15 @@ class TestExportCommand:
             output_path = Path(tmpdir) / "output.yaml"
             result = runner.invoke(
                 cli,
-                ["export", "ghostty", "-i", str(config_path), "-o", str(output_path)],
+                [
+                    "export",
+                    "--from",
+                    str(config_path),
+                    "--from-type",
+                    "ghostty",
+                    "--to",
+                    str(output_path),
+                ],
             )
 
             assert result.exit_code == 0
@@ -72,20 +82,12 @@ class TestExportCommand:
             parsed = yaml.safe_load(content)
             assert parsed["source_terminal"] == "ghostty"
 
-    def test_export_to_json(self, runner):
+    def test_export_to_yaml_default(self, runner):
+        """Export now always produces YAML (JSON option removed)."""
         config_path = FIXTURES_DIR / "ghostty" / "config"
         result = runner.invoke(
-            cli, ["export", "ghostty", "-i", str(config_path), "-f", "json", "-q"]
-        )
-
-        assert result.exit_code == 0
-        parsed = json.loads(result.output)
-        assert parsed["source_terminal"] == "ghostty"
-
-    def test_export_to_yaml(self, runner):
-        config_path = FIXTURES_DIR / "ghostty" / "config"
-        result = runner.invoke(
-            cli, ["export", "ghostty", "-i", str(config_path), "-f", "yaml", "-q"]
+            cli,
+            ["export", "--from", str(config_path), "--from-type", "ghostty", "--quiet"],
         )
 
         assert result.exit_code == 0
@@ -94,7 +96,10 @@ class TestExportCommand:
 
     def test_export_kitty(self, runner):
         config_path = FIXTURES_DIR / "kitty" / "kitty.conf"
-        result = runner.invoke(cli, ["export", "kitty", "-i", str(config_path), "-q"])
+        result = runner.invoke(
+            cli,
+            ["export", "--from", str(config_path), "--from-type", "kitty", "--quiet"],
+        )
 
         assert result.exit_code == 0
         parsed = yaml.safe_load(result.output)
@@ -103,7 +108,15 @@ class TestExportCommand:
     def test_export_alacritty_toml(self, runner):
         config_path = FIXTURES_DIR / "alacritty" / "alacritty.toml"
         result = runner.invoke(
-            cli, ["export", "alacritty", "-i", str(config_path), "-q"]
+            cli,
+            [
+                "export",
+                "--from",
+                str(config_path),
+                "--from-type",
+                "alacritty",
+                "--quiet",
+            ],
         )
 
         assert result.exit_code == 0
@@ -113,7 +126,15 @@ class TestExportCommand:
     def test_export_alacritty_yaml(self, runner):
         config_path = FIXTURES_DIR / "alacritty" / "alacritty.yml"
         result = runner.invoke(
-            cli, ["export", "alacritty", "-i", str(config_path), "-q"]
+            cli,
+            [
+                "export",
+                "--from",
+                str(config_path),
+                "--from-type",
+                "alacritty",
+                "--quiet",
+            ],
         )
 
         assert result.exit_code == 0
@@ -122,7 +143,10 @@ class TestExportCommand:
 
     def test_export_wezterm(self, runner):
         config_path = FIXTURES_DIR / "wezterm" / "wezterm.lua"
-        result = runner.invoke(cli, ["export", "wezterm", "-i", str(config_path), "-q"])
+        result = runner.invoke(
+            cli,
+            ["export", "--from", str(config_path), "--from-type", "wezterm", "--quiet"],
+        )
 
         assert result.exit_code == 0
         parsed = yaml.safe_load(result.output)
@@ -130,20 +154,25 @@ class TestExportCommand:
 
     def test_export_iterm2(self, runner):
         config_path = FIXTURES_DIR / "iterm2" / "com.googlecode.iterm2.plist"
-        result = runner.invoke(cli, ["export", "iterm2", "-i", str(config_path), "-q"])
+        result = runner.invoke(
+            cli,
+            ["export", "--from", str(config_path), "--from-type", "iterm2", "--quiet"],
+        )
 
         assert result.exit_code == 0
         parsed = yaml.safe_load(result.output)
         assert parsed["source_terminal"] == "iterm2"
 
     def test_export_nonexistent_file(self, runner):
-        result = runner.invoke(cli, ["export", "ghostty", "-i", "/nonexistent/path"])
+        result = runner.invoke(cli, ["export", "--from", "/nonexistent/path"])
         assert result.exit_code != 0
         assert "Error" in result.output or "not found" in result.output.lower()
 
     def test_export_shows_warnings(self, runner):
         config_path = FIXTURES_DIR / "wezterm" / "wezterm.lua"
-        result = runner.invoke(cli, ["export", "wezterm", "-i", str(config_path)])
+        result = runner.invoke(
+            cli, ["export", "--from", str(config_path), "--from-type", "wezterm"]
+        )
 
         # Wezterm should show warnings about Lua parsing
         assert "Warning" in result.output or result.exit_code == 0
@@ -154,7 +183,9 @@ class TestImportCommand:
 
     def test_import_ctec_to_ghostty(self, runner):
         ctec_path = FIXTURES_DIR / "ctec" / "complete.yaml"
-        result = runner.invoke(cli, ["import", str(ctec_path), "-t", "ghostty", "-q"])
+        result = runner.invoke(
+            cli, ["import", "--from", str(ctec_path), "--to-type", "ghostty", "--quiet"]
+        )
 
         assert result.exit_code == 0
         assert "font-family" in result.output
@@ -162,7 +193,10 @@ class TestImportCommand:
 
     def test_import_ctec_to_alacritty(self, runner):
         ctec_path = FIXTURES_DIR / "ctec" / "complete.yaml"
-        result = runner.invoke(cli, ["import", str(ctec_path), "-t", "alacritty", "-q"])
+        result = runner.invoke(
+            cli,
+            ["import", "--from", str(ctec_path), "--to-type", "alacritty", "--quiet"],
+        )
 
         assert result.exit_code == 0
         # Alacritty outputs TOML - check for valid content
@@ -170,14 +204,18 @@ class TestImportCommand:
 
     def test_import_ctec_to_kitty(self, runner):
         ctec_path = FIXTURES_DIR / "ctec" / "complete.yaml"
-        result = runner.invoke(cli, ["import", str(ctec_path), "-t", "kitty", "-q"])
+        result = runner.invoke(
+            cli, ["import", "--from", str(ctec_path), "--to-type", "kitty", "--quiet"]
+        )
 
         assert result.exit_code == 0
         assert "font_family" in result.output
 
     def test_import_ctec_to_wezterm(self, runner):
         ctec_path = FIXTURES_DIR / "ctec" / "complete.yaml"
-        result = runner.invoke(cli, ["import", str(ctec_path), "-t", "wezterm", "-q"])
+        result = runner.invoke(
+            cli, ["import", "--from", str(ctec_path), "--to-type", "wezterm", "--quiet"]
+        )
 
         assert result.exit_code == 0
         assert "wezterm" in result.output
@@ -185,7 +223,9 @@ class TestImportCommand:
 
     def test_import_ctec_to_iterm2(self, runner):
         ctec_path = FIXTURES_DIR / "ctec" / "complete.yaml"
-        result = runner.invoke(cli, ["import", str(ctec_path), "-t", "iterm2", "-q"])
+        result = runner.invoke(
+            cli, ["import", "--from", str(ctec_path), "--to-type", "iterm2", "--quiet"]
+        )
 
         assert result.exit_code == 0
         assert "plist" in result.output.lower()
@@ -198,11 +238,12 @@ class TestImportCommand:
                 cli,
                 [
                     "import",
+                    "--from",
                     str(ctec_path),
-                    "-t",
-                    "ghostty",
-                    "-o",
+                    "--to",
                     str(output_path),
+                    "--to-type",
+                    "ghostty",
                 ],
             )
 
@@ -211,20 +252,14 @@ class TestImportCommand:
             content = output_path.read_text()
             assert "Fira Code" in content
 
-    def test_import_with_explicit_format(self, runner):
-        ctec_path = FIXTURES_DIR / "ctec" / "complete.yaml"
-        result = runner.invoke(
-            cli, ["import", str(ctec_path), "-t", "ghostty", "-f", "yaml", "-q"]
-        )
-
-        assert result.exit_code == 0
-
     def test_import_missing_terminal(self, runner):
         ctec_path = FIXTURES_DIR / "ctec" / "complete.yaml"
-        result = runner.invoke(cli, ["import", str(ctec_path)])
+        result = runner.invoke(cli, ["import", "--from", str(ctec_path)])
 
         assert result.exit_code != 0
-        assert "Missing option" in result.output or "required" in result.output.lower()
+        assert (
+            "terminal" in result.output.lower() or "required" in result.output.lower()
+        )
 
 
 class TestConvertCommand:
@@ -236,12 +271,15 @@ class TestConvertCommand:
             cli,
             [
                 "convert",
+                "--from",
                 str(config_path),
-                "-f",
+                "--from-type",
                 "ghostty",
-                "-t",
+                "--to",
+                "-",
+                "--to-type",
                 "alacritty",
-                "-q",
+                "--quiet",
             ],
         )
 
@@ -255,12 +293,15 @@ class TestConvertCommand:
             cli,
             [
                 "convert",
+                "--from",
                 str(config_path),
-                "-f",
+                "--from-type",
                 "kitty",
-                "-t",
+                "--to",
+                "-",
+                "--to-type",
                 "ghostty",
-                "-q",
+                "--quiet",
             ],
         )
 
@@ -273,12 +314,15 @@ class TestConvertCommand:
             cli,
             [
                 "convert",
+                "--from",
                 str(config_path),
-                "-f",
+                "--from-type",
                 "alacritty",
-                "-t",
+                "--to",
+                "-",
+                "--to-type",
                 "wezterm",
-                "-q",
+                "--quiet",
             ],
         )
 
@@ -294,13 +338,14 @@ class TestConvertCommand:
                 cli,
                 [
                     "convert",
+                    "--from",
                     str(config_path),
-                    "-f",
+                    "--from-type",
                     "ghostty",
-                    "-t",
-                    "alacritty",
-                    "-o",
+                    "--to",
                     str(output_path),
+                    "--to-type",
+                    "alacritty",
                 ],
             )
 
@@ -313,10 +358,13 @@ class TestConvertCommand:
             cli,
             [
                 "convert",
+                "--from",
                 str(config_path),
-                "-f",
+                "--from-type",
                 "ghostty",
-                "-t",
+                "--to",
+                "-",
+                "--to-type",
                 "alacritty",
             ],
         )
@@ -330,7 +378,7 @@ class TestInfoCommand:
 
     def test_info_ctec_file(self, runner):
         ctec_path = FIXTURES_DIR / "ctec" / "complete.yaml"
-        result = runner.invoke(cli, ["info", str(ctec_path)])
+        result = runner.invoke(cli, ["info", "--from", str(ctec_path)])
 
         assert result.exit_code == 0
         assert "Configuration Summary" in result.output
@@ -339,7 +387,9 @@ class TestInfoCommand:
 
     def test_info_native_config(self, runner):
         config_path = FIXTURES_DIR / "ghostty" / "config"
-        result = runner.invoke(cli, ["info", str(config_path), "-t", "ghostty"])
+        result = runner.invoke(
+            cli, ["info", "--from", str(config_path), "--from-type", "ghostty"]
+        )
 
         assert result.exit_code == 0
         assert "Configuration Summary" in result.output
@@ -347,11 +397,78 @@ class TestInfoCommand:
 
     def test_info_minimal_config(self, runner):
         ctec_path = FIXTURES_DIR / "ctec" / "minimal.yaml"
-        result = runner.invoke(cli, ["info", str(ctec_path)])
+        result = runner.invoke(cli, ["info", "--from", str(ctec_path)])
 
         assert result.exit_code == 0
         assert "Font" in result.output
         assert "Cursor" in result.output
+
+
+class TestDefaultCommand:
+    """Tests for the default (implicit convert) command."""
+
+    def test_from_without_to_outputs_ctec(self, runner):
+        """--from without --to should output CTEC to stdout."""
+        config_path = FIXTURES_DIR / "ghostty" / "config"
+        result = runner.invoke(
+            cli,
+            ["--from", str(config_path), "--from-type", "ghostty", "--quiet"],
+        )
+
+        assert result.exit_code == 0
+        parsed = yaml.safe_load(result.output)
+        assert parsed["source_terminal"] == "ghostty"
+
+    def test_from_and_to_converts(self, runner):
+        """--from and --to should convert between formats."""
+        config_path = FIXTURES_DIR / "ghostty" / "config"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "config"
+            result = runner.invoke(
+                cli,
+                [
+                    "--from",
+                    str(config_path),
+                    "--from-type",
+                    "ghostty",
+                    "--to",
+                    str(output_path),
+                    "--to-type",
+                    "kitty",
+                    "--quiet",
+                ],
+            )
+
+            assert result.exit_code == 0
+            assert output_path.exists()
+            content = output_path.read_text()
+            assert "font_family" in content
+
+    def test_to_type_without_to_outputs_to_stdout(self, runner):
+        """--to-type without --to should output that type to stdout."""
+        config_path = FIXTURES_DIR / "ghostty" / "config"
+        result = runner.invoke(
+            cli,
+            [
+                "--from",
+                str(config_path),
+                "--from-type",
+                "ghostty",
+                "--to-type",
+                "alacritty",
+                "--quiet",
+            ],
+        )
+
+        assert result.exit_code == 0
+        # Should be Alacritty TOML format
+        assert "[font" in result.output or "[colors" in result.output
+
+    def test_no_args_shows_help(self, runner):
+        """No arguments should show help."""
+        result = runner.invoke(cli, [])
+        assert result.exit_code == 0
+        assert "Console Cowboy" in result.output
 
 
 class TestRoundTrip:
@@ -363,7 +480,8 @@ class TestRoundTrip:
 
         # Export to CTEC
         export_result = runner.invoke(
-            cli, ["export", "ghostty", "-i", str(config_path), "-q"]
+            cli,
+            ["export", "--from", str(config_path), "--from-type", "ghostty", "--quiet"],
         )
         assert export_result.exit_code == 0
 
@@ -374,7 +492,7 @@ class TestRoundTrip:
 
         try:
             import_result = runner.invoke(
-                cli, ["import", ctec_path, "-t", "ghostty", "-q"]
+                cli, ["import", "--from", ctec_path, "--to-type", "ghostty", "--quiet"]
             )
             assert import_result.exit_code == 0
 
@@ -399,7 +517,15 @@ class TestRoundTrip:
 
             # Export
             export_result = runner.invoke(
-                cli, ["export", terminal, "-i", str(config_path), "-q"]
+                cli,
+                [
+                    "export",
+                    "--from",
+                    str(config_path),
+                    "--from-type",
+                    terminal,
+                    "--quiet",
+                ],
             )
             assert export_result.exit_code == 0, f"Export failed for {terminal}"
 
@@ -416,8 +542,100 @@ class TestRoundTrip:
 
             try:
                 import_result = runner.invoke(
-                    cli, ["import", ctec_path, "-t", terminal, "-q"]
+                    cli,
+                    ["import", "--from", ctec_path, "--to-type", terminal, "--quiet"],
                 )
                 assert import_result.exit_code == 0, f"Import failed for {terminal}"
             finally:
                 Path(ctec_path).unlink()
+
+
+class TestAutoDetection:
+    """Tests for automatic terminal type detection."""
+
+    def test_detect_ghostty_config(self, runner):
+        """Should auto-detect Ghostty config format."""
+        config_path = FIXTURES_DIR / "ghostty" / "config"
+        result = runner.invoke(cli, ["--from", str(config_path), "--quiet"])
+
+        assert result.exit_code == 0
+        parsed = yaml.safe_load(result.output)
+        assert parsed["source_terminal"] == "ghostty"
+
+    def test_detect_alacritty_config(self, runner):
+        """Should auto-detect Alacritty config format."""
+        config_path = FIXTURES_DIR / "alacritty" / "alacritty.toml"
+        result = runner.invoke(cli, ["--from", str(config_path), "--quiet"])
+
+        assert result.exit_code == 0
+        parsed = yaml.safe_load(result.output)
+        assert parsed["source_terminal"] == "alacritty"
+
+    def test_detect_kitty_config(self, runner):
+        """Should auto-detect Kitty config format."""
+        config_path = FIXTURES_DIR / "kitty" / "kitty.conf"
+        result = runner.invoke(cli, ["--from", str(config_path), "--quiet"])
+
+        assert result.exit_code == 0
+        parsed = yaml.safe_load(result.output)
+        assert parsed["source_terminal"] == "kitty"
+
+    def test_detect_wezterm_config(self, runner):
+        """Should auto-detect Wezterm config format."""
+        config_path = FIXTURES_DIR / "wezterm" / "wezterm.lua"
+        result = runner.invoke(cli, ["--from", str(config_path), "--quiet"])
+
+        assert result.exit_code == 0
+        parsed = yaml.safe_load(result.output)
+        assert parsed["source_terminal"] == "wezterm"
+
+    def test_detect_ctec_file(self, runner):
+        """Should auto-detect CTEC YAML format."""
+        ctec_path = FIXTURES_DIR / "ctec" / "complete.yaml"
+        result = runner.invoke(
+            cli, ["--from", str(ctec_path), "--to-type", "ghostty", "--quiet"]
+        )
+
+        assert result.exit_code == 0
+        # Output should be Ghostty format
+        assert "font-family" in result.output
+
+
+class TestStdinStdout:
+    """Tests for stdin/stdout handling."""
+
+    def test_read_from_stdin(self, runner):
+        """Should read from stdin when --from is '-'."""
+        config_path = FIXTURES_DIR / "ghostty" / "config"
+        config_content = config_path.read_text()
+
+        result = runner.invoke(
+            cli,
+            ["--from", "-", "--from-type", "ghostty", "--quiet"],
+            input=config_content,
+        )
+
+        assert result.exit_code == 0
+        parsed = yaml.safe_load(result.output)
+        assert parsed["source_terminal"] == "ghostty"
+
+    def test_write_to_stdout_with_dash(self, runner):
+        """Should write to stdout when --to is '-'."""
+        config_path = FIXTURES_DIR / "ghostty" / "config"
+        result = runner.invoke(
+            cli,
+            [
+                "--from",
+                str(config_path),
+                "--from-type",
+                "ghostty",
+                "--to",
+                "-",
+                "--to-type",
+                "kitty",
+                "--quiet",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "font_family" in result.output

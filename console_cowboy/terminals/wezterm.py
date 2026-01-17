@@ -63,6 +63,28 @@ class WeztermAdapter(TerminalAdapter):
     }
 
     @classmethod
+    def can_parse(cls, content: str) -> bool:
+        """Check if content looks like a Wezterm Lua config."""
+        # Wezterm uses Lua with specific patterns
+        wezterm_markers = [
+            "local wezterm",
+            "require 'wezterm'",
+            'require "wezterm"',
+            "require('wezterm')",
+            'require("wezterm")',
+            "wezterm.config_builder",
+            "config.font",
+            "config.colors",
+            "config.font_size",
+            "wezterm.font",
+            "wezterm.font_with_fallback",
+        ]
+        for marker in wezterm_markers:
+            if marker in content:
+                return True
+        return False
+
+    @classmethod
     def _extract_lua_value(cls, content: str, key: str) -> str | None:
         """Extract a simple value from Lua config (config.key = value).
 
