@@ -8,7 +8,8 @@ commit-msg:
       run: uv run cz check --commit-msg-file {1}
 
 pre-commit:
-  parallel: true
+  # Run formatting first (piped group), then other checks in parallel
+  piped: true
   jobs:
     - name: ruff-format
       run: uv run ruff format {staged_files}
@@ -16,7 +17,8 @@ pre-commit:
       glob: "*.py"
 
     - name: ruff-lint
-      run: uv run ruff check {staged_files}
+      run: uv run ruff check --fix {staged_files}
+      stage_fixed: true
       glob: "*.py"
 
     - name: cli-smoke-test
