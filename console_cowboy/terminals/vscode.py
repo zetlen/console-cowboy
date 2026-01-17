@@ -27,9 +27,10 @@ from console_cowboy.ctec.schema import (
 from console_cowboy.utils.colors import normalize_color
 
 from .base import TerminalAdapter
+from .mixins import ColorMapMixin, CursorStyleMixin
 
 
-class VSCodeAdapter(TerminalAdapter):
+class VSCodeAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
     """
     Adapter for Visual Studio Code integrated terminal.
 
@@ -58,8 +59,6 @@ class VSCodeAdapter(TerminalAdapter):
         "underline": CursorStyle.UNDERLINE,
     }
 
-    CURSOR_STYLE_REVERSE_MAP = {v: k for k, v in CURSOR_STYLE_MAP.items()}
-
     # Color key mapping from VSCode (inside workbench.colorCustomizations) to CTEC
     COLOR_KEY_MAP = {
         "terminal.foreground": "foreground",
@@ -87,7 +86,7 @@ class VSCodeAdapter(TerminalAdapter):
         "terminal.ansiBrightWhite": "bright_white",
     }
 
-    COLOR_KEY_REVERSE_MAP = {v: k for k, v in COLOR_KEY_MAP.items()}
+
 
     @classmethod
     def can_parse(cls, content: str) -> bool:
@@ -226,7 +225,7 @@ class VSCodeAdapter(TerminalAdapter):
 
         if "terminal.integrated.cursorStyle" in data:
             style_str = data["terminal.integrated.cursorStyle"]
-            cursor.style = cls.CURSOR_STYLE_MAP.get(style_str, CursorStyle.BLOCK)
+            cursor.style = cls.get_cursor_style(style_str)
             cursor_modified = True
 
         if "terminal.integrated.cursorBlinking" in data:
@@ -241,18 +240,13 @@ class VSCodeAdapter(TerminalAdapter):
             color_customs = data["workbench.colorCustomizations"]
             if isinstance(color_customs, dict):
                 scheme = ColorScheme()
-                scheme_modified = False
 
-                for vscode_key, ctec_attr in cls.COLOR_KEY_MAP.items():
-                    if vscode_key in color_customs:
-                        try:
-                            color = normalize_color(color_customs[vscode_key])
-                            setattr(scheme, ctec_attr, color)
-                            scheme_modified = True
-                        except (ValueError, TypeError):
-                            ctec.add_warning(f"Invalid color for {vscode_key}")
+                def on_error(key, val, exc):
+                    ctec.add_warning(f"Invalid color for {key}")
 
-                if scheme_modified:
+                if cls.map_colors_to_ctec(
+                    color_customs, scheme, on_error=on_error
+                ):
                     ctec.color_scheme = scheme
 
         # Parse scroll settings
@@ -324,19 +318,15 @@ class VSCodeAdapter(TerminalAdapter):
         # Export cursor settings
         if ctec.cursor:
             if ctec.cursor.style:
-                result["terminal.integrated.cursorStyle"] = (
-                    cls.CURSOR_STYLE_REVERSE_MAP.get(ctec.cursor.style, "block")
+                result["terminal.integrated.cursorStyle"] = cls.get_cursor_style_value(
+                    ctec.cursor.style, "block"
                 )
             if ctec.cursor.blink is not None:
                 result["terminal.integrated.cursorBlinking"] = ctec.cursor.blink
 
         # Export colors inside workbench.colorCustomizations
         if ctec.color_scheme:
-            color_customs = {}
-            for ctec_attr, vscode_key in cls.COLOR_KEY_REVERSE_MAP.items():
-                color = getattr(ctec.color_scheme, ctec_attr, None)
-                if color:
-                    color_customs[vscode_key] = color.to_hex()
+            color_customs = cls.map_ctec_to_colors(ctec.color_scheme)
 
             if color_customs:
                 result["workbench.colorCustomizations"] = color_customs
