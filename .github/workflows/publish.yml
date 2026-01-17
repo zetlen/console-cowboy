@@ -1,10 +1,10 @@
 name: Publish Python Package
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       tag_name:
-        description: 'The tag name for the release'
+        description: 'The tag name for the release (e.g., v0.1.2)'
         required: true
         type: string
 
