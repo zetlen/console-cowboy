@@ -12,6 +12,7 @@ Commands:
     convert: Convert directly between terminal configuration formats
 """
 
+import sys
 from pathlib import Path
 
 import click
@@ -54,6 +55,248 @@ def print_terminal_specific(ctec: CTEC) -> None:
             )
 
 
+class SourceResolution:
+    """Result of resolving a source argument."""
+
+    def __init__(
+        self,
+        terminal_type: str,
+        path: Path | None = None,
+        content: str | None = None,
+        from_stdin: bool = False,
+    ):
+        self.terminal_type = terminal_type
+        self.path = path
+        self.content = content
+        self.from_stdin = from_stdin
+
+
+class DestinationResolution:
+    """Result of resolving a destination argument."""
+
+    def __init__(
+        self,
+        terminal_type: str | None = None,
+        path: Path | None = None,
+        to_stdout: bool = False,
+    ):
+        self.terminal_type = terminal_type
+        self.path = path
+        self.to_stdout = to_stdout
+
+
+def resolve_source(
+    from_arg: str,
+    from_type: str | None = None,
+) -> SourceResolution:
+    """
+    Resolve a --from argument to a terminal type, path, and content.
+
+    Args:
+        from_arg: The --from value (terminal name, file path, or "-" for stdin)
+        from_type: Explicit terminal type override
+
+    Returns:
+        SourceResolution with terminal_type, path, content, and from_stdin
+
+    Raises:
+        click.ClickException: If source cannot be resolved
+    """
+    terminal_names = get_terminal_choices()
+
+    # Check if it's stdin
+    if from_arg == "-":
+        content = sys.stdin.read()
+        if from_type:
+            if from_type.lower() not in terminal_names:
+                raise click.ClickException(
+                    f"Unknown terminal type: {from_type}. "
+                    f"Supported: {', '.join(terminal_names)}"
+                )
+            return SourceResolution(
+                terminal_type=from_type.lower(),
+                content=content,
+                from_stdin=True,
+            )
+        # Try to detect from content
+        detected = TerminalRegistry.detect_terminal_type(content)
+        if not detected:
+            raise click.ClickException(
+                "Cannot detect terminal type from stdin content. "
+                "Please specify --from-type."
+            )
+        return SourceResolution(
+            terminal_type=detected,
+            content=content,
+            from_stdin=True,
+        )
+
+    # Check if it's a terminal name
+    if from_arg.lower() in terminal_names:
+        terminal_type = from_arg.lower()
+        path = TerminalRegistry.get_default_config_path_for_terminal(terminal_type)
+        if not path or not path.exists():
+            raise click.ClickException(
+                f"Could not find default config for {terminal_type}. "
+                f"Please specify a file path instead."
+            )
+        return SourceResolution(
+            terminal_type=terminal_type,
+            path=path,
+        )
+
+    # It's a file path
+    path = Path(from_arg).expanduser().resolve()
+    if not path.exists():
+        raise click.ClickException(f"File not found: {path}")
+
+    # Determine terminal type
+    if from_type:
+        if from_type.lower() not in terminal_names:
+            raise click.ClickException(
+                f"Unknown terminal type: {from_type}. "
+                f"Supported: {', '.join(terminal_names)}"
+            )
+        return SourceResolution(
+            terminal_type=from_type.lower(),
+            path=path,
+        )
+
+    # Try to detect from file
+    try:
+        content = path.read_text()
+    except UnicodeDecodeError:
+        # Binary file - try to read bytes for detection
+        content = path.read_bytes().decode("latin-1", errors="replace")
+
+    detected = TerminalRegistry.detect_terminal_type(content, path)
+    if not detected:
+        raise click.ClickException(
+            f"Cannot detect terminal type from {path}. "
+            f"Please specify --from-type."
+        )
+    return SourceResolution(
+        terminal_type=detected,
+        path=path,
+    )
+
+
+def resolve_destination(
+    to_arg: str | None,
+    to_type: str | None = None,
+    for_ctec_output: bool = False,
+) -> DestinationResolution:
+    """
+    Resolve a --to argument to a terminal type and path.
+
+    Args:
+        to_arg: The --to value (terminal name, file path, "-" for stdout, or None)
+        to_type: Explicit terminal type override
+        for_ctec_output: If True, destination is for CTEC format (export command)
+
+    Returns:
+        DestinationResolution with terminal_type, path, and to_stdout
+
+    Raises:
+        click.ClickException: If destination cannot be resolved
+    """
+    terminal_names = get_terminal_choices()
+
+    # No --to means stdout
+    if to_arg is None or to_arg == "-":
+        if for_ctec_output:
+            return DestinationResolution(to_stdout=True)
+        if to_type:
+            if to_type.lower() not in terminal_names:
+                raise click.ClickException(
+                    f"Unknown terminal type: {to_type}. "
+                    f"Supported: {', '.join(terminal_names)}"
+                )
+            return DestinationResolution(
+                terminal_type=to_type.lower(),
+                to_stdout=True,
+            )
+        if to_arg == "-":
+            raise click.ClickException(
+                "When writing to stdout with '-', --to-type is required "
+                "to specify the output terminal format."
+            )
+        return DestinationResolution(to_stdout=True)
+
+    # Check if it's a terminal name
+    if to_arg.lower() in terminal_names:
+        if for_ctec_output:
+            raise click.ClickException(
+                f"'{to_arg}' is a terminal name, not a file path. "
+                f"For export, --to must be a file path or '-' for stdout."
+            )
+        terminal_type = to_arg.lower()
+        path = TerminalRegistry.get_default_config_path_for_terminal(terminal_type)
+        if not path:
+            raise click.ClickException(
+                f"Could not determine default config path for {terminal_type}."
+            )
+        return DestinationResolution(
+            terminal_type=terminal_type,
+            path=path,
+        )
+
+    # It's a file path
+    path = Path(to_arg).expanduser().resolve()
+
+    if for_ctec_output:
+        return DestinationResolution(path=path)
+
+    # For native output, we need a terminal type
+    if to_type:
+        if to_type.lower() not in terminal_names:
+            raise click.ClickException(
+                f"Unknown terminal type: {to_type}. "
+                f"Supported: {', '.join(terminal_names)}"
+            )
+        return DestinationResolution(
+            terminal_type=to_type.lower(),
+            path=path,
+        )
+
+    # Try to detect from existing file content or path
+    if path.exists():
+        try:
+            content = path.read_text()
+            detected = TerminalRegistry.detect_terminal_type(content, path)
+            if detected:
+                return DestinationResolution(
+                    terminal_type=detected,
+                    path=path,
+                )
+        except Exception:
+            pass
+
+    # Try to detect from path alone
+    detected = TerminalRegistry.detect_terminal_type("", path)
+    if detected:
+        return DestinationResolution(
+            terminal_type=detected,
+            path=path,
+        )
+
+    raise click.ClickException(
+        f"Cannot detect terminal type for destination {path}. "
+        f"Please specify --to-type."
+    )
+
+
+def write_output(content: str, path: Path | None, to_stdout: bool, quiet: bool) -> None:
+    """Write output to file or stdout."""
+    if to_stdout or path is None:
+        click.echo(content)
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        if not quiet:
+            click.echo(f"Written to {path}", err=True)
+
+
 @click.group()
 @click.version_option()
 def cli():
@@ -67,21 +310,24 @@ def cli():
     CTEC uses YAML as its primary format, aligned with the iTerm2-Color-Schemes
     ecosystem for maximum compatibility with existing themes.
 
-    Supported terminals: iTerm2, Ghostty, Alacritty, Kitty, Wezterm
+    Supported terminals: iTerm2, Ghostty, Alacritty, Kitty, Wezterm, VSCode, Terminal.app
 
     \b
     Examples:
+        # Convert between terminals using their default config locations
+        console-cowboy convert --from iterm2 --to ghostty
+
+        # Convert from a specific file, auto-detecting the source type
+        console-cowboy convert --from ~/custom/config --to ghostty
+
         # Export iTerm2 config to CTEC format
-        console-cowboy export iterm2 -o my-config.yaml
+        console-cowboy export --from iterm2
 
         # Import CTEC config into Ghostty format
-        console-cowboy import my-config.yaml -t ghostty -o ~/.config/ghostty/config
+        console-cowboy import --from config.yaml --to ghostty
 
-        # Convert directly between terminals
-        console-cowboy convert ~/.config/kitty/kitty.conf -f kitty -t alacritty
-
-        # Generate JSON schema for editor validation
-        console-cowboy schema -o ctec.schema.json
+        # Read from stdin, write to stdout
+        cat config.yaml | console-cowboy import --from - --from-type ctec --to-type alacritty --to -
     """
     pass
 
@@ -106,26 +352,24 @@ def list_terminals():
 
 
 @cli.command(name="export")
-@click.argument(
-    "terminal",
+@click.option(
+    "--from",
+    "from_arg",
+    required=True,
+    help="Source: terminal name (e.g., 'iterm2'), file path, or '-' for stdin.",
+)
+@click.option(
+    "--from-type",
+    "from_type",
     type=click.Choice(get_terminal_choices(), case_sensitive=False),
+    help="Explicit source terminal type (required if auto-detection fails).",
 )
 @click.option(
-    "-i",
-    "--input",
-    "input_path",
-    type=click.Path(exists=True, path_type=Path),
-    help="Input configuration file. If not specified, uses the terminal's default location.",
+    "--to",
+    "to_arg",
+    help="Output file path or '-' for stdout. Defaults to stdout if not specified.",
 )
 @click.option(
-    "-o",
-    "--output",
-    "output_path",
-    type=click.Path(path_type=Path),
-    help="Output file path. If not specified, outputs to stdout.",
-)
-@click.option(
-    "-f",
     "--format",
     "output_format",
     type=click.Choice(["yaml", "json"], case_sensitive=False),
@@ -133,23 +377,21 @@ def list_terminals():
     help="Output format (default: yaml).",
 )
 @click.option(
-    "-p",
     "--profile",
     "profile_name",
     type=str,
     default=None,
-    help="Profile name to export (iTerm2 only). If not specified, uses the default profile.",
+    help="Profile name to export (iTerm2/Terminal.app only).",
 )
 @click.option(
-    "-q",
     "--quiet",
     is_flag=True,
     help="Suppress warnings and informational output.",
 )
 def export_config(
-    terminal: str,
-    input_path: Path | None,
-    output_path: Path | None,
+    from_arg: str,
+    from_type: str | None,
+    to_arg: str | None,
     output_format: str,
     profile_name: str | None,
     quiet: bool,
@@ -157,73 +399,73 @@ def export_config(
     """
     Export a terminal's configuration to CTEC format.
 
-    TERMINAL is the name of the source terminal emulator (e.g., iterm2, ghostty).
+    The --from argument can be:
+      - A terminal name (e.g., 'iterm2'): Uses the default config location
+      - A file path: Detects terminal type from contents (or use --from-type)
+      - '-': Read from stdin (requires --from-type)
 
     \b
     Examples:
-        # Export iTerm2 config to YAML (default)
-        console-cowboy export iterm2 -o my-config.yaml
+        # Export from iTerm2's default location
+        console-cowboy export --from iterm2
+
+        # Export to a specific file
+        console-cowboy export --from ghostty --to config.yaml
 
         # Export from a specific file
-        console-cowboy export ghostty -i ~/custom/config -o config.json -f json
-
-        # Export to stdout
-        console-cowboy export kitty
+        console-cowboy export --from ~/custom/config --from-type kitty
 
         # Export a specific iTerm2 profile
-        console-cowboy export iterm2 -p "Development" -o dev-config.yaml
+        console-cowboy export --from iterm2 --profile "Development"
+
+        # Export as JSON
+        console-cowboy export --from alacritty --format json
     """
-    adapter = TerminalRegistry.get(terminal)
+    # Resolve source
+    source = resolve_source(from_arg, from_type)
+
+    # Resolve destination (for CTEC output)
+    dest = resolve_destination(to_arg, for_ctec_output=True)
+
+    adapter = TerminalRegistry.get(source.terminal_type)
     if not adapter:
-        raise click.ClickException(f"Unknown terminal: {terminal}")
+        raise click.ClickException(f"Unknown terminal: {source.terminal_type}")
 
     # Check if profile option is valid for this terminal
-    if profile_name and terminal.lower() not in ("iterm2", "terminal_app"):
+    if profile_name and source.terminal_type not in ("iterm2", "terminal_app"):
         raise click.ClickException(
             f"The --profile option is only supported for iTerm2 and Terminal.app. "
             f"{adapter.display_name} does not have multiple profiles."
         )
 
-    # Determine input path
-    if input_path is None:
-        input_path = adapter.get_default_config_path()
-        if input_path is None:
-            raise click.ClickException(
-                f"Could not find default config for {terminal}. "
-                f"Please specify input file with -i/--input."
-            )
-        if not quiet:
-            click.echo(
-                f"Using default config: {input_path}",
-                err=True,
-            )
+    if not quiet and source.path:
+        click.echo(f"Reading from: {source.path}", err=True)
 
     # Parse configuration
     try:
-        # Pass profile_name for iTerm2 and Terminal.app, other adapters ignore extra kwargs
-        if terminal.lower() in ("iterm2", "terminal_app"):
-            ctec = adapter.parse(input_path, profile_name=profile_name)
+        if source.terminal_type in ("iterm2", "terminal_app"):
+            if source.from_stdin:
+                ctec = adapter.parse("stdin", content=source.content, profile_name=profile_name)
+            else:
+                ctec = adapter.parse(source.path, profile_name=profile_name)
         else:
-            ctec = adapter.parse(input_path)
+            if source.from_stdin:
+                ctec = adapter.parse("stdin", content=source.content)
+            else:
+                ctec = adapter.parse(source.path)
     except FileNotFoundError as e:
         raise click.ClickException(str(e))
     except ValueError as e:
-        # Profile not found error
         raise click.ClickException(str(e))
     except Exception as e:
-        raise click.ClickException(f"Failed to parse {terminal} config: {e}")
+        raise click.ClickException(f"Failed to parse {source.terminal_type} config: {e}")
 
     # Serialize to output format
     fmt = OutputFormat(output_format.lower())
     output = CTECSerializer.serialize(ctec, fmt)
 
     # Write output
-    if output_path:
-        output_path.write_text(output)
-        if not quiet:
-            click.echo(f"Exported to {output_path}", err=True)
-    else:
-        click.echo(output)
+    write_output(output, dest.path, dest.to_stdout, quiet)
 
     # Print warnings and terminal-specific settings
     if not quiet:
@@ -232,110 +474,131 @@ def export_config(
 
 
 @cli.command(name="import")
-@click.argument(
-    "input_file",
-    type=click.Path(exists=True, path_type=Path),
-)
 @click.option(
-    "-t",
-    "--terminal",
-    "terminal",
-    type=click.Choice(get_terminal_choices(), case_sensitive=False),
+    "--from",
+    "from_arg",
     required=True,
-    help="Target terminal emulator to convert to.",
+    help="Source CTEC file path or '-' for stdin.",
 )
 @click.option(
-    "-o",
-    "--output",
-    "output_path",
-    type=click.Path(path_type=Path),
-    help="Output file path. If not specified, outputs to stdout.",
+    "--to",
+    "to_arg",
+    help="Destination: terminal name, file path, or '-' for stdout.",
 )
 @click.option(
-    "-f",
+    "--to-type",
+    "to_type",
+    type=click.Choice(get_terminal_choices(), case_sensitive=False),
+    help="Explicit destination terminal type (required if auto-detection fails).",
+)
+@click.option(
     "--format",
     "input_format",
     type=click.Choice(["yaml", "json"], case_sensitive=False),
-    help="Input format. If not specified, detected from file extension.",
+    help="Input CTEC format. If not specified, detected from file extension.",
 )
 @click.option(
-    "-q",
     "--quiet",
     is_flag=True,
     help="Suppress warnings and informational output.",
 )
 def import_config(
-    input_file: Path,
-    terminal: str,
-    output_path: Path | None,
+    from_arg: str,
+    to_arg: str | None,
+    to_type: str | None,
     input_format: str | None,
     quiet: bool,
 ):
     """
     Import a CTEC configuration into a terminal's native format.
 
-    INPUT_FILE is the path to a CTEC configuration file (.yaml or .json).
+    The --from argument is a CTEC file path or '-' for stdin.
+
+    The --to argument can be:
+      - A terminal name (e.g., 'ghostty'): Writes to default config location
+      - A file path: Detects terminal type from path/contents (or use --to-type)
+      - '-': Write to stdout (requires --to-type)
+      - Omitted: Write to stdout
 
     \b
     Examples:
-        # Import CTEC config into Ghostty format
-        console-cowboy import config.yaml -t ghostty -o ~/.config/ghostty/config
+        # Import to Ghostty's default config location
+        console-cowboy import --from config.yaml --to ghostty
 
-        # Import and output to stdout
-        console-cowboy import config.yaml -t alacritty
+        # Import to a specific file
+        console-cowboy import --from config.yaml --to ~/.config/alacritty/alacritty.toml --to-type alacritty
 
-        # Specify input format explicitly
-        console-cowboy import config -t kitty -f yaml
+        # Import from stdin, output to stdout
+        cat config.yaml | console-cowboy import --from - --to-type kitty --to -
     """
-    adapter = TerminalRegistry.get(terminal)
-    if not adapter:
-        raise click.ClickException(f"Unknown terminal: {terminal}")
-
-    # Determine input format
-    fmt = None
-    if input_format:
-        fmt = OutputFormat(input_format.lower())
+    # Read CTEC source
+    if from_arg == "-":
+        content = sys.stdin.read()
+        # Determine format
+        if input_format:
+            fmt = OutputFormat(input_format.lower())
+        else:
+            # Default to YAML for stdin
+            fmt = OutputFormat.YAML
     else:
-        try:
-            fmt = CTECSerializer.detect_format(input_file)
-        except ValueError:
-            raise click.ClickException(
-                "Cannot detect format from extension. Please specify with -f/--format."
-            )
+        path = Path(from_arg).expanduser().resolve()
+        if not path.exists():
+            raise click.ClickException(f"File not found: {path}")
+
+        # Determine format
+        if input_format:
+            fmt = OutputFormat(input_format.lower())
+        else:
+            try:
+                fmt = CTECSerializer.detect_format(path)
+            except ValueError:
+                raise click.ClickException(
+                    "Cannot detect CTEC format from extension. Please specify --format."
+                )
+        content = path.read_text()
 
     # Parse CTEC configuration
     try:
-        ctec = CTECSerializer.read_file(input_file, fmt)
+        ctec = CTECSerializer.deserialize(content, fmt)
     except Exception as e:
         raise click.ClickException(f"Failed to read CTEC config: {e}")
+
+    # Resolve destination
+    if to_arg is None and to_type is None:
+        raise click.ClickException(
+            "Either --to or --to-type is required to specify the output format."
+        )
+
+    dest = resolve_destination(to_arg, to_type, for_ctec_output=False)
+
+    adapter = TerminalRegistry.get(dest.terminal_type)
+    if not adapter:
+        raise click.ClickException(f"Unknown terminal: {dest.terminal_type}")
+
+    if not quiet and dest.path and not dest.to_stdout:
+        click.echo(f"Writing to: {dest.path}", err=True)
 
     # Export to target format
     try:
         output = adapter.export(ctec)
     except Exception as e:
-        raise click.ClickException(f"Failed to export to {terminal} format: {e}")
+        raise click.ClickException(f"Failed to export to {dest.terminal_type} format: {e}")
 
     # Write output
-    if output_path:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(output)
-        if not quiet:
-            click.echo(f"Imported to {output_path}", err=True)
-    else:
-        click.echo(output)
+    write_output(output, dest.path, dest.to_stdout, quiet)
 
     # Print warnings
     if not quiet:
         print_warnings(ctec)
 
         # Check for incompatibilities
-        if ctec.source_terminal and ctec.source_terminal != terminal:
+        if ctec.source_terminal and ctec.source_terminal != dest.terminal_type:
             source_specific = ctec.get_terminal_specific(ctec.source_terminal)
             if source_specific:
                 click.echo(
                     click.style(
                         f"\nNote: {len(source_specific)} setting(s) from "
-                        f"{ctec.source_terminal} could not be converted to {terminal}.",
+                        f"{ctec.source_terminal} could not be converted to {dest.terminal_type}.",
                         fg="yellow",
                     ),
                     err=True,
@@ -343,127 +606,146 @@ def import_config(
 
 
 @cli.command(name="convert")
-@click.argument(
-    "input_file",
-    type=click.Path(exists=True, path_type=Path),
-)
 @click.option(
-    "-f",
     "--from",
-    "from_terminal",
-    type=click.Choice(get_terminal_choices(), case_sensitive=False),
+    "from_arg",
     required=True,
-    help="Source terminal emulator.",
+    help="Source: terminal name (e.g., 'iterm2'), file path, or '-' for stdin.",
 )
 @click.option(
-    "-t",
+    "--from-type",
+    "from_type",
+    type=click.Choice(get_terminal_choices(), case_sensitive=False),
+    help="Explicit source terminal type (required if auto-detection fails).",
+)
+@click.option(
     "--to",
-    "to_terminal",
+    "to_arg",
+    help="Destination: terminal name, file path, or '-' for stdout.",
+)
+@click.option(
+    "--to-type",
+    "to_type",
     type=click.Choice(get_terminal_choices(), case_sensitive=False),
-    required=True,
-    help="Target terminal emulator.",
+    help="Explicit destination terminal type (required if auto-detection fails).",
 )
 @click.option(
-    "-o",
-    "--output",
-    "output_path",
-    type=click.Path(path_type=Path),
-    help="Output file path. If not specified, outputs to stdout.",
-)
-@click.option(
-    "-p",
     "--profile",
     "profile_name",
     type=str,
     default=None,
-    help="Profile name to convert (iTerm2 source only). If not specified, uses the default profile.",
+    help="Profile name to convert (iTerm2/Terminal.app source only).",
 )
 @click.option(
-    "-q",
     "--quiet",
     is_flag=True,
     help="Suppress warnings and informational output.",
 )
 def convert_config(
-    input_file: Path,
-    from_terminal: str,
-    to_terminal: str,
-    output_path: Path | None,
+    from_arg: str,
+    from_type: str | None,
+    to_arg: str | None,
+    to_type: str | None,
     profile_name: str | None,
     quiet: bool,
 ):
     """
     Convert directly between terminal configuration formats.
 
-    This is a convenience command that combines export and import in one step.
+    The --from argument can be:
+      - A terminal name (e.g., 'iterm2'): Uses the default config location
+      - A file path: Detects terminal type from contents (or use --from-type)
+      - '-': Read from stdin (requires --from-type)
+
+    The --to argument can be:
+      - A terminal name (e.g., 'ghostty'): Writes to default config location
+      - A file path: Detects terminal type from path/contents (or use --to-type)
+      - '-': Write to stdout (requires --to-type)
+      - Omitted: Write to stdout (requires --to-type)
 
     \b
     Examples:
-        # Convert Kitty config to Alacritty
-        console-cowboy convert kitty.conf -f kitty -t alacritty -o alacritty.toml
+        # Convert using default config locations
+        console-cowboy convert --from iterm2 --to ghostty
 
-        # Convert iTerm2 plist to Ghostty
-        console-cowboy convert com.googlecode.iterm2.plist -f iterm2 -t ghostty
+        # Convert from a specific file, auto-detecting source type
+        console-cowboy convert --from ~/custom/config --to ghostty
 
-        # Convert a specific iTerm2 profile to Ghostty
-        console-cowboy convert com.googlecode.iterm2.plist -f iterm2 -t ghostty -p "Development"
+        # Convert with explicit types
+        console-cowboy convert --from myconfig --from-type kitty --to-type alacritty --to -
+
+        # Convert a specific iTerm2 profile
+        console-cowboy convert --from iterm2 --to ghostty --profile "Development"
     """
-    from_adapter = TerminalRegistry.get(from_terminal)
-    to_adapter = TerminalRegistry.get(to_terminal)
+    # Resolve source
+    source = resolve_source(from_arg, from_type)
+
+    # Resolve destination
+    if to_arg is None and to_type is None:
+        raise click.ClickException(
+            "Either --to or --to-type is required to specify the output format."
+        )
+
+    dest = resolve_destination(to_arg, to_type, for_ctec_output=False)
+
+    from_adapter = TerminalRegistry.get(source.terminal_type)
+    to_adapter = TerminalRegistry.get(dest.terminal_type)
 
     if not from_adapter:
-        raise click.ClickException(f"Unknown source terminal: {from_terminal}")
+        raise click.ClickException(f"Unknown source terminal: {source.terminal_type}")
     if not to_adapter:
-        raise click.ClickException(f"Unknown target terminal: {to_terminal}")
+        raise click.ClickException(f"Unknown target terminal: {dest.terminal_type}")
 
     # Check if profile option is valid for this terminal
-    if profile_name and from_terminal.lower() not in ("iterm2", "terminal_app"):
+    if profile_name and source.terminal_type not in ("iterm2", "terminal_app"):
         raise click.ClickException(
             f"The --profile option is only supported when converting from iTerm2 or Terminal.app. "
             f"{from_adapter.display_name} does not have multiple profiles."
         )
 
+    if not quiet:
+        if source.path:
+            click.echo(f"Reading from: {source.path}", err=True)
+        if dest.path and not dest.to_stdout:
+            click.echo(f"Writing to: {dest.path}", err=True)
+
     # Parse source configuration
     try:
-        if from_terminal.lower() in ("iterm2", "terminal_app"):
-            ctec = from_adapter.parse(input_file, profile_name=profile_name)
+        if source.terminal_type in ("iterm2", "terminal_app"):
+            if source.from_stdin:
+                ctec = from_adapter.parse("stdin", content=source.content, profile_name=profile_name)
+            else:
+                ctec = from_adapter.parse(source.path, profile_name=profile_name)
         else:
-            ctec = from_adapter.parse(input_file)
+            if source.from_stdin:
+                ctec = from_adapter.parse("stdin", content=source.content)
+            else:
+                ctec = from_adapter.parse(source.path)
     except FileNotFoundError as e:
         raise click.ClickException(str(e))
     except ValueError as e:
-        # Profile not found error
         raise click.ClickException(str(e))
     except Exception as e:
-        raise click.ClickException(f"Failed to parse {from_terminal} config: {e}")
+        raise click.ClickException(f"Failed to parse {source.terminal_type} config: {e}")
 
     # Export to target format
     try:
         output = to_adapter.export(ctec)
     except Exception as e:
-        raise click.ClickException(f"Failed to export to {to_terminal} format: {e}")
+        raise click.ClickException(f"Failed to export to {dest.terminal_type} format: {e}")
 
     # Write output
-    if output_path:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(output)
-        if not quiet:
-            click.echo(
-                f"Converted {from_terminal} -> {to_terminal}: {output_path}",
-                err=True,
-            )
-    else:
-        click.echo(output)
+    write_output(output, dest.path, dest.to_stdout, quiet)
 
     # Print warnings and incompatibilities
     if not quiet:
         print_warnings(ctec)
 
-        source_specific = ctec.get_terminal_specific(from_terminal)
+        source_specific = ctec.get_terminal_specific(source.terminal_type)
         if source_specific:
             click.echo(
                 click.style(
-                    f"\nNote: {len(source_specific)} {from_terminal}-specific setting(s) "
+                    f"\nNote: {len(source_specific)} {source.terminal_type}-specific setting(s) "
                     f"could not be converted:",
                     fg="yellow",
                 ),
@@ -477,18 +759,19 @@ def convert_config(
 
 
 @cli.command(name="info")
-@click.argument(
-    "input_file",
-    type=click.Path(exists=True, path_type=Path),
+@click.option(
+    "--from",
+    "from_arg",
+    required=True,
+    help="Source: terminal name, file path, or CTEC file.",
 )
 @click.option(
-    "-t",
-    "--terminal",
-    "terminal",
+    "--from-type",
+    "from_type",
     type=click.Choice(get_terminal_choices(), case_sensitive=False),
     help="Terminal type (if parsing native config). If not specified, assumes CTEC format.",
 )
-def show_info(input_file: Path, terminal: str | None):
+def show_info(from_arg: str, from_type: str | None):
     """
     Display information about a configuration file.
 
@@ -498,28 +781,69 @@ def show_info(input_file: Path, terminal: str | None):
     \b
     Examples:
         # Show info about a CTEC file
-        console-cowboy info my-config.toml
+        console-cowboy info --from my-config.yaml
 
         # Show info about a native terminal config
-        console-cowboy info ~/.config/kitty/kitty.conf -t kitty
+        console-cowboy info --from ~/.config/kitty/kitty.conf --from-type kitty
+
+        # Show info about a terminal's default config
+        console-cowboy info --from iterm2 --from-type iterm2
     """
-    # Parse the configuration
-    if terminal:
-        adapter = TerminalRegistry.get(terminal)
+    terminal_names = get_terminal_choices()
+
+    # Check if it's a terminal name with explicit type
+    if from_arg.lower() in terminal_names and from_type:
+        # Use default config path
+        path = TerminalRegistry.get_default_config_path_for_terminal(from_arg.lower())
+        if not path or not path.exists():
+            raise click.ClickException(
+                f"Could not find default config for {from_arg}."
+            )
+        adapter = TerminalRegistry.get(from_type.lower())
         if not adapter:
-            raise click.ClickException(f"Unknown terminal: {terminal}")
+            raise click.ClickException(f"Unknown terminal: {from_type}")
         try:
-            ctec = adapter.parse(input_file)
+            ctec = adapter.parse(path)
+        except Exception as e:
+            raise click.ClickException(f"Failed to parse config: {e}")
+    elif from_type:
+        # Parse as native config
+        path = Path(from_arg).expanduser().resolve()
+        if not path.exists():
+            raise click.ClickException(f"File not found: {path}")
+
+        adapter = TerminalRegistry.get(from_type.lower())
+        if not adapter:
+            raise click.ClickException(f"Unknown terminal: {from_type}")
+        try:
+            ctec = adapter.parse(path)
         except Exception as e:
             raise click.ClickException(f"Failed to parse config: {e}")
     else:
+        # Try to parse as CTEC file
+        path = Path(from_arg).expanduser().resolve()
+        if not path.exists():
+            raise click.ClickException(f"File not found: {path}")
+
         try:
-            fmt = CTECSerializer.detect_format(input_file)
-            ctec = CTECSerializer.read_file(input_file, fmt)
+            fmt = CTECSerializer.detect_format(path)
+            ctec = CTECSerializer.read_file(path, fmt)
         except ValueError:
-            raise click.ClickException(
-                "Cannot detect format. Use -t to specify terminal type."
-            )
+            # Try to detect and parse as native config
+            try:
+                content = path.read_text()
+                detected = TerminalRegistry.detect_terminal_type(content, path)
+                if detected:
+                    adapter = TerminalRegistry.get(detected)
+                    ctec = adapter.parse(path)
+                else:
+                    raise click.ClickException(
+                        "Cannot detect format. Use --from-type to specify terminal type."
+                    )
+            except click.ClickException:
+                raise
+            except Exception as e:
+                raise click.ClickException(f"Failed to parse config: {e}")
         except Exception as e:
             raise click.ClickException(f"Failed to parse CTEC config: {e}")
 
