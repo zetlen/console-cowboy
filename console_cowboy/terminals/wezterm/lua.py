@@ -313,6 +313,10 @@ def execute_wezterm_config(lua_source: str) -> dict[str, Any]:
     """
     Execute a WezTerm Lua config and return the captured configuration.
 
+    The Lua environment is sandboxed to prevent arbitrary code execution.
+    Only safe standard library functions are available (string, table, math),
+    and dangerous functions (os.execute, io.*, loadfile, etc.) are blocked.
+
     Args:
         lua_source: The Lua source code to execute
 
@@ -330,10 +334,13 @@ def execute_wezterm_config(lua_source: str) -> dict[str, Any]:
 
     # Set up the Lua environment with our mock
     lua.globals()["_mock_wezterm"] = mock_wezterm
+    lua.globals()["_user_code"] = lua_source
 
-    # Create the wezterm module in Lua that delegates to our Python mock
-    setup_code = """
+    # Create the wezterm module and sandboxed environment in Lua
+    # Uses load() with env parameter (Lua 5.2+) to restrict the user code's environment
+    setup_and_execute_code = """
     local _mock = _mock_wezterm
+    local _user_code = _user_code
 
     -- Create the wezterm module table
     local wezterm = {}
@@ -391,20 +398,66 @@ def execute_wezterm_config(lua_source: str) -> dict[str, Any]:
     -- Provide nop for target_triple (platform detection)
     wezterm.target_triple = "unknown-unknown-unknown"
 
-    -- Make require('wezterm') return our mock
-    package.loaded['wezterm'] = wezterm
+    -- Create a sandboxed environment with only safe globals
+    -- This prevents malicious configs from executing system commands
+    local safe_env = {
+        -- Safe standard functions
+        assert = assert,
+        error = error,
+        ipairs = ipairs,
+        next = next,
+        pairs = pairs,
+        pcall = pcall,
+        rawequal = rawequal,
+        rawget = rawget,
+        rawset = rawset,
+        select = select,
+        setmetatable = setmetatable,
+        getmetatable = getmetatable,
+        tonumber = tonumber,
+        tostring = tostring,
+        type = type,
+        xpcall = xpcall,
 
-    return wezterm
+        -- Safe standard libraries (pure functions, no I/O)
+        string = string,
+        table = table,
+        math = math,
+
+        -- Version info
+        _VERSION = _VERSION,
+
+        -- Our mock wezterm module
+        wezterm = wezterm,
+
+        -- Sandboxed require that only returns wezterm
+        require = function(name)
+            if name == "wezterm" then
+                return wezterm
+            end
+            error("require('" .. name .. "') is not available in sandboxed environment", 2)
+        end,
+
+        -- Sandboxed print (no-op, but some configs may call it)
+        print = function() end,
+    }
+
+    -- Allow safe_env to reference itself as _G
+    safe_env._G = safe_env
+
+    -- Load the user's config as a function with sandboxed environment
+    -- In Lua 5.2+, load() takes the environment as the 4th parameter
+    local user_func, err = load(_user_code, "wezterm.lua", "t", safe_env)
+    if not user_func then
+        error("Failed to parse WezTerm config: " .. (err or "unknown error"))
+    end
+
+    -- Execute and return the result
+    return user_func()
     """
 
     try:
-        lua.execute(setup_code)
-    except Exception as e:
-        raise ValueError(f"Failed to set up Lua environment: {e}") from e
-
-    # Execute the user's config
-    try:
-        result = lua.execute(lua_source)
+        result = lua.execute(setup_and_execute_code)
     except Exception as e:
         raise ValueError(f"Failed to execute WezTerm config: {e}") from e
 

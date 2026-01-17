@@ -448,6 +448,81 @@ return config
         assert "SplitHorizontal" in output
         assert "domain" in output
 
+    def test_sandbox_blocks_os_execute(self):
+        """Test that the Lua sandbox blocks dangerous os.execute calls."""
+        content = """
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+-- This should fail because os is not available in the sandbox
+os.execute('echo pwned')
+
+return config
+"""
+        ctec = WeztermAdapter.parse("test.lua", content=content)
+
+        # Should have a warning about the sandbox blocking os access
+        assert any("Failed to execute" in w or "os" in w.lower() for w in ctec.warnings)
+
+    def test_sandbox_blocks_io_open(self):
+        """Test that the Lua sandbox blocks dangerous io.open calls."""
+        content = """
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+-- This should fail because io is not available in the sandbox
+local f = io.open('/etc/passwd', 'r')
+
+return config
+"""
+        ctec = WeztermAdapter.parse("test.lua", content=content)
+
+        # Should have a warning about the sandbox blocking io access
+        assert any("Failed to execute" in w or "io" in w.lower() for w in ctec.warnings)
+
+    def test_sandbox_blocks_loadfile(self):
+        """Test that the Lua sandbox blocks dangerous loadfile calls."""
+        content = """
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+-- This should fail because loadfile is not available in the sandbox
+local evil = loadfile('/tmp/evil.lua')
+
+return config
+"""
+        ctec = WeztermAdapter.parse("test.lua", content=content)
+
+        # Should have a warning about the sandbox blocking loadfile
+        assert any("Failed to execute" in w for w in ctec.warnings)
+
+    def test_sandbox_allows_safe_operations(self):
+        """Test that the sandbox allows legitimate WezTerm config operations."""
+        content = """
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+-- Safe string operations
+local font_name = string.upper("jetbrains mono")
+
+-- Safe table operations
+local colors = {}
+table.insert(colors, "#ff0000")
+
+-- Safe math operations
+local size = math.floor(12.5)
+
+config.font_size = size
+
+return config
+"""
+        ctec = WeztermAdapter.parse("test.lua", content=content)
+
+        # Should parse successfully without errors
+        assert not any("Failed to execute" in w for w in ctec.warnings)
+        assert ctec.font is not None
+        assert ctec.font.size == 12
+
 
 class TestITerm2Adapter:
     """Tests for the iTerm2 adapter."""
