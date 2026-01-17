@@ -63,7 +63,15 @@ Native Config → TerminalAdapter.parse() → CTEC → TerminalAdapter.export() 
 
 ## Adding New Terminal Support
 
-1. Create adapter in `console_cowboy/terminals/your_terminal.py`
-2. Inherit from `TerminalAdapter`, implement `parse()` and `export()`
-3. Register in `console_cowboy/terminals/__init__.py`
-4. Add test fixtures in `tests/fixtures/` and tests in `tests/test_terminals.py`
+1. Create adapter directory: `console_cowboy/terminals/your_terminal/`
+2. Create `__init__.py` with docstring and adapter import:
+   ```python
+   """Your Terminal adapter."""
+   from .adapter import YourTerminalAdapter
+   __all__ = ["YourTerminalAdapter"]
+   ```
+3. Create `adapter.py` with your `TerminalAdapter` subclass implementing `parse()` and `export()`
+4. Register in `console_cowboy/terminals/__init__.py`
+5. Add test fixtures in `tests/fixtures/` and tests in `tests/test_terminals.py`
+
+**Note:** For complex adapters (like WezTerm with Lua parsing), you can add additional modules alongside `adapter.py` in the subdirectory.
