@@ -78,6 +78,12 @@ dev = [
     "twine>=6.2.0",
 ]
 
+scripts = [
+    "beautifulsoup4>=4.12",
+    "html2text>=2024.2",
+    "requests>=2.31",
+]
+
 [tool.commitizen]
 name = "cz_conventional_commits"
 version = "0.1.0"
