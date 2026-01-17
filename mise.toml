@@ -1,6 +1,13 @@
 [tools]
 "pipx:cookiecutter" = "latest"
 
+[tasks.cli]
+description = "Run the cli with arguments"
+run = "python ./console_cowboy/cli.py"
+raw = true
+dir = "{{ config_root }}"
+
+
 [tasks.publish]
 description = "Build and publish to PyPI"
 run = """
@@ -8,3 +15,12 @@ rm -rf dist/
 uv run python -m build
 uv run twine upload dist/*
 """
+
+[tasks.sync]
+description = "prepare repository for stuff"
+run = "uv sync"
+
+[tasks.test]
+depends = ["sync"]
+description = "Run tests with pytest"
+run = "uv run python -m pytest"

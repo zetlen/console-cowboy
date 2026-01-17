@@ -37,9 +37,6 @@ CI = "https://github.com/zetlen/console-cowboy/actions"
 [project.scripts]
 console-cowboy = "console_cowboy.cli:cli"
 
-[project.optional-dependencies]
-test = ["pytest", "pytest-cov"]
-
 [tool.ruff]
 target-version = "py310"
 line-length = 88
@@ -75,6 +72,8 @@ dev = [
     "build>=1.0",
     "commitizen>=4.0",
     "lefthook>=2.0.15",
+    "pytest",
+    "pytest-cov",
     "ruff>=0.4",
     "twine>=6.2.0",
 ]

@@ -100,6 +100,7 @@ class ITerm2Adapter(TerminalAdapter):
     COLOR_KEY_REVERSE_MAP = {v: k for k, v in COLOR_KEY_MAP.items()}
 
     # Mapping of iTerm2 Hotkey Window Type to QuickTerminalPosition
+    # This is a separate property from Window Type, specific to hotkey windows
     # iTerm2 values: 0=floating, 1=fullscreen, 2=left, 3=right, 4=bottom, 5=top
     HOTKEY_WINDOW_TYPE_MAP = {
         0: QuickTerminalPosition.FLOATING,
@@ -111,6 +112,37 @@ class ITerm2Adapter(TerminalAdapter):
     }
 
     HOTKEY_WINDOW_TYPE_REVERSE_MAP = {v: k for k, v in HOTKEY_WINDOW_TYPE_MAP.items()}
+
+    # Mapping of iTerm2 Window Type enum to quick terminal positions
+    # Window Type is a general profile property that can indicate edge positioning
+    # Values 4-11 indicate edge-anchored windows suitable for quick terminal
+    WINDOW_TYPE_TO_QUICK_POSITION = {
+        4: QuickTerminalPosition.BOTTOM,  # Full-Width Bottom of Screen
+        5: QuickTerminalPosition.TOP,  # Full-Width Top of Screen
+        6: QuickTerminalPosition.LEFT,  # Full Height Left of Screen
+        7: QuickTerminalPosition.RIGHT,  # Full Height Right of Screen
+        8: QuickTerminalPosition.BOTTOM,  # Bottom of Screen
+        9: QuickTerminalPosition.TOP,  # Top of Screen
+        10: QuickTerminalPosition.LEFT,  # Left of Screen
+        11: QuickTerminalPosition.RIGHT,  # Right of Screen
+    }
+
+    # Window Type values that indicate full-width/full-height edge windows
+    WINDOW_TYPE_FULL_EDGE = {4, 5, 6, 7}  # Full-width or full-height
+
+    # Window Type enum values for reference:
+    # 0: Normal
+    # 1: Full Screen
+    # 2: Maximized
+    # 3: No Title Bar
+    # 4: Full-Width Bottom of Screen
+    # 5: Full-Width Top of Screen
+    # 6: Full Height Left of Screen
+    # 7: Full Height Right of Screen
+    # 8: Bottom of Screen
+    # 9: Top of Screen
+    # 10: Left of Screen
+    # 11: Right of Screen
 
     @classmethod
     def _parse_iterm_color(cls, color_dict: dict) -> Color:
@@ -240,10 +272,17 @@ class ITerm2Adapter(TerminalAdapter):
             else:
                 ctec.scroll = ScrollConfig(lines=lines)
 
-        # Parse window settings from profile (transparency, blur)
-        # Note: columns/rows are parsed from global config in parse(), not here
+        # Parse window settings from profile (transparency, blur, columns, rows)
         window = ctec.window or WindowConfig()
         window_modified = False
+
+        # Columns and Rows
+        if "Columns" in profile_data:
+            window.columns = profile_data["Columns"]
+            window_modified = True
+        if "Rows" in profile_data:
+            window.rows = profile_data["Rows"]
+            window_modified = True
 
         # Transparency: iTerm2 uses 0=opaque, 1=fully transparent
         # CTEC uses opacity where 1.0=opaque, 0.0=fully transparent
@@ -257,6 +296,22 @@ class ITerm2Adapter(TerminalAdapter):
             blur_radius = profile_data.get("Blur Radius", 10)
             window.blur = blur_radius
             window_modified = True
+
+        # Parse Window Type for startup mode and decorations
+        if "Window Type" in profile_data:
+            window_type = profile_data["Window Type"]
+            if window_type == 1:
+                # Full Screen
+                window.startup_mode = "fullscreen"
+                window_modified = True
+            elif window_type == 2:
+                # Maximized
+                window.startup_mode = "maximized"
+                window_modified = True
+            elif window_type == 3:
+                # No Title Bar
+                window.decorations = False
+                window_modified = True
 
         if window_modified:
             ctec.window = window
@@ -340,6 +395,85 @@ class ITerm2Adapter(TerminalAdapter):
         for key in specific_keys:
             if key in profile_data:
                 ctec.add_terminal_specific("iterm2", key, profile_data[key])
+
+    @classmethod
+    def _parse_hotkey_settings(cls, profile_data: dict, ctec: CTEC) -> None:
+        """
+        Extract only hotkey/quick-terminal settings from an iTerm2 profile.
+
+        This is used to import hotkey settings from a dedicated Hotkey Window
+        profile, which is how iTerm2 implements quick-terminal functionality.
+        Unlike other terminals where quick-terminal is a top-level setting,
+        iTerm2 uses a separate profile for the hotkey window.
+        """
+        if not profile_data.get("Has Hotkey", False):
+            return
+
+        quick = QuickTerminalConfig(enabled=True)
+
+        # Parse window position from Window Type
+        # Window Type values 4-11 indicate edge-positioned windows
+        if "Window Type" in profile_data:
+            window_type = profile_data["Window Type"]
+            if window_type in cls.WINDOW_TYPE_TO_QUICK_POSITION:
+                quick.position = cls.WINDOW_TYPE_TO_QUICK_POSITION[window_type]
+                # Track if this is a full-width/full-height edge window
+                if window_type in cls.WINDOW_TYPE_FULL_EDGE:
+                    # Full edge windows span the entire edge
+                    pass  # Could set a size property here if CTEC supports it
+            elif window_type == 1:
+                # Full Screen
+                quick.position = QuickTerminalPosition.FULLSCREEN
+            else:
+                # Default to TOP for other window types
+                quick.position = QuickTerminalPosition.TOP
+        elif "Hotkey Window Type" in profile_data:
+            # Fallback to Hotkey Window Type if present (separate property)
+            window_type = profile_data["Hotkey Window Type"]
+            quick.position = cls.HOTKEY_WINDOW_TYPE_MAP.get(
+                window_type, QuickTerminalPosition.TOP
+            )
+
+        # Parse animation setting
+        if "HotKey Window Animates" in profile_data:
+            if profile_data["HotKey Window Animates"]:
+                quick.animation_duration = 200  # Default 200ms
+            else:
+                quick.animation_duration = 0
+        # Also check for variant spelling
+        elif "Hotkey Window Animates" in profile_data:
+            if profile_data["Hotkey Window Animates"]:
+                quick.animation_duration = 200
+            else:
+                quick.animation_duration = 0
+
+        # Parse floating setting
+        if "HotKey Window Floats" in profile_data:
+            quick.floating = profile_data["HotKey Window Floats"]
+        elif "Hotkey Window Float" in profile_data:
+            quick.floating = profile_data["Hotkey Window Float"]
+
+        # Parse auto-hide setting (maps to hide_on_focus_loss)
+        if "HotKey Window AutoHides" in profile_data:
+            quick.hide_on_focus_loss = profile_data["HotKey Window AutoHides"]
+
+        # Parse hotkey configuration
+        if "HotKey Key Code" in profile_data:
+            quick.hotkey_key_code = profile_data["HotKey Key Code"]
+        elif "Hotkey Key Code" in profile_data:
+            quick.hotkey_key_code = profile_data["Hotkey Key Code"]
+
+        if "HotKey Modifier Flags" in profile_data:
+            quick.hotkey_modifiers = profile_data["HotKey Modifier Flags"]
+        elif "Hotkey Modifier Flags" in profile_data:
+            quick.hotkey_modifiers = profile_data["Hotkey Modifier Flags"]
+
+        if "HotKey Characters" in profile_data:
+            quick.hotkey = profile_data["HotKey Characters"]
+        elif "Hotkey Characters" in profile_data:
+            quick.hotkey = profile_data["Hotkey Characters"]
+
+        ctec.quick_terminal = quick
 
     @classmethod
     def parse(
@@ -443,13 +577,28 @@ class ITerm2Adapter(TerminalAdapter):
             # Parse the selected profile into CTEC
             cls._parse_profile_into_ctec(selected_profile_data, ctec)
 
-        # Parse window configuration
-        window = WindowConfig()
-        if "Default Bookmark Window Width" in data:
-            window.columns = data["Default Bookmark Window Width"]
-        if "Default Bookmark Window Height" in data:
-            window.rows = data["Default Bookmark Window Height"]
-        if window.columns or window.rows:
+            # Import hotkey settings from the designated hotkey profile
+            # iTerm2 implements quick-terminal as a separate "Hotkey Window" profile,
+            # unlike other terminals where it's a top-level setting.
+            # The top-level HotKeyBookmark setting contains the GUID of the hotkey profile.
+            if ctec.quick_terminal is None and "HotKeyBookmark" in data:
+                hotkey_guid = data["HotKeyBookmark"]
+                for profile_data in profiles:
+                    if profile_data.get("Guid") == hotkey_guid:
+                        cls._parse_hotkey_settings(profile_data, ctec)
+                        break
+
+        # Parse global window configuration (fallback if not set in profile)
+        # Use existing window config to preserve opacity, blur, decorations, etc.
+        if (
+            "Default Bookmark Window Width" in data
+            or "Default Bookmark Window Height" in data
+        ):
+            window = ctec.window or WindowConfig()
+            if "Default Bookmark Window Width" in data and window.columns is None:
+                window.columns = data["Default Bookmark Window Width"]
+            if "Default Bookmark Window Height" in data and window.rows is None:
+                window.rows = data["Default Bookmark Window Height"]
             ctec.window = window
 
         # Parse global settings
@@ -557,6 +706,12 @@ class ITerm2Adapter(TerminalAdapter):
             if ctec.window.blur is not None and ctec.window.blur > 0:
                 result["Blur"] = True
                 result["Blur Radius"] = ctec.window.blur
+
+            # Columns and Rows
+            if ctec.window.columns is not None:
+                result["Columns"] = ctec.window.columns
+            if ctec.window.rows is not None:
+                result["Rows"] = ctec.window.rows
 
         # Export quick terminal (hotkey window) settings
         if ctec.quick_terminal and ctec.quick_terminal.enabled:

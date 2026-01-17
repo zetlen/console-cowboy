@@ -351,7 +351,7 @@ class TestITerm2Adapter:
 
         assert ctec.source_terminal == "iterm2"
         assert ctec.window.columns == 120
-        assert ctec.window.rows == 40
+        assert ctec.window.rows == 200
 
     def test_parse_default_profile(self):
         """Test that the default profile settings are imported correctly."""
@@ -391,6 +391,24 @@ class TestITerm2Adapter:
 
         iterm_specific = ctec.get_terminal_specific("iterm2")
         assert len(iterm_specific) > 0
+
+    def test_hotkey_profile_extraction(self):
+        """Test that hotkey settings are extracted from a separate Hotkey Window profile."""
+        config_path = FIXTURES_DIR / "iterm2" / "com.googlecode.iterm2.plist"
+        ctec = ITerm2Adapter.parse(config_path)
+
+        # The Default profile doesn't have hotkey settings, but the Hotkey Window profile does
+        # The adapter should extract hotkey settings from the Hotkey Window profile
+        assert ctec.quick_terminal is not None
+        assert ctec.quick_terminal.enabled is True
+        assert ctec.quick_terminal.floating is True
+        assert ctec.quick_terminal.animation_duration == 200
+        assert ctec.quick_terminal.hotkey_key_code == 7  # 'X' key
+        assert ctec.quick_terminal.hotkey_modifiers == 1441792  # Cmd+Option
+        # Window Type 7 = Full Height Right of Screen
+        from console_cowboy.ctec.schema import QuickTerminalPosition
+
+        assert ctec.quick_terminal.position == QuickTerminalPosition.RIGHT
 
 
 class TestCrossTerminalConversion:
