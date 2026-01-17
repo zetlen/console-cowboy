@@ -788,14 +788,8 @@ class GhosttyAdapter(TerminalAdapter):
                 )
             # Warn about unsupported tab features
             unsupported = []
-            if ctec.tabs.alignment is not None:
-                unsupported.append("alignment")
             if ctec.tabs.style is not None:
                 unsupported.append("style")
-            if ctec.tabs.close_strategy is not None:
-                unsupported.append("close_strategy")
-            if ctec.tabs.min_tabs_to_show is not None:
-                unsupported.append("min_tabs_to_show")
             if ctec.tabs.max_width is not None:
                 unsupported.append("max_width")
             if ctec.tabs.show_index is not None:
@@ -842,19 +836,6 @@ class GhosttyAdapter(TerminalAdapter):
                 lines.append(
                     f"focus-follows-mouse = "
                     f"{str(ctec.panes.focus_follows_mouse).lower()}"
-                )
-            # Warn about unsupported pane features
-            unsupported = []
-            if ctec.panes.border_width is not None:
-                unsupported.append("border_width")
-            if ctec.panes.active_border_color is not None:
-                unsupported.append("active_border_color")
-            if ctec.panes.inactive_border_color is not None:
-                unsupported.append("inactive_border_color")
-            if unsupported:
-                ctec.add_warning(
-                    f"Ghostty does not support: {', '.join(unsupported)}. "
-                    "These pane settings will not be exported."
                 )
             lines.append("")
 

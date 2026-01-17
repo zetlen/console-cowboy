@@ -1051,12 +1051,6 @@ class WeztermAdapter(TerminalAdapter):
 
             # Warn about unsupported tab features
             unsupported = []
-            if ctec.tabs.alignment is not None:
-                unsupported.append("alignment")
-            if ctec.tabs.close_strategy is not None:
-                unsupported.append("close_strategy")
-            if ctec.tabs.min_tabs_to_show is not None:
-                unsupported.append("min_tabs_to_show")
             if ctec.tabs.new_tab_position is not None:
                 unsupported.append("new_tab_position")
             if ctec.tabs.inherit_working_directory is not None:
@@ -1090,12 +1084,6 @@ class WeztermAdapter(TerminalAdapter):
             unsupported = []
             if ctec.panes.inactive_dim_color is not None:
                 unsupported.append("inactive_dim_color")
-            if ctec.panes.border_width is not None:
-                unsupported.append("border_width")
-            if ctec.panes.active_border_color is not None:
-                unsupported.append("active_border_color")
-            if ctec.panes.inactive_border_color is not None:
-                unsupported.append("inactive_border_color")
             if unsupported:
                 ctec.add_warning(
                     f"WezTerm does not support: {', '.join(unsupported)}. "

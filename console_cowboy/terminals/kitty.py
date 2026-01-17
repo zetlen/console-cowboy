@@ -21,11 +21,9 @@ from console_cowboy.ctec.schema import (
     QuickTerminalConfig,
     QuickTerminalPosition,
     ScrollConfig,
-    TabBarAlignment,
     TabBarPosition,
     TabBarStyle,
     TabBarVisibility,
-    TabCloseStrategy,
     TabConfig,
     WindowConfig,
 )
@@ -117,25 +115,6 @@ class KittyAdapter(TerminalAdapter):
     }
 
     TAB_STYLE_REVERSE_MAP = {v: k for k, v in TAB_STYLE_MAP.items()}
-
-    # Tab bar alignment mapping
-    TAB_ALIGNMENT_MAP = {
-        "left": TabBarAlignment.LEFT,
-        "center": TabBarAlignment.CENTER,
-        "right": TabBarAlignment.RIGHT,
-    }
-
-    TAB_ALIGNMENT_REVERSE_MAP = {v: k for k, v in TAB_ALIGNMENT_MAP.items()}
-
-    # Tab switch/close strategy mapping
-    TAB_CLOSE_STRATEGY_MAP = {
-        "previous": TabCloseStrategy.PREVIOUS,
-        "left": TabCloseStrategy.LEFT,
-        "right": TabCloseStrategy.RIGHT,
-        "last": TabCloseStrategy.LAST,
-    }
-
-    TAB_CLOSE_STRATEGY_REVERSE_MAP = {v: k for k, v in TAB_CLOSE_STRATEGY_MAP.items()}
 
     @classmethod
     def can_parse(cls, content: str) -> bool:
@@ -410,13 +389,13 @@ class KittyAdapter(TerminalAdapter):
                 else:
                     tabs.style = cls.TAB_STYLE_MAP.get(value.lower())
             elif key == "tab_bar_align":
-                tabs.alignment = cls.TAB_ALIGNMENT_MAP.get(
-                    value.lower(), TabBarAlignment.LEFT
-                )
+                # Kitty-specific: store in terminal_specific for round-trip
+                ctec.add_terminal_specific("kitty", "tab_bar_align", value.lower())
             elif key == "tab_bar_min_tabs":
                 try:
                     min_tabs = int(value)
-                    tabs.min_tabs_to_show = min_tabs
+                    # Store raw value in terminal_specific for round-trip
+                    ctec.add_terminal_specific("kitty", "tab_bar_min_tabs", min_tabs)
                     # 1 = always show, 2 = show when 2+ tabs (auto)
                     if min_tabs <= 1:
                         tabs.visibility = TabBarVisibility.ALWAYS
@@ -425,8 +404,9 @@ class KittyAdapter(TerminalAdapter):
                 except ValueError:
                     ctec.add_warning(f"Invalid tab_bar_min_tabs: {value}")
             elif key == "tab_switch_strategy":
-                tabs.close_strategy = cls.TAB_CLOSE_STRATEGY_MAP.get(
-                    value.lower(), TabCloseStrategy.PREVIOUS
+                # Kitty-specific: store in terminal_specific for round-trip
+                ctec.add_terminal_specific(
+                    "kitty", "tab_switch_strategy", value.lower()
                 )
             elif key == "active_tab_foreground":
                 tabs.active_foreground = normalize_color(value)
@@ -446,16 +426,14 @@ class KittyAdapter(TerminalAdapter):
                 except ValueError:
                     ctec.add_warning(f"Invalid inactive_text_alpha: {value}")
             elif key == "active_border_color":
-                panes.active_border_color = normalize_color(value)
+                # Kitty-specific: store in terminal_specific for round-trip
+                ctec.add_terminal_specific("kitty", "active_border_color", value)
             elif key == "inactive_border_color":
-                panes.inactive_border_color = normalize_color(value)
+                # Kitty-specific: store in terminal_specific for round-trip
+                ctec.add_terminal_specific("kitty", "inactive_border_color", value)
             elif key == "window_border_width":
-                try:
-                    # Kitty supports pt, px, or bare numbers (defaults to pt)
-                    val_str = value.replace("pt", "").replace("px", "").strip()
-                    panes.border_width = float(val_str)
-                except ValueError:
-                    ctec.add_warning(f"Invalid window_border_width: {value}")
+                # Kitty-specific: store in terminal_specific for round-trip
+                ctec.add_terminal_specific("kitty", "window_border_width", value)
             elif key == "focus_follows_mouse":
                 panes.focus_follows_mouse = value.lower() == "yes"
 
@@ -499,10 +477,8 @@ class KittyAdapter(TerminalAdapter):
             for f in [
                 "position",
                 "visibility",
-                "alignment",
                 "style",
-                "min_tabs_to_show",
-                "close_strategy",
+                "auto_hide_single",
                 "active_foreground",
                 "active_background",
                 "inactive_foreground",
@@ -516,9 +492,6 @@ class KittyAdapter(TerminalAdapter):
             getattr(panes, f) is not None
             for f in [
                 "inactive_dim_factor",
-                "border_width",
-                "active_border_color",
-                "inactive_border_color",
                 "focus_follows_mouse",
             ]
         ):
@@ -684,14 +657,17 @@ class KittyAdapter(TerminalAdapter):
                 position = cls.TAB_POSITION_REVERSE_MAP.get(ctec.tabs.position, "top")
                 lines.append(f"tab_bar_edge {position}")
             # Handle visibility - Kitty uses tab_bar_style=hidden or tab_bar_min_tabs
+            # Check for Kitty-specific min_tabs value in terminal_specific first
+            min_tabs_specific = ctec.get_terminal_specific("kitty", "tab_bar_min_tabs")
             if ctec.tabs.visibility == TabBarVisibility.NEVER:
                 lines.append("tab_bar_style hidden")
+            elif min_tabs_specific is not None:
+                # Use the exact min_tabs value from terminal_specific (round-trip)
+                lines.append(f"tab_bar_min_tabs {min_tabs_specific}")
             elif ctec.tabs.visibility == TabBarVisibility.ALWAYS:
                 lines.append("tab_bar_min_tabs 1")
             elif ctec.tabs.auto_hide_single:
                 lines.append("tab_bar_min_tabs 2")
-            elif ctec.tabs.min_tabs_to_show is not None:
-                lines.append(f"tab_bar_min_tabs {ctec.tabs.min_tabs_to_show}")
             # Export style (only if visibility != hidden)
             if (
                 ctec.tabs.style is not None
@@ -700,16 +676,15 @@ class KittyAdapter(TerminalAdapter):
                 style = cls.TAB_STYLE_REVERSE_MAP.get(ctec.tabs.style)
                 if style:
                     lines.append(f"tab_bar_style {style}")
-            if ctec.tabs.alignment is not None:
-                alignment = cls.TAB_ALIGNMENT_REVERSE_MAP.get(
-                    ctec.tabs.alignment, "left"
-                )
-                lines.append(f"tab_bar_align {alignment}")
-            if ctec.tabs.close_strategy is not None:
-                strategy = cls.TAB_CLOSE_STRATEGY_REVERSE_MAP.get(
-                    ctec.tabs.close_strategy, "previous"
-                )
-                lines.append(f"tab_switch_strategy {strategy}")
+            # Export Kitty-specific tab settings from terminal_specific (round-trip)
+            align_specific = ctec.get_terminal_specific("kitty", "tab_bar_align")
+            if align_specific:
+                lines.append(f"tab_bar_align {align_specific}")
+            strategy_specific = ctec.get_terminal_specific(
+                "kitty", "tab_switch_strategy"
+            )
+            if strategy_specific:
+                lines.append(f"tab_switch_strategy {strategy_specific}")
             # Tab colors
             if ctec.tabs.active_foreground is not None:
                 lines.append(
@@ -751,16 +726,6 @@ class KittyAdapter(TerminalAdapter):
             lines.append("# Pane Settings")
             if ctec.panes.inactive_dim_factor is not None:
                 lines.append(f"inactive_text_alpha {ctec.panes.inactive_dim_factor}")
-            if ctec.panes.border_width is not None:
-                lines.append(f"window_border_width {ctec.panes.border_width}pt")
-            if ctec.panes.active_border_color is not None:
-                lines.append(
-                    f"active_border_color {ctec.panes.active_border_color.to_hex()}"
-                )
-            if ctec.panes.inactive_border_color is not None:
-                lines.append(
-                    f"inactive_border_color {ctec.panes.inactive_border_color.to_hex()}"
-                )
             if ctec.panes.focus_follows_mouse is not None:
                 val = "yes" if ctec.panes.focus_follows_mouse else "no"
                 lines.append(f"focus_follows_mouse {val}")
@@ -776,6 +741,23 @@ class KittyAdapter(TerminalAdapter):
                     "These pane settings will not be exported."
                 )
             lines.append("")
+
+        # Export Kitty-specific pane border settings from terminal_specific (round-trip)
+        border_width = ctec.get_terminal_specific("kitty", "window_border_width")
+        active_border = ctec.get_terminal_specific("kitty", "active_border_color")
+        inactive_border = ctec.get_terminal_specific("kitty", "inactive_border_color")
+        if border_width or active_border or inactive_border:
+            if not ctec.panes:
+                # Add header if not already present from above
+                lines.append("# Pane Settings")
+            if border_width:
+                lines.append(f"window_border_width {border_width}")
+            if active_border:
+                lines.append(f"active_border_color {active_border}")
+            if inactive_border:
+                lines.append(f"inactive_border_color {inactive_border}")
+            if not ctec.panes:
+                lines.append("")
 
         # Export quick-access-terminal settings (Kitty 0.42+ kitten)
         # Note: These settings are typically placed in quick-access-terminal.conf

@@ -2122,8 +2122,10 @@ active_tab_background #000000
         assert ctec.tabs is not None
         assert ctec.tabs.position.value == "bottom"
         assert ctec.tabs.style.value == "powerline"
-        assert ctec.tabs.alignment.value == "center"
-        assert ctec.tabs.close_strategy.value == "previous"
+        # Kitty-specific settings are stored in terminal_specific
+        assert ctec.get_terminal_specific("kitty", "tab_bar_align") == "center"
+        assert ctec.get_terminal_specific("kitty", "tab_switch_strategy") == "previous"
+        assert ctec.get_terminal_specific("kitty", "tab_bar_min_tabs") == 2
         assert ctec.tabs.active_foreground.to_hex() == "#ffffff"
         assert ctec.tabs.active_background.to_hex() == "#000000"
 
@@ -2148,15 +2150,15 @@ focus_follows_mouse yes
         ctec = KittyAdapter.parse("test", content=config)
         assert ctec.panes is not None
         assert ctec.panes.inactive_dim_factor == 0.7
-        assert ctec.panes.active_border_color.to_hex() == "#00ff00"
-        assert ctec.panes.inactive_border_color.to_hex() == "#555555"
-        assert ctec.panes.border_width == 1.5
         assert ctec.panes.focus_follows_mouse is True
+        # Kitty-specific border settings are stored in terminal_specific
+        assert ctec.get_terminal_specific("kitty", "active_border_color") == "#00ff00"
+        assert ctec.get_terminal_specific("kitty", "inactive_border_color") == "#555555"
+        assert ctec.get_terminal_specific("kitty", "window_border_width") == "1.5pt"
 
     def test_kitty_export_tabs(self):
         """Test Kitty exports tab settings."""
         from console_cowboy.ctec.schema import (
-            TabBarAlignment,
             TabBarPosition,
             TabBarStyle,
             TabConfig,
@@ -2166,9 +2168,10 @@ focus_follows_mouse yes
             tabs=TabConfig(
                 position=TabBarPosition.BOTTOM,
                 style=TabBarStyle.POWERLINE,
-                alignment=TabBarAlignment.CENTER,
             )
         )
+        # Add Kitty-specific alignment via terminal_specific
+        ctec.add_terminal_specific("kitty", "tab_bar_align", "center")
         output = KittyAdapter.export(ctec)
         assert "tab_bar_edge bottom" in output
         assert "tab_bar_style powerline" in output
@@ -2333,24 +2336,32 @@ focus_follows_mouse yes
 
     def test_pane_config_roundtrip_kitty(self):
         """Test pane config roundtrip through Kitty."""
-        from console_cowboy.ctec.schema import Color, PaneConfig
+        from console_cowboy.ctec.schema import PaneConfig
 
         original = CTEC(
             panes=PaneConfig(
                 inactive_dim_factor=0.75,
-                border_width=2.0,
-                active_border_color=Color(0, 255, 0),
-                inactive_border_color=Color(100, 100, 100),
                 focus_follows_mouse=True,
             )
         )
+        # Add Kitty-specific border settings via terminal_specific
+        original.add_terminal_specific("kitty", "window_border_width", "2.0pt")
+        original.add_terminal_specific("kitty", "active_border_color", "#00ff00")
+        original.add_terminal_specific("kitty", "inactive_border_color", "#646464")
+
         output = KittyAdapter.export(original)
         parsed = KittyAdapter.parse("test", content=output)
 
+        # Check common pane settings
         assert parsed.panes.inactive_dim_factor == original.panes.inactive_dim_factor
-        assert parsed.panes.border_width == original.panes.border_width
-        assert parsed.panes.active_border_color == original.panes.active_border_color
-        assert (
-            parsed.panes.inactive_border_color == original.panes.inactive_border_color
-        )
         assert parsed.panes.focus_follows_mouse == original.panes.focus_follows_mouse
+        # Check Kitty-specific settings round-trip via terminal_specific
+        assert parsed.get_terminal_specific(
+            "kitty", "window_border_width"
+        ) == original.get_terminal_specific("kitty", "window_border_width")
+        assert parsed.get_terminal_specific(
+            "kitty", "active_border_color"
+        ) == original.get_terminal_specific("kitty", "active_border_color")
+        assert parsed.get_terminal_specific(
+            "kitty", "inactive_border_color"
+        ) == original.get_terminal_specific("kitty", "inactive_border_color")

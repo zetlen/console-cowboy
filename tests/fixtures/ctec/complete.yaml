@@ -165,15 +165,14 @@ scroll:
   multiplier: 3.0
 
 # Tab bar configuration (Ghostty, Kitty, WezTerm, iTerm2)
+# Note: alignment, close_strategy, min_tabs_to_show are Kitty-specific
+# and stored in terminal_specific per the commutativity principle
 tabs:
   position: top
   visibility: auto
-  alignment: left
   style: native
   auto_hide_single: true
   new_tab_position: current
-  close_strategy: previous
-  min_tabs_to_show: 2
   max_width: 25
   show_index: true
   inherit_working_directory: true
@@ -200,21 +199,14 @@ tabs:
     b: 34
 
 # Split pane configuration (Ghostty, Kitty, WezTerm, iTerm2)
+# Note: border_width, active_border_color, inactive_border_color are Kitty-specific
+# and stored in terminal_specific per the commutativity principle
 panes:
   inactive_dim_factor: 0.8
   inactive_dim_color:
     r: 30
     g: 30
     b: 40
-  border_width: 1.5
-  active_border_color:
-    r: 100
-    g: 200
-    b: 100
-  inactive_border_color:
-    r: 80
-    g: 80
-    b: 80
   divider_color:
     r: 60
     g: 60

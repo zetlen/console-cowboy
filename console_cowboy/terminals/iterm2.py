@@ -965,12 +965,6 @@ class ITerm2Adapter(TerminalAdapter):
             unsupported = []
             if ctec.panes.inactive_dim_color is not None:
                 unsupported.append("inactive_dim_color")
-            if ctec.panes.border_width is not None:
-                unsupported.append("border_width")
-            if ctec.panes.active_border_color is not None:
-                unsupported.append("active_border_color")
-            if ctec.panes.inactive_border_color is not None:
-                unsupported.append("inactive_border_color")
             if ctec.panes.divider_color is not None:
                 unsupported.append("divider_color")
             if ctec.panes.focus_follows_mouse is not None:

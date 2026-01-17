@@ -239,18 +239,6 @@ class TabBarPosition(Enum):
     BOTTOM = "bottom"
 
 
-class TabBarAlignment(Enum):
-    """
-    Horizontal alignment of tabs within the bar.
-
-    Supported by: Kitty, WezTerm.
-    """
-
-    LEFT = "left"
-    CENTER = "center"
-    RIGHT = "right"
-
-
 class TabBarStyle(Enum):
     """
     Tab bar visual style.
@@ -276,19 +264,6 @@ class NewTabPosition(Enum):
 
     CURRENT = "current"  # After current tab
     END = "end"  # At end of tab bar
-
-
-class TabCloseStrategy(Enum):
-    """
-    Which tab to focus when current tab is closed.
-
-    Supported by: Kitty.
-    """
-
-    PREVIOUS = "previous"  # Focus previously active
-    LEFT = "left"  # Focus tab to left
-    RIGHT = "right"  # Focus tab to right
-    LAST = "last"  # Focus last tab
 
 
 @dataclass
@@ -1099,12 +1074,9 @@ class TabConfig:
     Attributes:
         position: Where the tab bar appears (top/bottom)
         visibility: When the tab bar is shown (always/auto/never)
-        alignment: Horizontal alignment of tabs within the bar (left/center/right)
         style: Tab bar visual style (native/fancy/fade/powerline/slant/separator)
         auto_hide_single: Hide tab bar when only one tab exists
         new_tab_position: Where new tabs are created (current/end)
-        close_strategy: Which tab to focus when current is closed
-        min_tabs_to_show: Minimum tabs before showing bar
         max_width: Maximum tab width in cells
         show_index: Show tab numbers
         inherit_working_directory: New tabs inherit cwd
@@ -1113,19 +1085,19 @@ class TabConfig:
         inactive_foreground: Inactive tab text color
         inactive_background: Inactive tab background color
         bar_background: Tab bar background color
+
+    Note: Kitty-specific settings (alignment, close_strategy, min_tabs_to_show)
+    are stored in terminal_specific to comply with the commutativity principle.
     """
 
     # Tab bar layout
     position: TabBarPosition | None = None
     visibility: TabBarVisibility | None = None
-    alignment: TabBarAlignment | None = None
     style: TabBarStyle | None = None
 
     # Tab behavior
     auto_hide_single: bool | None = None
     new_tab_position: NewTabPosition | None = None
-    close_strategy: TabCloseStrategy | None = None
-    min_tabs_to_show: int | None = None
     max_width: int | None = None
     show_index: bool | None = None
     inherit_working_directory: bool | None = None
@@ -1145,18 +1117,13 @@ class TabConfig:
             result["position"] = self.position.value
         if self.visibility is not None:
             result["visibility"] = self.visibility.value
-        if self.alignment is not None:
-            result["alignment"] = self.alignment.value
         if self.style is not None:
             result["style"] = self.style.value
         if self.new_tab_position is not None:
             result["new_tab_position"] = self.new_tab_position.value
-        if self.close_strategy is not None:
-            result["close_strategy"] = self.close_strategy.value
         # Simple fields
         for field_name in [
             "auto_hide_single",
-            "min_tabs_to_show",
             "max_width",
             "show_index",
             "inherit_working_directory",
@@ -1185,18 +1152,11 @@ class TabConfig:
             visibility=TabBarVisibility(data["visibility"])
             if "visibility" in data
             else None,
-            alignment=TabBarAlignment(data["alignment"])
-            if "alignment" in data
-            else None,
             style=TabBarStyle(data["style"]) if "style" in data else None,
             auto_hide_single=data.get("auto_hide_single"),
             new_tab_position=NewTabPosition(data["new_tab_position"])
             if "new_tab_position" in data
             else None,
-            close_strategy=TabCloseStrategy(data["close_strategy"])
-            if "close_strategy" in data
-            else None,
-            min_tabs_to_show=data.get("min_tabs_to_show"),
             max_width=data.get("max_width"),
             show_index=data.get("show_index"),
             inherit_working_directory=data.get("inherit_working_directory"),
@@ -1230,22 +1190,20 @@ class PaneConfig:
         inactive_dim_factor: Brightness multiplier for inactive panes (0.0-1.0,
             where 1.0 = full brightness, 0.0 = completely dimmed).
             Ghostty minimum is 0.15, values will be clamped on export.
-        inactive_dim_color: Fill color for dimmed inactive panes
-        border_width: Pane border width (Kitty)
-        active_border_color: Border color for active pane (Kitty)
-        inactive_border_color: Border color for inactive panes (Kitty)
+        inactive_dim_color: Fill color for dimmed inactive panes (Ghostty)
         divider_color: Color of pane dividers (Ghostty, WezTerm)
         focus_follows_mouse: Focus pane under mouse cursor (Ghostty, WezTerm)
+
+    Note: Kitty-specific settings (border_width, active_border_color,
+    inactive_border_color) are stored in terminal_specific to comply
+    with the commutativity principle.
     """
 
     # Inactive pane appearance
     inactive_dim_factor: float | None = None
     inactive_dim_color: Color | None = None
 
-    # Pane borders
-    border_width: float | None = None
-    active_border_color: Color | None = None
-    inactive_border_color: Color | None = None
+    # Pane dividers (Ghostty, WezTerm)
     divider_color: Color | None = None
 
     # Behavior
@@ -1257,7 +1215,6 @@ class PaneConfig:
         # Simple fields
         for field_name in [
             "inactive_dim_factor",
-            "border_width",
             "focus_follows_mouse",
         ]:
             value = getattr(self, field_name)
@@ -1266,8 +1223,6 @@ class PaneConfig:
         # Color fields
         for field_name in [
             "inactive_dim_color",
-            "active_border_color",
-            "inactive_border_color",
             "divider_color",
         ]:
             color = getattr(self, field_name)
@@ -1282,13 +1237,6 @@ class PaneConfig:
             inactive_dim_factor=data.get("inactive_dim_factor"),
             inactive_dim_color=Color.from_dict(data["inactive_dim_color"])
             if "inactive_dim_color" in data
-            else None,
-            border_width=data.get("border_width"),
-            active_border_color=Color.from_dict(data["active_border_color"])
-            if "active_border_color" in data
-            else None,
-            inactive_border_color=Color.from_dict(data["inactive_border_color"])
-            if "inactive_border_color" in data
             else None,
             divider_color=Color.from_dict(data["divider_color"])
             if "divider_color" in data
@@ -1645,6 +1593,24 @@ class CTEC:
             TerminalSpecificSetting(terminal=terminal, key=key, value=value)
         )
 
-    def get_terminal_specific(self, terminal: str) -> list[TerminalSpecificSetting]:
-        """Get all terminal-specific settings for a given terminal."""
+    def get_terminal_specific(
+        self, terminal: str, key: str | None = None
+    ) -> list[TerminalSpecificSetting] | object | None:
+        """Get terminal-specific settings.
+
+        Args:
+            terminal: Terminal emulator name (e.g., 'kitty', 'ghostty')
+            key: Optional specific key to retrieve. If provided, returns the
+                 value directly (or None if not found). If not provided,
+                 returns all settings for the terminal as a list.
+
+        Returns:
+            If key is provided: The value for that key, or None if not found.
+            If key is not provided: List of all TerminalSpecificSetting for terminal.
+        """
+        if key is not None:
+            for ts in self.terminal_specific:
+                if ts.terminal == terminal and ts.key == key:
+                    return ts.value
+            return None
         return [ts for ts in self.terminal_specific if ts.terminal == terminal]
