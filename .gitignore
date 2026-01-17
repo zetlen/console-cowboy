@@ -10,3 +10,6 @@ venv
 .claude
 dist/
 build/
+
+.gemini/
+gha-creds-*.json
