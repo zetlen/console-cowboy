@@ -1,12 +1,7 @@
-name: '🔎 Gemini Review'
+name: 'Gemini Review'
 
 on:
-  workflow_call:
-    inputs:
-      additional_context:
-        type: 'string'
-        description: 'Any additional context from the request'
-        required: false
+  pull_request:
 
 concurrency:
   group: '${{ github.workflow }}-review-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}'
@@ -15,6 +10,9 @@ concurrency:
 defaults:
   run:
     shell: 'bash'
+
+env:
+  GEMINI_DEBUG: true
 
 jobs:
   review:
@@ -50,7 +48,7 @@ jobs:
           ISSUE_BODY: '${{ github.event.pull_request.body || github.event.issue.body }}'
           PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
           REPOSITORY: '${{ github.repository }}'
-          ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
+          ADDITIONAL_CONTEXT: ''
         with:
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
