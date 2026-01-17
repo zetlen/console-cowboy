@@ -56,3 +56,12 @@ mouse-hide-while-typing = true
 # Ghostty-specific settings
 gtk-single-instance = true
 shell-integration = detect
+
+# Key bindings - various Ghostty formats
+keybind = ctrl+shift+c=copy_to_clipboard
+keybind = ctrl+shift+v=paste_from_clipboard
+keybind = ctrl+shift+enter=new_split:right
+keybind = global:ctrl+grave=toggle_quick_terminal
+keybind = unconsumed:ctrl+shift+g=write_screen_file
+keybind = ctrl+a>n=new_window
+keybind = ctrl+a>t=new_tab

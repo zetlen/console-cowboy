@@ -13,3 +13,4 @@ build/
 
 .gemini/
 gha-creds-*.json
+.coverage

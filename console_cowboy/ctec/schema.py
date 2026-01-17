@@ -147,6 +147,26 @@ class QuickTerminalScreen(Enum):
     ALL = "all"
 
 
+class KeyBindingScope(Enum):
+    """
+    Scope/context in which a keybinding is active.
+
+    Most keybindings are application-scoped (only work when the terminal is focused).
+    Some terminals support additional scopes:
+    - Ghostty: global (system-wide), unconsumed (passed to shell), all (all contexts)
+    - iTerm2: Global hotkeys via Hotkey Window profiles
+    """
+
+    # Normal application scope - keybinding only works when terminal is focused (default)
+    APPLICATION = "application"
+    # Global hotkey that works even when terminal is not focused
+    GLOBAL = "global"
+    # Keybinding is processed but not consumed, passed through to the shell/app
+    UNCONSUMED = "unconsumed"
+    # Active in all contexts (Ghostty-specific, combines global + local behavior)
+    ALL = "all"
+
+
 class TextHintAction(Enum):
     """
     Actions that can be triggered when a text hint pattern matches.
@@ -819,21 +839,69 @@ class KeyBinding:
     """
     A keyboard shortcut binding.
 
+    This schema is designed to represent keybindings across multiple terminals
+    with varying capabilities. Features like global hotkeys, key sequences,
+    and action parameters are supported where the target terminal allows.
+
+    Terminal Support:
+    - Alacritty: key, mods, action, mode (for Vi mode restrictions)
+    - Kitty: key, mods, action (via 'map' directive)
+    - Ghostty: key, mods, action, action_param, scope (global/unconsumed/all),
+               key_sequence (leader keys like ctrl+a>n), physical_key
+    - WezTerm: key, mods, action (via Lua config.keys)
+    - iTerm2: Complex Keyboard Map with key codes and hex actions
+
     Attributes:
-        action: The action to perform (e.g., 'copy', 'paste', 'new_tab')
-        key: The key (e.g., 'c', 'v', 'Return')
-        mods: Modifier keys (e.g., ['ctrl'], ['ctrl', 'shift'])
+        action: The action to perform (e.g., 'copy', 'paste', 'new_tab', 'new_split')
+        key: The key (e.g., 'c', 'v', 'Return', 'grave')
+        mods: Modifier keys (e.g., ['ctrl'], ['ctrl', 'shift'], ['super', 'alt'])
+        action_param: Optional parameter for the action (e.g., 'right' for 'new_split:right')
+                     Used by Ghostty for parameterized actions.
+        scope: Keybinding scope/context (application, global, unconsumed, all)
+               Default is application (only when terminal is focused).
+        key_sequence: For leader key sequences (e.g., ['ctrl+a', 'n'] for ctrl+a>n=action).
+                     When set, this represents a multi-key chord where keys must be
+                     pressed in sequence. The main 'key' and 'mods' are ignored.
+        mode: Terminal mode context restriction (e.g., '~Vi' to exclude Vi mode).
+              Used by Alacritty for mode-specific bindings.
+        physical_key: If True, use physical key position rather than logical key.
+                     Used by Ghostty for layout-independent bindings.
+        consume: Whether the terminal consumes the key event (default True).
+                If False, the key is passed through to the running application.
+        _raw: Original raw string for perfect round-trip preservation.
+              Used internally to preserve exact formatting for same-terminal exports.
     """
 
     action: str
     key: str
     mods: list[str] = field(default_factory=list)
+    action_param: str | None = None
+    scope: KeyBindingScope | None = None
+    key_sequence: list[str] | None = None
+    mode: str | None = None
+    physical_key: bool | None = None
+    consume: bool | None = None
+    _raw: str | None = field(default=None, repr=False)
 
     def to_dict(self) -> dict:
         """Convert to dictionary representation."""
         result = {"action": self.action, "key": self.key}
         if self.mods:
             result["mods"] = self.mods
+        if self.action_param is not None:
+            result["action_param"] = self.action_param
+        if self.scope is not None:
+            result["scope"] = self.scope.value
+        if self.key_sequence is not None:
+            result["key_sequence"] = self.key_sequence
+        if self.mode is not None:
+            result["mode"] = self.mode
+        if self.physical_key is not None:
+            result["physical_key"] = self.physical_key
+        if self.consume is not None:
+            result["consume"] = self.consume
+        if self._raw is not None:
+            result["_raw"] = self._raw
         return result
 
     @classmethod
@@ -843,7 +911,20 @@ class KeyBinding:
             action=data["action"],
             key=data["key"],
             mods=data.get("mods", []),
+            action_param=data.get("action_param"),
+            scope=KeyBindingScope(data["scope"]) if "scope" in data else None,
+            key_sequence=data.get("key_sequence"),
+            mode=data.get("mode"),
+            physical_key=data.get("physical_key"),
+            consume=data.get("consume"),
+            _raw=data.get("_raw"),
         )
+
+    def get_full_action(self) -> str:
+        """Get the full action string including parameter if present."""
+        if self.action_param:
+            return f"{self.action}:{self.action_param}"
+        return self.action
 
 
 @dataclass

@@ -23,6 +23,7 @@ from console_cowboy.ctec.schema import (
     FontConfig,
     FontStyle,
     KeyBinding,
+    KeyBindingScope,
     ScrollConfig,
     TextHintAction,
     TextHintBinding,
@@ -431,27 +432,92 @@ class AlacrittyAdapter(TerminalAdapter):
         # Parse key bindings
         if "keyboard" in data and "bindings" in data["keyboard"]:
             for binding in data["keyboard"]["bindings"]:
-                if "key" in binding and "action" in binding:
-                    kb = KeyBinding(
-                        action=binding["action"],
-                        key=binding["key"],
-                        mods=binding.get("mods", "").split("+")
+                if "key" in binding:
+                    mods = (
+                        binding.get("mods", "").split("+")
                         if binding.get("mods")
-                        else [],
+                        else []
                     )
-                    ctec.key_bindings.append(kb)
+                    if "action" in binding:
+                        kb = KeyBinding(
+                            action=binding["action"],
+                            key=binding["key"],
+                            mods=mods,
+                            mode=binding.get("mode"),
+                        )
+                        ctec.key_bindings.append(kb)
+                    elif "chars" in binding:
+                        # Keybindings using chars send raw characters instead of actions
+                        # Store as terminal-specific for round-trip preservation
+                        chars_value = binding["chars"]
+                        mode_str = (
+                            f",mode={binding['mode']}" if binding.get("mode") else ""
+                        )
+                        mods_str = (
+                            f",mods={binding['mods']}" if binding.get("mods") else ""
+                        )
+                        ctec.add_terminal_specific(
+                            "alacritty",
+                            f"keyboard.binding.chars:{binding['key']}{mods_str}{mode_str}",
+                            chars_value,
+                        )
+                        ctec.add_warning(
+                            f"Keybinding '{binding['key']}' uses 'chars' field to send raw characters. "
+                            "This is Alacritty-specific and cannot be converted to other terminals."
+                        )
+                    elif "command" in binding:
+                        # Keybindings using command execute external programs
+                        # Store as terminal-specific for round-trip preservation
+                        cmd_value = binding["command"]
+                        mode_str = (
+                            f",mode={binding['mode']}" if binding.get("mode") else ""
+                        )
+                        mods_str = (
+                            f",mods={binding['mods']}" if binding.get("mods") else ""
+                        )
+                        ctec.add_terminal_specific(
+                            "alacritty",
+                            f"keyboard.binding.command:{binding['key']}{mods_str}{mode_str}",
+                            cmd_value,
+                        )
+                        ctec.add_warning(
+                            f"Keybinding '{binding['key']}' uses 'command' field to execute a program. "
+                            "This is Alacritty-specific and cannot be converted to other terminals."
+                        )
         # Legacy format
         elif "key_bindings" in data:
             for binding in data["key_bindings"]:
-                if "key" in binding and "action" in binding:
-                    kb = KeyBinding(
-                        action=binding["action"],
-                        key=binding["key"],
-                        mods=binding.get("mods", "").split("|")
+                if "key" in binding:
+                    mods = (
+                        binding.get("mods", "").split("|")
                         if binding.get("mods")
-                        else [],
+                        else []
                     )
-                    ctec.key_bindings.append(kb)
+                    if "action" in binding:
+                        kb = KeyBinding(
+                            action=binding["action"],
+                            key=binding["key"],
+                            mods=mods,
+                            mode=binding.get("mode"),
+                        )
+                        ctec.key_bindings.append(kb)
+                    elif "chars" in binding:
+                        chars_value = binding["chars"]
+                        mode_str = (
+                            f",mode={binding['mode']}" if binding.get("mode") else ""
+                        )
+                        mods_str = (
+                            f",mods={binding['mods']}" if binding.get("mods") else ""
+                        )
+                        ctec.add_terminal_specific(
+                            "alacritty",
+                            f"key_bindings.chars:{binding['key']}{mods_str}{mode_str}",
+                            chars_value,
+                        )
+                        ctec.add_warning(
+                            f"Keybinding '{binding['key']}' uses 'chars' field to send raw characters. "
+                            "This is Alacritty-specific and cannot be converted to other terminals."
+                        )
 
         # Parse hints section (regex-based pattern detection)
         if "hints" in data:
@@ -664,12 +730,35 @@ class AlacrittyAdapter(TerminalAdapter):
         # Export key bindings
         if ctec.key_bindings:
             bindings = []
+            skipped_count = 0
             for kb in ctec.key_bindings:
-                binding = {"key": kb.key, "action": kb.action}
+                # Check for unsupported features
+                if kb.key_sequence:
+                    ctec.add_warning(
+                        f"Keybinding with key sequence '{'>'.join(kb.key_sequence)}' cannot be "
+                        "exported to Alacritty. Key sequences (leader keys) are not supported."
+                    )
+                    skipped_count += 1
+                    continue
+                if kb.scope and kb.scope != KeyBindingScope.APPLICATION:
+                    ctec.add_warning(
+                        f"Keybinding '{kb.key}' has scope '{kb.scope.value}' which is not supported "
+                        "in Alacritty. It will be exported as a regular (application-scoped) binding."
+                    )
+                # Build full action with parameter if present
+                action = (
+                    kb.get_full_action()
+                    if hasattr(kb, "get_full_action")
+                    else kb.action
+                )
+                binding = {"key": kb.key, "action": action}
                 if kb.mods:
                     binding["mods"] = "+".join(kb.mods)
+                if kb.mode:
+                    binding["mode"] = kb.mode
                 bindings.append(binding)
-            result["keyboard"] = {"bindings": bindings}
+            if bindings:
+                result["keyboard"] = {"bindings": bindings}
 
         # Export hints (text pattern detection)
         if ctec.text_hints and ctec.text_hints.rules:
