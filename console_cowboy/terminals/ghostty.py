@@ -522,9 +522,14 @@ class GhosttyAdapter(TerminalAdapter):
                 )
             elif key == "gtk-tabs-location":
                 # GTK-specific tab position
-                tabs.position = cls.TAB_POSITION_MAP.get(
-                    value.lower(), TabBarPosition.TOP
-                )
+                val_lower = value.lower()
+                tabs.position = cls.TAB_POSITION_MAP.get(val_lower, TabBarPosition.TOP)
+                # Warn when approximating left/right to top/bottom
+                if val_lower in ("left", "right"):
+                    ctec.add_warning(
+                        f"Ghostty gtk-tabs-location '{value}' is approximated to "
+                        f"'{'top' if val_lower == 'left' else 'bottom'}' for cross-terminal compatibility."
+                    )
             elif key == "window-new-tab-position":
                 tabs.new_tab_position = cls.NEW_TAB_POSITION_MAP.get(
                     value.lower(), NewTabPosition.CURRENT

@@ -270,7 +270,8 @@ class NewTabPosition(Enum):
     """
     Where new tabs are created.
 
-    Supported by: Ghostty, Kitty.
+    Supported by: Ghostty.
+    Note: Kitty's new tab position is controlled via launch command, not config.
     """
 
     CURRENT = "current"  # After current tab

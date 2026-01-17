@@ -451,8 +451,8 @@ class KittyAdapter(TerminalAdapter):
                 panes.inactive_border_color = normalize_color(value)
             elif key == "window_border_width":
                 try:
-                    # Kitty uses pt units, we store as float
-                    val_str = value.replace("pt", "").strip()
+                    # Kitty supports pt, px, or bare numbers (defaults to pt)
+                    val_str = value.replace("pt", "").replace("px", "").strip()
                     panes.border_width = float(val_str)
                 except ValueError:
                     ctec.add_warning(f"Invalid window_border_width: {value}")
