@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/zetlen/console-cowboy/compare/v0.1.2...v0.2.0) (2026-01-17)
+
+
+### Features
+
+* **ctec:** add TextHintConfig for regex-based text pattern detection ([#29](https://github.com/zetlen/console-cowboy/issues/29)) ([270ec3f](https://github.com/zetlen/console-cowboy/commit/270ec3fba1be5687dd1910e978a6ca04fca7b44a))
+
+
+### Bug Fixes
+
+* add manual trigger for publishing to release-please workflow ([#25](https://github.com/zetlen/console-cowboy/issues/25)) ([600d10a](https://github.com/zetlen/console-cowboy/commit/600d10ab9359e53d4bfbc4fa87bbbcd3051dd5d4))
+* allow manual trigger for publish workflow ([#23](https://github.com/zetlen/console-cowboy/issues/23)) ([21d6188](https://github.com/zetlen/console-cowboy/commit/21d6188b35cdf3ecbd8889659955c7aa25ce9efc))
+* **iterm2:** improve hotkey window and window type parsing ([#28](https://github.com/zetlen/console-cowboy/issues/28)) ([618160e](https://github.com/zetlen/console-cowboy/commit/618160e0ef90a2308495425dba3a2ed658bacded))
+
+
+### Miscellaneous
+
+* add gemini config ([#26](https://github.com/zetlen/console-cowboy/issues/26)) ([2cd6f53](https://github.com/zetlen/console-cowboy/commit/2cd6f53fedded64df5cc5930bbe484e45aa4b572))
+
 ## [0.1.2](https://github.com/zetlen/console-cowboy/compare/v0.1.1...v0.1.2) (2026-01-17)
 
 
