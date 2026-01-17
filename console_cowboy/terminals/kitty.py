@@ -491,4 +491,12 @@ class KittyAdapter(TerminalAdapter):
                 lines.append(f"{setting.key} {setting.value}")
             lines.append("")
 
+        # Warn about text hints not being supported
+        if ctec.text_hints and ctec.text_hints.rules:
+            ctec.add_warning(
+                f"Kitty does not support text hints/smart selection. "
+                f"{len(ctec.text_hints.rules)} hint rule(s) will not be exported. "
+                "Consider using Kitty's open_url_with setting for URL handling."
+            )
+
         return "\n".join(lines)
