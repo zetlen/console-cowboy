@@ -27,8 +27,24 @@ jobs:
   publish:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
-    uses: ./.github/workflows/publish.yml
-    with:
-      tag_name: ${{ needs.release-please.outputs.tag_name }}
-    secrets: inherit
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install build dependencies
+        run: pip install build
+      - name: Build package
+        run: python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
 
