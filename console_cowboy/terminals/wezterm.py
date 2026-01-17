@@ -23,6 +23,7 @@ from console_cowboy.ctec.schema import (
     FontConfig,
     FontWeight,
     KeyBinding,
+    KeyBindingScope,
     ScrollConfig,
     TextHintAction,
     TextHintConfig,
@@ -708,11 +709,42 @@ class WeztermAdapter(TerminalAdapter):
         if ctec.key_bindings:
             lines.append("-- Key bindings")
             lines.append("config.keys = {")
+            skipped_count = 0
             for kb in ctec.key_bindings:
-                mods = "|".join(kb.mods) if kb.mods else "NONE"
-                lines.append(
-                    f'  {{ key = "{kb.key}", mods = "{mods}", action = wezterm.action.{kb.action} }},'
-                )
+                # Check for unsupported features and warn
+                if kb.key_sequence:
+                    ctec.add_warning(
+                        f"Keybinding with key sequence '{'>'.join(kb.key_sequence)}' cannot be "
+                        "directly exported to WezTerm. Consider using WezTerm's key_tables and "
+                        "LEADER modifier for similar functionality."
+                    )
+                    skipped_count += 1
+                    continue
+                if kb.scope and kb.scope != KeyBindingScope.APPLICATION:
+                    ctec.add_warning(
+                        f"Keybinding '{kb.key}' has scope '{kb.scope.value}' which is not supported "
+                        "in WezTerm. It will be exported as a regular (application-scoped) binding."
+                    )
+                if kb.mode:
+                    ctec.add_warning(
+                        f"Keybinding '{kb.key}' has mode restriction '{kb.mode}' which is not "
+                        "supported in WezTerm. It will be exported without mode restrictions."
+                    )
+
+                # WezTerm uses uppercase modifiers
+                mods = "|".join(m.upper() for m in kb.mods) if kb.mods else "NONE"
+                action = kb.action
+                # WezTerm actions with parameters use different syntax
+                # e.g., wezterm.action.SplitHorizontal { domain = "CurrentPaneDomain" }
+                if kb.action_param:
+                    # Try to format the action with parameter in WezTerm style
+                    lines.append(
+                        f'  {{ key = "{kb.key}", mods = "{mods}", action = wezterm.action.{action} {{ args = "{kb.action_param}" }} }},'
+                    )
+                else:
+                    lines.append(
+                        f'  {{ key = "{kb.key}", mods = "{mods}", action = wezterm.action.{action} }},'
+                    )
             lines.append("}")
             lines.append("")
 

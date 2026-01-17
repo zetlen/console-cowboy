@@ -16,6 +16,7 @@ from console_cowboy.ctec.schema import (
     CursorStyle,
     FontConfig,
     KeyBinding,
+    KeyBindingScope,
     QuickTerminalConfig,
     QuickTerminalPosition,
     ScrollConfig,
@@ -310,20 +311,46 @@ class KittyAdapter(TerminalAdapter):
             # Parse key bindings
             elif key == "map":
                 # Format: map <keys> <action>
+                # Keys can be:
+                # - Simple: ctrl+shift+c
+                # - Key sequence (leader keys): ctrl+a>n or ctrl+x>ctrl+y>z
                 binding_parts = value.split(None, 1)
                 if len(binding_parts) >= 2:
                     keys, action = binding_parts
-                    # Parse modifier+key format
-                    key_parts = keys.split("+")
-                    if len(key_parts) > 1:
-                        mods = key_parts[:-1]
-                        actual_key = key_parts[-1]
+
+                    # Check for key sequence (leader keys) with > separator
+                    if ">" in keys:
+                        # Multi-key sequence like ctrl+a>n or ctrl+x>ctrl+y>z
+                        key_sequence = keys.split(">")
+                        # Parse the last key in sequence for mods/key
+                        last_key = key_sequence[-1]
+                        last_key_parts = last_key.split("+")
+                        if len(last_key_parts) > 1:
+                            mods = last_key_parts[:-1]
+                            actual_key = last_key_parts[-1]
+                        else:
+                            mods = []
+                            actual_key = last_key
+                        ctec.key_bindings.append(
+                            KeyBinding(
+                                action=action,
+                                key=actual_key,
+                                mods=mods,
+                                key_sequence=key_sequence,
+                            )
+                        )
                     else:
-                        mods = []
-                        actual_key = keys
-                    ctec.key_bindings.append(
-                        KeyBinding(action=action, key=actual_key, mods=mods)
-                    )
+                        # Simple keybinding: modifier+key format
+                        key_parts = keys.split("+")
+                        if len(key_parts) > 1:
+                            mods = key_parts[:-1]
+                            actual_key = key_parts[-1]
+                        else:
+                            mods = []
+                            actual_key = keys
+                        ctec.key_bindings.append(
+                            KeyBinding(action=action, key=actual_key, mods=mods)
+                        )
 
             # Parse quick-access-terminal kitten settings (Kitty 0.42+)
             # These are typically in quick-access-terminal.conf but we support
@@ -483,11 +510,34 @@ class KittyAdapter(TerminalAdapter):
         if ctec.key_bindings:
             lines.append("# Key bindings")
             for kb in ctec.key_bindings:
-                if kb.mods:
+                # Check for unsupported features and warn
+                if kb.scope and kb.scope == KeyBindingScope.GLOBAL:
+                    ctec.add_warning(
+                        f"Keybinding '{kb.key}' has global scope which is not supported "
+                        "in Kitty. It will be exported as a regular (application-scoped) binding. "
+                        "Consider using Kitty's quick-access-terminal kitten for global hotkeys."
+                    )
+                if kb.mode:
+                    ctec.add_warning(
+                        f"Keybinding '{kb.key}' has mode restriction '{kb.mode}' which is not "
+                        "supported in Kitty. It will be exported without mode restrictions."
+                    )
+
+                # Handle key sequences (leader keys)
+                if kb.key_sequence:
+                    # Kitty supports key sequences with > separator
+                    keys = ">".join(kb.key_sequence)
+                elif kb.mods:
                     keys = "+".join(kb.mods + [kb.key])
                 else:
                     keys = kb.key
-                lines.append(f"map {keys} {kb.action}")
+
+                # Format action - Kitty uses space-separated parameters, not colon
+                if kb.action_param:
+                    action = f"{kb.action} {kb.action_param}"
+                else:
+                    action = kb.action
+                lines.append(f"map {keys} {action}")
             lines.append("")
 
         # Export quick-access-terminal settings (Kitty 0.42+ kitten)

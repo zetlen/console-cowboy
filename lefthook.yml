@@ -11,7 +11,8 @@ pre-commit:
   parallel: true
   jobs:
     - name: ruff-format
-      run: uv run ruff format --check {staged_files}
+      run: uv run ruff format {staged_files}
+      stage_fixed: true
       glob: "*.py"
 
     - name: ruff-lint

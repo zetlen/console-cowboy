@@ -14,6 +14,8 @@ from console_cowboy.ctec.schema import (
     CursorConfig,
     CursorStyle,
     FontConfig,
+    KeyBinding,
+    KeyBindingScope,
     QuickTerminalConfig,
     QuickTerminalPosition,
     QuickTerminalScreen,
@@ -133,6 +135,174 @@ class GhosttyAdapter(TerminalAdapter):
         ]
         if 0 <= index < len(color_names):
             setattr(scheme, color_names[index], color)
+
+    @classmethod
+    def _parse_keybind(cls, value: str, ctec: CTEC) -> KeyBinding | None:
+        """
+        Parse a Ghostty keybind value into a KeyBinding.
+
+        Ghostty keybind format:
+        - Basic: modifier+key=action or modifier+key=action:param
+        - Prefixes: global:, unconsumed:, all:, physical: (can be combined)
+        - Key sequences: ctrl+a>n=new_window (leader key followed by another key)
+        - Unbind: keybind = ctrl+c=unbind or keybind = performable:unbind
+
+        Examples:
+        - keybind = ctrl+shift+c=copy_to_clipboard
+        - keybind = ctrl+grave=toggle_quick_terminal
+        - keybind = global:ctrl+grave=toggle_quick_terminal
+        - keybind = unconsumed:ctrl+shift+g=write_screen_file
+        - keybind = ctrl+a>n=new_window
+        - keybind = ctrl+shift+enter=new_split:right
+        - keybind = physical:ctrl+grave=toggle_quick_terminal
+        - keybind = all:ctrl+shift+p=command_palette
+        """
+        value = value.strip()
+        if not value:
+            return None
+
+        # Store the raw value for perfect round-trip
+        raw_value = value
+
+        # Parse prefixes
+        scope: KeyBindingScope | None = None
+        physical_key: bool | None = None
+        consume: bool | None = None
+
+        # Process prefixes - they can be combined (e.g., global:physical:)
+        while ":" in value:
+            # Check if this colon is a prefix separator or an action parameter
+            first_colon = value.index(":")
+            potential_prefix = value[:first_colon].lower()
+
+            if potential_prefix == "global":
+                scope = KeyBindingScope.GLOBAL
+                value = value[first_colon + 1 :]
+            elif potential_prefix == "unconsumed":
+                scope = KeyBindingScope.UNCONSUMED
+                consume = False
+                value = value[first_colon + 1 :]
+            elif potential_prefix == "all":
+                scope = KeyBindingScope.ALL
+                value = value[first_colon + 1 :]
+            elif potential_prefix == "physical":
+                physical_key = True
+                value = value[first_colon + 1 :]
+            elif potential_prefix == "performable":
+                # performable: prefix - skip it, it's Ghostty-specific behavior modifier
+                value = value[first_colon + 1 :]
+            else:
+                # Not a prefix, must be part of the key=action:param format
+                break
+
+        # Now parse the key=action part
+        if "=" not in value:
+            ctec.add_warning(f"Invalid keybind (missing '='): {raw_value}")
+            return None
+
+        key_part, action_part = value.split("=", 1)
+        key_part = key_part.strip()
+        action_part = action_part.strip()
+
+        # Handle special "unbind" action
+        if action_part.lower() == "unbind":
+            # Unbind entries are terminal-specific, we can't represent them in CTEC
+            # Store as terminal-specific for round-trip
+            ctec.add_terminal_specific(
+                "ghostty", f"keybind_unbind:{key_part}", raw_value
+            )
+            return None
+
+        # Parse action and optional parameter (action:param)
+        action = action_part
+        action_param: str | None = None
+        if ":" in action_part:
+            action, action_param = action_part.split(":", 1)
+
+        # Parse key sequence (e.g., ctrl+a>n for leader key)
+        key_sequence: list[str] | None = None
+        if ">" in key_part:
+            # This is a key sequence
+            key_sequence = key_part.split(">")
+            # For key sequences, the key and mods fields hold the last key in the sequence
+            last_key_part = key_sequence[-1] if key_sequence else key_part
+            mods, key = cls._parse_key_with_mods(last_key_part)
+        else:
+            mods, key = cls._parse_key_with_mods(key_part)
+
+        return KeyBinding(
+            action=action,
+            key=key,
+            mods=mods,
+            action_param=action_param,
+            scope=scope,
+            key_sequence=key_sequence,
+            physical_key=physical_key,
+            consume=consume,
+            _raw=raw_value,
+        )
+
+    @classmethod
+    def _parse_key_with_mods(cls, key_str: str) -> tuple[list[str], str]:
+        """
+        Parse a key string with modifiers into (mods, key).
+
+        Examples:
+        - "ctrl+shift+c" -> (["ctrl", "shift"], "c")
+        - "grave" -> ([], "grave")
+        - "super+return" -> (["super"], "return")
+        """
+        parts = key_str.split("+")
+        if len(parts) == 1:
+            return [], parts[0]
+
+        # The last part is the key, everything else is modifiers
+        key = parts[-1]
+        mods = [m.lower() for m in parts[:-1]]
+        return mods, key
+
+    @classmethod
+    def _format_keybind(cls, kb: KeyBinding) -> str:
+        """
+        Format a KeyBinding as a Ghostty keybind value.
+
+        Returns the value part after 'keybind = '.
+        """
+        # If we have the raw value, use it for perfect round-trip
+        if kb._raw and kb._raw.strip():
+            return kb._raw
+
+        parts = []
+
+        # Add scope prefix if not default
+        if kb.scope == KeyBindingScope.GLOBAL:
+            parts.append("global:")
+        elif kb.scope == KeyBindingScope.UNCONSUMED:
+            parts.append("unconsumed:")
+        elif kb.scope == KeyBindingScope.ALL:
+            parts.append("all:")
+
+        # Add physical prefix if set
+        if kb.physical_key:
+            parts.append("physical:")
+
+        # Build the key part
+        if kb.key_sequence:
+            key_part = ">".join(kb.key_sequence)
+        else:
+            if kb.mods:
+                key_part = "+".join(kb.mods + [kb.key])
+            else:
+                key_part = kb.key
+
+        # Build the action part
+        action_part = kb.action
+        if kb.action_param:
+            action_part = f"{kb.action}:{kb.action_param}"
+
+        parts.append(f"{key_part}={action_part}")
+
+        return "".join(parts)
 
     @classmethod
     def parse(
@@ -306,6 +476,12 @@ class GhosttyAdapter(TerminalAdapter):
                     ctec.add_warning(
                         f"Invalid quick-terminal-animation-duration: {value}"
                     )
+
+            # Parse keybindings
+            elif key == "keybind":
+                kb = cls._parse_keybind(value, ctec)
+                if kb:
+                    ctec.key_bindings.append(kb)
 
             # Store unrecognized settings as terminal-specific
             else:
@@ -492,6 +668,20 @@ class GhosttyAdapter(TerminalAdapter):
                 # Ghostty uses fractional seconds, convert from milliseconds
                 duration_sec = ctec.quick_terminal.animation_duration / 1000.0
                 lines.append(f"quick-terminal-animation-duration = {duration_sec}")
+            lines.append("")
+
+        # Export keybindings
+        if ctec.key_bindings:
+            lines.append("# Key bindings")
+            for kb in ctec.key_bindings:
+                # Warn about unsupported features
+                if kb.mode:
+                    ctec.add_warning(
+                        f"Keybinding '{kb.key}' has mode restriction '{kb.mode}' which is not "
+                        "supported in Ghostty. It will be exported without mode restrictions."
+                    )
+                keybind_value = cls._format_keybind(kb)
+                lines.append(f"keybind = {keybind_value}")
             lines.append("")
 
         # Restore terminal-specific settings
