@@ -253,7 +253,7 @@ program = "/bin/bash"
         ctec = CTEC(behavior=BehaviorConfig(shell="/bin/zsh"))
         output = AlacrittyAdapter.export(ctec, use_toml=True)
 
-        assert "[terminal.shell]" in output or 'terminal.shell' in output
+        assert "[terminal.shell]" in output or "terminal.shell" in output
         assert "program" in output
         assert "/bin/zsh" in output
 
@@ -2666,7 +2666,10 @@ quick-terminal-position = center
 
     def test_ghostty_export_quick_terminal_center_position(self):
         """Test Ghostty exports center position for quick terminal."""
-        from console_cowboy.ctec.schema import QuickTerminalConfig, QuickTerminalPosition
+        from console_cowboy.ctec.schema import (
+            QuickTerminalConfig,
+            QuickTerminalPosition,
+        )
 
         ctec = CTEC(
             quick_terminal=QuickTerminalConfig(
@@ -2935,8 +2938,14 @@ mouse_map ctrl+left click ungrabbed mouse_handle_click selection link
         output = KittyAdapter.export(ctec)
 
         # Both mouse_map lines should appear in output
-        assert "mouse_map left click ungrabbed mouse_handle_click selection link prompt" in output
-        assert "mouse_map ctrl+left click ungrabbed mouse_handle_click selection link" in output
+        assert (
+            "mouse_map left click ungrabbed mouse_handle_click selection link prompt"
+            in output
+        )
+        assert (
+            "mouse_map ctrl+left click ungrabbed mouse_handle_click selection link"
+            in output
+        )
 
     def test_url_color_maps_to_link(self):
         """Test that url_color maps to color_scheme.link."""
@@ -3073,6 +3082,9 @@ url_color #0087ff
         assert "startup_session ~/.config/kitty/startup.conf" in output
         assert "scrollback_pager nvim -c 'set ft=man' -" in output
         assert "font_features JetBrainsMono-Regular +zero +ss01" in output
-        assert "mouse_map left click ungrabbed mouse_handle_click selection link prompt" in output
+        assert (
+            "mouse_map left click ungrabbed mouse_handle_click selection link prompt"
+            in output
+        )
         assert "macos_option_as_alt yes" in output
         assert "url_color #0087ff" in output

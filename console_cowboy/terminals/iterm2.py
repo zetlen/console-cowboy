@@ -102,8 +102,6 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
         "Ansi 15 Color": "bright_white",
     }
 
-
-
     # Mapping of iTerm2 Hotkey Window Type to QuickTerminalPosition
     # This is a separate property from Window Type, specific to hotkey windows
     # iTerm2 values: 0=floating, 1=fullscreen, 2=left, 3=right, 4=bottom, 5=top
@@ -802,9 +800,7 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
         # Export cursor
         if ctec.cursor:
             if ctec.cursor.style:
-                result["Cursor Type"] = cls.get_cursor_style_value(
-                    ctec.cursor.style, 1
-                )
+                result["Cursor Type"] = cls.get_cursor_style_value(ctec.cursor.style, 1)
             if ctec.cursor.blink is not None:
                 result["Blinking Cursor"] = ctec.cursor.blink
 
@@ -1056,7 +1052,5 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
         Returns:
             Plist XML string for .itermcolors file
         """
-        result = cls.map_ctec_to_colors(
-            color_scheme, value_formatter=cls._export_color
-        )
+        result = cls.map_ctec_to_colors(color_scheme, value_formatter=cls._export_color)
         return plistlib.dumps(result).decode()

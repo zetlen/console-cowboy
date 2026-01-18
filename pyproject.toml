@@ -97,6 +97,7 @@ addopts = [
 [tool.coverage.run]
 source = ["console_cowboy"]
 branch = true
+relative_files = true
 omit = [
     "console_cowboy/__init__.py",
 ]
@@ -115,7 +116,7 @@ show_missing = true
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.1.0"
+version = "0.3.0"
 version_files = ["pyproject.toml:^version"]
 tag_format = "v$version"
 update_changelog_on_bump = false  # release-please handles changelog

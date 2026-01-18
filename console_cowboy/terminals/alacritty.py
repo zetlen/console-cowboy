@@ -6,7 +6,6 @@ Alacritty uses YAML (versions < 0.13) or TOML (versions >= 0.13) format stored i
 """
 
 from pathlib import Path
-from typing import Optional
 
 import tomli
 import tomli_w
@@ -81,7 +80,10 @@ class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
         "window.padding.y": ("padding_vertical", int),
         "window.dynamic_title": ("dynamic_title", bool),
         "window.startup_mode": ("startup_mode", lambda v: v.lower()),
-        "window.decorations": ("decorations", lambda v: v not in ("None", "none", False)),
+        "window.decorations": (
+            "decorations",
+            lambda v: v not in ("None", "none", False),
+        ),
     }
 
     @classmethod
@@ -123,7 +125,7 @@ class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
         return False
 
     @classmethod
-    def _parse_color(cls, color_data: str | dict) -> Optional["Color"]:
+    def _parse_color(cls, color_data: str | dict) -> Color | None:
         """Parse a color from Alacritty format."""
         if color_data is None:
             return None
@@ -668,9 +670,9 @@ class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
             cursor = {}
             style = {}
             if ctec.cursor.style:
-                style["shape"] = (
-                    str(cls.get_cursor_style_value(ctec.cursor.style)).capitalize()
-                )
+                style["shape"] = str(
+                    cls.get_cursor_style_value(ctec.cursor.style)
+                ).capitalize()
             if ctec.cursor.blink is not None:
                 style["blinking"] = "On" if ctec.cursor.blink else "Off"
             if style:

@@ -9,7 +9,6 @@ accurately parse WezTerm configurations.
 """
 
 from pathlib import Path
-from typing import Optional
 
 from console_cowboy.ctec.schema import (
     CTEC,
@@ -139,7 +138,7 @@ class WeztermAdapter(TerminalAdapter):
         return False
 
     @classmethod
-    def _parse_lua_color(cls, color_str: str) -> Optional["Color"]:
+    def _parse_lua_color(cls, color_str: str) -> Color | None:
         """Parse a color from Lua format."""
         if color_str is None:
             return None

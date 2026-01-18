@@ -1235,6 +1235,100 @@ concerns:
             ```
 
   # ===========================================================================
+  # PYTHON VERSIONS
+  # ===========================================================================
+  python-versions:
+    signals:
+      # requires-python in pyproject.toml
+      - watch:
+          include: 'pyproject.toml'
+          type: regex
+          pattern: 'requires-python'
+        report:
+          type: handlebars
+          template: |
+            # Python version constraint changed
+
+            The `requires-python` constraint was modified in `pyproject.toml`.
+
+            **Action required:** Ensure consistency across:
+            - `pyproject.toml` classifiers
+            - `.github/workflows/test.yml` matrix
+            - `.github/workflows/release-please.yml`
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Python classifiers in pyproject.toml
+      - watch:
+          include: 'pyproject.toml'
+          type: regex
+          pattern: 'Programming Language :: Python :: 3\.'
+        report:
+          type: handlebars
+          template: |
+            # Python version classifiers changed
+
+            PyPI classifiers were modified in `pyproject.toml`.
+
+            **Action required:** Ensure the CI test matrix matches these versions.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # CI test matrix
+      - watch:
+          include: '.github/workflows/test.yml'
+          type: regex
+          pattern: 'python-version.*\[.*\]'
+        report:
+          type: handlebars
+          template: |
+            # CI Python test matrix changed
+
+            The Python versions tested in CI were modified.
+
+            **Action required:** Ensure `pyproject.toml` classifiers match.
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # Release workflow Python version
+      - watch:
+          include: '.github/workflows/release-please.yml'
+          type: regex
+          pattern: 'python-version'
+        report:
+          type: handlebars
+          template: |
+            # Release workflow Python version changed
+
+            ```diff
+            {{diffText}}
+            ```
+
+      # mise.toml Python tool version
+      - watch:
+          include: 'mise.toml'
+          type: regex
+          pattern: 'python'
+        report:
+          type: handlebars
+          template: |
+            # mise.toml Python configuration changed
+
+            Python-related configuration was modified in `mise.toml`.
+
+            **Action required:** Ensure consistency with `pyproject.toml` and CI workflows.
+
+            ```diff
+            {{diffText}}
+            ```
+
+  # ===========================================================================
   # DEPENDENCIES
   # ===========================================================================
   dependencies:

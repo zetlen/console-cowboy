@@ -97,7 +97,10 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
         "font-family-bold": ("bold_font", str),
         "font-family-italic": ("italic_font", str),
         "font-family-bold-italic": ("bold_italic_font", str),
-        "adjust-cell-height": ("line_height", lambda v: 1.0 + float(v.rstrip("%")) / 100),
+        "adjust-cell-height": (
+            "line_height",
+            lambda v: 1.0 + float(v.rstrip("%")) / 100,
+        ),
     }
     # Note: adjust-cell-width handled separately in parse() method
     # due to pixel vs percentage handling - see the elif key == "adjust-cell-width" block
@@ -429,9 +432,13 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
             # Parse mappings
             elif cls.apply_line_mapping(key, value, font, cls.FONT_MAPPING, on_error):
                 pass
-            elif cls.apply_line_mapping(key, value, window, cls.WINDOW_MAPPING, on_error):
+            elif cls.apply_line_mapping(
+                key, value, window, cls.WINDOW_MAPPING, on_error
+            ):
                 pass
-            elif cls.apply_line_mapping(key, value, behavior, cls.BEHAVIOR_MAPPING, on_error):
+            elif cls.apply_line_mapping(
+                key, value, behavior, cls.BEHAVIOR_MAPPING, on_error
+            ):
                 pass
 
             # Handle special cases that didn't fit into simple mappings
@@ -585,7 +592,13 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
             ]
         ):
             ctec.color_scheme = scheme
-        if font.family or font.size or font.font_features or font.cell_width or font.line_height:
+        if (
+            font.family
+            or font.size
+            or font.font_features
+            or font.cell_width
+            or font.line_height
+        ):
             ctec.font = font
         if cursor.style or cursor.blink is not None:
             ctec.cursor = cursor
@@ -633,7 +646,7 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
         if ctec.color_scheme:
             scheme = ctec.color_scheme
             lines.append("# Colors")
-            
+
             # Use mixin to export standard colors
             colors = cls.map_ctec_to_colors(scheme)
             for ghostty_key, color_hex in colors.items():

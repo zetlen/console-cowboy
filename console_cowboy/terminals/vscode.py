@@ -24,7 +24,6 @@ from console_cowboy.ctec.schema import (
     FontWeight,
     ScrollConfig,
 )
-from console_cowboy.utils.colors import normalize_color
 
 from .base import TerminalAdapter
 from .mixins import ColorMapMixin, CursorStyleMixin
@@ -85,8 +84,6 @@ class VSCodeAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
         "terminal.ansiBrightCyan": "bright_cyan",
         "terminal.ansiBrightWhite": "bright_white",
     }
-
-
 
     @classmethod
     def can_parse(cls, content: str) -> bool:
@@ -244,9 +241,7 @@ class VSCodeAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
                 def on_error(key, val, exc):
                     ctec.add_warning(f"Invalid color for {key}")
 
-                if cls.map_colors_to_ctec(
-                    color_customs, scheme, on_error=on_error
-                ):
+                if cls.map_colors_to_ctec(color_customs, scheme, on_error=on_error):
                     ctec.color_scheme = scheme
 
         # Parse scroll settings

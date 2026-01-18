@@ -1,12 +1,43 @@
 [tools]
+uv = "latest"
 "pipx:cookiecutter" = "latest"
 
+[settings]
+python.uv_venv_auto = true
+
 [tasks.cli]
-description = "Run the cli with arguments"
-run = "python ./console_cowboy/cli.py"
+description = "Run the CLI with arguments"
+run = "uv run console-cowboy"
 raw = true
 dir = "{{ config_root }}"
 
+[tasks.sync]
+description = "Install dependencies"
+run = "uv sync"
+
+[tasks.test]
+depends = ["sync"]
+description = "Run tests with pytest"
+run = "uv run python -m pytest"
+
+[tasks.lint]
+description = "Check code formatting and linting"
+run = """
+uv run ruff format --check .
+uv run ruff check .
+"""
+
+[tasks."lint:fix"]
+description = "Fix code formatting and linting issues"
+run = """
+uv run ruff format .
+uv run ruff check --fix .
+"""
+
+[tasks.coverage]
+depends = ["sync"]
+description = "Run tests with coverage report"
+run = "uv run python -m pytest --cov=console_cowboy --cov-report=term-missing"
 
 [tasks.publish]
 description = "Build and publish to PyPI"
@@ -15,12 +46,3 @@ rm -rf dist/
 uv run python -m build
 uv run twine upload dist/*
 """
-
-[tasks.sync]
-description = "prepare repository for stuff"
-run = "uv sync"
-
-[tasks.test]
-depends = ["sync"]
-description = "Run tests with pytest"
-run = "uv run python -m pytest"
