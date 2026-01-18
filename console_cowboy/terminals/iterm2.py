@@ -37,9 +37,10 @@ from console_cowboy.utils.fonts import (
 )
 
 from .base import TerminalAdapter
+from .mixins import ColorMapMixin, CursorStyleMixin
 
 
-class ITerm2Adapter(TerminalAdapter):
+class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
     """
     Adapter for iTerm2 terminal emulator.
 
@@ -65,8 +66,6 @@ class ITerm2Adapter(TerminalAdapter):
         1: CursorStyle.BLOCK,
         2: CursorStyle.BEAM,
     }
-
-    CURSOR_STYLE_REVERSE_MAP = {v: k for k, v in CURSOR_STYLE_MAP.items()}
 
     # Color key mappings from iTerm2 to CTEC
     # Aligned with iTerm2-Color-Schemes extended YAML format
@@ -102,7 +101,7 @@ class ITerm2Adapter(TerminalAdapter):
         "Ansi 15 Color": "bright_white",
     }
 
-    COLOR_KEY_REVERSE_MAP = {v: k for k, v in COLOR_KEY_MAP.items()}
+
 
     # Mapping of iTerm2 Hotkey Window Type to QuickTerminalPosition
     # This is a separate property from Window Type, specific to hotkey windows
@@ -218,10 +217,7 @@ class ITerm2Adapter(TerminalAdapter):
     def _parse_color_scheme(cls, profile: dict) -> ColorScheme:
         """Parse color settings from an iTerm2 profile."""
         scheme = ColorScheme()
-        for iterm_key, ctec_key in cls.COLOR_KEY_MAP.items():
-            if iterm_key in profile:
-                color = cls._parse_iterm_color(profile[iterm_key])
-                setattr(scheme, ctec_key, color)
+        cls.map_colors_to_ctec(profile, scheme, value_parser=cls._parse_iterm_color)
         return scheme
 
     @classmethod
@@ -342,9 +338,7 @@ class ITerm2Adapter(TerminalAdapter):
         cursor_config = CursorConfig()
         if "Cursor Type" in profile_data:
             cursor_type = profile_data["Cursor Type"]
-            cursor_config.style = cls.CURSOR_STYLE_MAP.get(
-                cursor_type, CursorStyle.BLOCK
-            )
+            cursor_config.style = cls.get_cursor_style(cursor_type)
         if "Blinking Cursor" in profile_data:
             cursor_config.blink = profile_data["Blinking Cursor"]
         ctec.cursor = cursor_config
@@ -757,10 +751,10 @@ class ITerm2Adapter(TerminalAdapter):
 
         # Export colors
         if ctec.color_scheme:
-            for ctec_key, iterm_key in cls.COLOR_KEY_REVERSE_MAP.items():
-                color = getattr(ctec.color_scheme, ctec_key, None)
-                if color:
-                    result[iterm_key] = cls._export_color(color)
+            colors = cls.map_ctec_to_colors(
+                ctec.color_scheme, value_formatter=cls._export_color
+            )
+            result.update(colors)
 
         # Export font
         if ctec.font and ctec.font.family:
@@ -798,7 +792,7 @@ class ITerm2Adapter(TerminalAdapter):
         # Export cursor
         if ctec.cursor:
             if ctec.cursor.style:
-                result["Cursor Type"] = cls.CURSOR_STYLE_REVERSE_MAP.get(
+                result["Cursor Type"] = cls.get_cursor_style_value(
                     ctec.cursor.style, 1
                 )
             if ctec.cursor.blink is not None:
@@ -1012,9 +1006,7 @@ class ITerm2Adapter(TerminalAdapter):
         Returns:
             Plist XML string for .itermcolors file
         """
-        result = {}
-        for ctec_key, iterm_key in cls.COLOR_KEY_REVERSE_MAP.items():
-            color = getattr(color_scheme, ctec_key, None)
-            if color:
-                result[iterm_key] = cls._export_color(color)
+        result = cls.map_ctec_to_colors(
+            color_scheme, value_formatter=cls._export_color
+        )
         return plistlib.dumps(result).decode()

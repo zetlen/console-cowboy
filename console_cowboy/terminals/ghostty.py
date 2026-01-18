@@ -30,9 +30,10 @@ from console_cowboy.ctec.schema import (
 from console_cowboy.utils.colors import normalize_color
 
 from .base import TerminalAdapter
+from .mixins import ColorMapMixin, CursorStyleMixin, ParsingMixin
 
 
-class GhosttyAdapter(TerminalAdapter):
+class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMixin):
     """
     Adapter for Ghostty terminal emulator.
 
@@ -56,7 +57,6 @@ class GhosttyAdapter(TerminalAdapter):
         "cursor-text": "cursor_text",
         "selection-foreground": "selection_text",
         "selection-background": "selection",
-        "palette": None,  # Handled specially
     }
 
     # Cursor style mapping
@@ -65,8 +65,6 @@ class GhosttyAdapter(TerminalAdapter):
         "bar": CursorStyle.BEAM,
         "underline": CursorStyle.UNDERLINE,
     }
-
-    CURSOR_STYLE_REVERSE_MAP = {v: k for k, v in CURSOR_STYLE_MAP.items()}
 
     # Quick terminal position mapping
     QUICK_TERMINAL_POSITION_MAP = {
@@ -89,6 +87,37 @@ class GhosttyAdapter(TerminalAdapter):
 
     QUICK_TERMINAL_SCREEN_REVERSE_MAP = {
         v: k for k, v in QUICK_TERMINAL_SCREEN_MAP.items()
+    }
+
+    # Font mapping
+    FONT_MAPPING = {
+        "font-family": ("family", str),
+        "font-size": ("size", float),
+        "font-family-bold": ("bold_font", str),
+        "font-family-italic": ("italic_font", str),
+        "font-family-bold-italic": ("bold_italic_font", str),
+        "adjust-cell-height": ("line_height", lambda v: 1.0 + float(v) / 100),
+        "adjust-cell-width": ("cell_width", lambda v: 1.0 + float(v.rstrip("%")) / 100),
+    }
+
+    # Window mapping
+    WINDOW_MAPPING = {
+        "window-width": ("columns", int),
+        "window-height": ("rows", int),
+        "background-opacity": ("opacity", float),
+        "background-blur-radius": ("blur", int),
+        "window-padding-x": ("padding_horizontal", int),
+        "window-padding-y": ("padding_vertical", int),
+        "window-decoration": ("decorations", lambda v: v.lower() != "none"),
+        "window-title-show-all": ("dynamic_title", lambda v: v.lower() == "true"),
+    }
+
+    # Behavior mapping
+    BEHAVIOR_MAPPING = {
+        "command": ("shell", str),
+        "working-directory": ("working_directory", str),
+        "copy-on-select": ("copy_on_select", lambda v: v.lower() == "true"),
+        "confirm-close-surface": ("confirm_close", lambda v: v.lower() == "true"),
     }
 
     # Tab bar visibility mapping
@@ -377,19 +406,14 @@ class GhosttyAdapter(TerminalAdapter):
             key = key.strip()
             value = value.strip()
 
-            # Parse color settings
-            if key == "foreground":
-                scheme.foreground = normalize_color(value)
-            elif key == "background":
-                scheme.background = normalize_color(value)
-            elif key == "cursor-color":
-                scheme.cursor = normalize_color(value)
-            elif key == "cursor-text":
-                scheme.cursor_text = normalize_color(value)
-            elif key == "selection-foreground":
-                scheme.selection_text = normalize_color(value)
-            elif key == "selection-background":
-                scheme.selection = normalize_color(value)
+            def on_error(k, v, e):
+                ctec.add_warning(f"Invalid {k}: {v}")
+
+            # Check if it's a standard color key
+            ctec_color_key = cls.get_ctec_color_key(key)
+            if ctec_color_key:
+                setattr(scheme, ctec_color_key, normalize_color(value))
+            # Handle special palette color
             elif key == "palette":
                 # Format: index=color (e.g., "0=#1d1f21")
                 if "=" in value:
@@ -400,85 +424,26 @@ class GhosttyAdapter(TerminalAdapter):
                     except ValueError:
                         ctec.add_warning(f"Invalid palette entry: {value}")
 
-            # Parse font settings
-            elif key == "font-family":
-                font.family = value
-            elif key == "font-size":
-                try:
-                    font.size = float(value)
-                except ValueError:
-                    ctec.add_warning(f"Invalid font-size: {value}")
-            elif key == "font-family-bold":
-                font.bold_font = value
-            elif key == "font-family-italic":
-                font.italic_font = value
-            elif key == "adjust-cell-height":
-                try:
-                    font.line_height = 1.0 + float(value) / 100
-                except ValueError:
-                    ctec.add_warning(f"Invalid adjust-cell-height: {value}")
-            elif key == "adjust-cell-width":
-                try:
-                    # Handle both "5" and "5%" formats
-                    val_str = value.rstrip("%")
-                    font.cell_width = 1.0 + float(val_str) / 100
-                except ValueError:
-                    ctec.add_warning(f"Invalid adjust-cell-width: {value}")
-            elif key == "font-family-bold-italic":
-                font.bold_italic_font = value
+            # Parse mappings
+            elif cls.apply_line_mapping(key, value, font, cls.FONT_MAPPING, on_error):
+                pass
+            elif cls.apply_line_mapping(key, value, window, cls.WINDOW_MAPPING, on_error):
+                pass
+            elif cls.apply_line_mapping(key, value, behavior, cls.BEHAVIOR_MAPPING, on_error):
+                pass
 
-            # Parse cursor settings
-            elif key == "cursor-style":
-                cursor.style = cls.CURSOR_STYLE_MAP.get(
-                    value.lower(), CursorStyle.BLOCK
-                )
-            elif key == "cursor-style-blink":
-                cursor.blink = value.lower() == "true"
-
-            # Parse window settings
-            elif key == "window-width":
-                try:
-                    window.columns = int(value)
-                except ValueError:
-                    ctec.add_warning(f"Invalid window-width: {value}")
-            elif key == "window-height":
-                try:
-                    window.rows = int(value)
-                except ValueError:
-                    ctec.add_warning(f"Invalid window-height: {value}")
-            elif key == "background-opacity":
-                try:
-                    window.opacity = float(value)
-                except ValueError:
-                    ctec.add_warning(f"Invalid background-opacity: {value}")
-            elif key == "background-blur-radius":
-                try:
-                    window.blur = int(value)
-                except ValueError:
-                    ctec.add_warning(f"Invalid background-blur-radius: {value}")
-            elif key == "window-padding-x":
-                try:
-                    window.padding_horizontal = int(value)
-                except ValueError:
-                    ctec.add_warning(f"Invalid window-padding-x: {value}")
-            elif key == "window-padding-y":
-                try:
-                    window.padding_vertical = int(value)
-                except ValueError:
-                    ctec.add_warning(f"Invalid window-padding-y: {value}")
-            elif key == "window-decoration":
-                window.decorations = value.lower() != "none"
+            # Handle special cases that didn't fit into simple mappings
             elif key == "fullscreen":
                 if value.lower() == "true":
                     window.startup_mode = "fullscreen"
-            elif key == "window-title-show-all":
-                window.dynamic_title = value.lower() == "true"
 
-            # Parse behavior settings
-            elif key == "command":
-                behavior.shell = value
-            elif key == "working-directory":
-                behavior.working_directory = value
+            # Parse cursor settings
+            elif key == "cursor-style":
+                cursor.style = cls.get_cursor_style(value)
+            elif key == "cursor-style-blink":
+                cursor.blink = value.lower() == "true"
+
+            # Parse behavior settings (remaining)
             elif key == "scrollback-limit":
                 try:
                     # Ghostty uses bytes, not lines - convert to ScrollConfig
@@ -489,10 +454,8 @@ class GhosttyAdapter(TerminalAdapter):
             elif key == "mouse-hide-while-typing":
                 # Not directly mappable, store as terminal-specific
                 ctec.add_terminal_specific("ghostty", key, value.lower() == "true")
-            elif key == "copy-on-select":
-                behavior.copy_on_select = value.lower() == "true"
-            elif key == "confirm-close-surface":
-                behavior.confirm_close = value.lower() == "true"
+
+            # Parse quick terminal settings
 
             # Parse quick terminal settings
             elif key == "quick-terminal-position":
@@ -622,18 +585,11 @@ class GhosttyAdapter(TerminalAdapter):
         if ctec.color_scheme:
             scheme = ctec.color_scheme
             lines.append("# Colors")
-            if scheme.foreground:
-                lines.append(f"foreground = {scheme.foreground.to_hex()}")
-            if scheme.background:
-                lines.append(f"background = {scheme.background.to_hex()}")
-            if scheme.cursor:
-                lines.append(f"cursor-color = {scheme.cursor.to_hex()}")
-            if scheme.cursor_text:
-                lines.append(f"cursor-text = {scheme.cursor_text.to_hex()}")
-            if scheme.selection:
-                lines.append(f"selection-background = {scheme.selection.to_hex()}")
-            if scheme.selection_text:
-                lines.append(f"selection-foreground = {scheme.selection_text.to_hex()}")
+            
+            # Use mixin to export standard colors
+            colors = cls.map_ctec_to_colors(scheme)
+            for ghostty_key, color_hex in colors.items():
+                lines.append(f"{ghostty_key} = {color_hex}")
 
             # Export palette colors
             palette_colors = [
@@ -685,7 +641,7 @@ class GhosttyAdapter(TerminalAdapter):
         if ctec.cursor:
             lines.append("# Cursor")
             if ctec.cursor.style:
-                style = cls.CURSOR_STYLE_REVERSE_MAP.get(ctec.cursor.style, "block")
+                style = cls.get_cursor_style_value(ctec.cursor.style, "block")
                 lines.append(f"cursor-style = {style}")
             if ctec.cursor.blink is not None:
                 lines.append(f"cursor-style-blink = {str(ctec.cursor.blink).lower()}")

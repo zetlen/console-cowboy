@@ -30,9 +30,10 @@ from console_cowboy.ctec.schema import (
 from console_cowboy.utils.colors import normalize_color
 
 from .base import TerminalAdapter
+from .mixins import ColorMapMixin, CursorStyleMixin
 
 
-class KittyAdapter(TerminalAdapter):
+class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
     """
     Adapter for Kitty terminal emulator.
 
@@ -53,8 +54,6 @@ class KittyAdapter(TerminalAdapter):
         "beam": CursorStyle.BEAM,
         "underline": CursorStyle.UNDERLINE,
     }
-
-    CURSOR_STYLE_REVERSE_MAP = {v: k for k, v in CURSOR_STYLE_MAP.items()}
 
     # Kitty color key mappings
     COLOR_KEY_MAP = {
@@ -81,8 +80,6 @@ class KittyAdapter(TerminalAdapter):
         "color14": "bright_cyan",
         "color15": "bright_white",
     }
-
-    COLOR_KEY_REVERSE_MAP = {v: k for k, v in COLOR_KEY_MAP.items()}
 
     # Kitty quick-access-terminal edge mapping (kitten feature in 0.42+)
     # The quick-access-terminal kitten uses a separate config file but we support
@@ -235,9 +232,7 @@ class KittyAdapter(TerminalAdapter):
 
             # Parse cursor settings
             elif key == "cursor_shape":
-                cursor.style = cls.CURSOR_STYLE_MAP.get(
-                    value.lower(), CursorStyle.BLOCK
-                )
+                cursor.style = cls.get_cursor_style(value)
             elif key == "cursor_blink_interval":
                 try:
                     interval = float(value)
@@ -508,10 +503,9 @@ class KittyAdapter(TerminalAdapter):
         if ctec.color_scheme:
             scheme = ctec.color_scheme
             lines.append("# Colors")
-            for ctec_key, kitty_key in cls.COLOR_KEY_REVERSE_MAP.items():
-                color = getattr(scheme, ctec_key, None)
-                if color:
-                    lines.append(f"{kitty_key} {color.to_hex()}")
+            colors = cls.map_ctec_to_colors(scheme)
+            for kitty_key, color_hex in colors.items():
+                lines.append(f"{kitty_key} {color_hex}")
             lines.append("")
 
         # Export font settings
@@ -547,7 +541,7 @@ class KittyAdapter(TerminalAdapter):
         if ctec.cursor:
             lines.append("# Cursor")
             if ctec.cursor.style:
-                style = cls.CURSOR_STYLE_REVERSE_MAP.get(ctec.cursor.style, "block")
+                style = cls.get_cursor_style_value(ctec.cursor.style, "block")
                 lines.append(f"cursor_shape {style}")
             if ctec.cursor.blink is not None:
                 if ctec.cursor.blink:

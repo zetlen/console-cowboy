@@ -35,9 +35,10 @@ from console_cowboy.ctec.schema import (
 from console_cowboy.utils.colors import normalize_color
 
 from .base import TerminalAdapter
+from .mixins import CursorStyleMixin, ParsingMixin
 
 
-class AlacrittyAdapter(TerminalAdapter):
+class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
     """
     Adapter for Alacritty terminal emulator.
 
@@ -61,8 +62,6 @@ class AlacrittyAdapter(TerminalAdapter):
         "underline": CursorStyle.UNDERLINE,
     }
 
-    CURSOR_STYLE_REVERSE_MAP = {v: k for k, v in CURSOR_STYLE_MAP.items()}
-
     # Alacritty hint action mapping to CTEC
     HINT_ACTION_MAP = {
         "Copy": TextHintAction.COPY,
@@ -72,6 +71,18 @@ class AlacrittyAdapter(TerminalAdapter):
     }
 
     HINT_ACTION_REVERSE_MAP = {v: k for k, v in HINT_ACTION_MAP.items()}
+
+    # Window mapping
+    WINDOW_MAPPING = {
+        "window.dimensions.columns": ("columns", int),
+        "window.dimensions.lines": ("rows", int),
+        "window.opacity": ("opacity", float),
+        "window.padding.x": ("padding_horizontal", int),
+        "window.padding.y": ("padding_vertical", int),
+        "window.dynamic_title": ("dynamic_title", bool),
+        "window.startup_mode": ("startup_mode", lambda v: v.lower()),
+        "window.decorations": ("decorations", lambda v: v not in ("None", "none", False)),
+    }
 
     @classmethod
     def can_parse(cls, content: str) -> bool:
@@ -325,13 +336,9 @@ class AlacrittyAdapter(TerminalAdapter):
             if "style" in cursor_data:
                 style_data = cursor_data["style"]
                 if isinstance(style_data, str):
-                    cursor.style = cls.CURSOR_STYLE_MAP.get(
-                        style_data.lower(), CursorStyle.BLOCK
-                    )
+                    cursor.style = cls.get_cursor_style(style_data)
                 elif isinstance(style_data, dict) and "shape" in style_data:
-                    cursor.style = cls.CURSOR_STYLE_MAP.get(
-                        style_data["shape"].lower(), CursorStyle.BLOCK
-                    )
+                    cursor.style = cls.get_cursor_style(style_data["shape"])
                     if "blinking" in style_data:
                         cursor.blink = style_data["blinking"] not in (
                             "Off",
@@ -343,40 +350,21 @@ class AlacrittyAdapter(TerminalAdapter):
             ctec.cursor = cursor
 
         # Parse window
-        if "window" in data:
-            window_data = data["window"]
-            window = WindowConfig()
-            if "dimensions" in window_data:
-                dims = window_data["dimensions"]
-                if "columns" in dims:
-                    window.columns = dims["columns"]
-                if "lines" in dims:
-                    window.rows = dims["lines"]
-            if "opacity" in window_data:
-                window.opacity = window_data["opacity"]
-            if "blur" in window_data:
-                blur_val = window_data["blur"]
-                # Alacritty uses boolean blur; store as default radius if enabled
-                if isinstance(blur_val, bool):
-                    window.blur = 20 if blur_val else None
-                elif isinstance(blur_val, int):
-                    window.blur = blur_val if blur_val > 0 else None
-            if "padding" in window_data:
-                padding = window_data["padding"]
-                if "x" in padding:
-                    window.padding_horizontal = padding["x"]
-                if "y" in padding:
-                    window.padding_vertical = padding["y"]
-            if "decorations" in window_data:
-                window.decorations = window_data["decorations"] not in (
-                    "None",
-                    "none",
-                    False,
-                )
-            if "startup_mode" in window_data:
-                window.startup_mode = window_data["startup_mode"].lower()
-            if "dynamic_title" in window_data:
-                window.dynamic_title = window_data["dynamic_title"]
+        window = WindowConfig()
+        
+        # Handle blur separately as it has custom logic
+        if "window" in data and "blur" in data["window"]:
+            blur_val = data["window"]["blur"]
+            if isinstance(blur_val, bool):
+                window.blur = 20 if blur_val else None
+            elif isinstance(blur_val, int):
+                window.blur = blur_val if blur_val > 0 else None
+
+        # Apply standard mappings
+        if cls.apply_key_mapping(data, window, cls.WINDOW_MAPPING):
+            ctec.window = window
+        elif window.blur is not None:
+            # If only blur was set
             ctec.window = window
 
         # Parse shell/behavior
@@ -651,9 +639,9 @@ class AlacrittyAdapter(TerminalAdapter):
             cursor = {}
             style = {}
             if ctec.cursor.style:
-                style["shape"] = cls.CURSOR_STYLE_REVERSE_MAP.get(
-                    ctec.cursor.style, "Block"
-                ).capitalize()
+                style["shape"] = (
+                    str(cls.get_cursor_style_value(ctec.cursor.style)).capitalize()
+                )
             if ctec.cursor.blink is not None:
                 style["blinking"] = "On" if ctec.cursor.blink else "Off"
             if style:
