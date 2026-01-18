@@ -82,36 +82,6 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
         "color15": "bright_white",
     }
 
-    # Keys that should be explicitly preserved in terminal_specific for power users
-    # These are critical settings that power users rely on for their workflows
-    POWER_USER_KEYS = {
-        # Shell integration and session management
-        "shell_integration",
-        "startup_session",
-        # Scrollback pager (custom nvim/less pagers)
-        "scrollback_pager",
-        "scrollback_pager_history_size",
-        # Hyperlink support
-        "allow_hyperlinks",
-        # Cursor appearance when unfocused
-        "cursor_shape_unfocused",
-        # Platform-specific settings
-        "linux_display_server",
-        # Scrollbar settings
-        "scrollbar",
-        "scrollbar_on_right",
-    }
-
-    # Prefixes for settings that are platform-specific or multi-instance
-    # These are preserved in terminal_specific with their full key
-    POWER_USER_PREFIXES = (
-        "macos_",  # macOS-specific options
-        "wayland_",  # Wayland-specific options
-        "mark1_",  # Text marking colors
-        "mark2_",
-        "mark3_",
-    )
-
     # Kitty quick-access-terminal edge mapping (kitten feature in 0.42+)
     # The quick-access-terminal kitten uses a separate config file but we support
     # parsing/exporting these settings for cross-terminal compatibility
@@ -522,7 +492,9 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
                     # but handle gracefully
                     ctec.add_terminal_specific("kitty", key, value)
 
-            # Store unrecognized settings (including power user keys and prefixes)
+            # Store all other unrecognized settings in terminal_specific
+            # This preserves power user settings like shell_integration,
+            # startup_session, macos_* options, wayland_* options, etc.
             else:
                 ctec.add_terminal_specific("kitty", key, value)
 
