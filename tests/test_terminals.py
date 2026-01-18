@@ -2563,3 +2563,32 @@ env = COLORTERM=truecolor
         # Kitty doesn't support shell_args, should warn
         KittyAdapter.export(ctec)
         assert any("shell argument" in w.lower() for w in ctec.warnings)
+
+    def test_iterm2_env_key_validation(self):
+        """Test that iTerm2 validates environment variable keys to prevent injection."""
+        ctec = CTEC(
+            behavior=BehaviorConfig(
+                environment_variables={
+                    "VALID_KEY": "value1",
+                    "_ALSO_VALID": "value2",
+                    "invalid-key": "value3",  # Hyphens not allowed
+                    "123_INVALID": "value4",  # Can't start with number
+                    "FOO; rm -rf /": "malicious",  # Injection attempt
+                }
+            )
+        )
+        output = ITerm2Adapter.export(ctec)
+
+        # Valid keys should be exported
+        assert "export VALID_KEY=" in output
+        assert "export _ALSO_VALID=" in output
+
+        # Invalid keys should be skipped with warnings
+        assert "invalid-key" not in output
+        assert "123_INVALID" not in output
+        assert "rm -rf" not in output
+
+        # Should have warnings about skipped keys
+        assert any("invalid-key" in w for w in ctec.warnings)
+        assert any("123_INVALID" in w for w in ctec.warnings)
+        assert any("FOO; rm -rf /" in w for w in ctec.warnings)
