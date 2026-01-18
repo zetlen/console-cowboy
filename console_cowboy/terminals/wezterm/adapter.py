@@ -393,10 +393,28 @@ class WeztermAdapter(TerminalAdapter):
             default_prog = config["default_prog"]
             if isinstance(default_prog, (list, tuple)) and len(default_prog) > 0:
                 behavior.shell = str(default_prog[0])
+                if len(default_prog) > 1:
+                    behavior.shell_args = [str(arg) for arg in default_prog[1:]]
             elif isinstance(default_prog, dict):
-                # Lua table with numeric keys
+                # Lua table with numeric keys (1-indexed in Lua)
                 if 1 in default_prog:
                     behavior.shell = str(default_prog[1])
+                    # Get remaining args (keys 2, 3, ...)
+                    args = []
+                    i = 2
+                    while i in default_prog:
+                        args.append(str(default_prog[i]))
+                        i += 1
+                    if args:
+                        behavior.shell_args = args
+
+        # Parse environment variables
+        if "set_environment_variables" in config:
+            env_vars = config["set_environment_variables"]
+            if isinstance(env_vars, dict):
+                behavior.environment_variables = {
+                    str(k): str(v) for k, v in env_vars.items()
+                }
 
         if "scrollback_lines" in config:
             try:
@@ -423,7 +441,12 @@ class WeztermAdapter(TerminalAdapter):
                 if duration and int(duration) > 0:
                     behavior.bell_mode = BellMode.VISUAL
 
-        if behavior.shell or behavior.scrollback_lines or behavior.bell_mode:
+        if (
+            behavior.shell
+            or behavior.scrollback_lines
+            or behavior.bell_mode
+            or behavior.environment_variables
+        ):
             ctec.behavior = behavior
 
         # Parse tab settings
@@ -934,8 +957,20 @@ class WeztermAdapter(TerminalAdapter):
         # Export behavior
         if ctec.behavior:
             lines.append("-- Behavior")
-            if ctec.behavior.shell:
-                lines.append(f'config.default_prog = {{ "{ctec.behavior.shell}" }}')
+            if ctec.behavior.shell or ctec.behavior.shell_args:
+                prog_parts = []
+                if ctec.behavior.shell:
+                    prog_parts.append(f'"{ctec.behavior.shell}"')
+                if ctec.behavior.shell_args:
+                    prog_parts.extend(f'"{arg}"' for arg in ctec.behavior.shell_args)
+                if prog_parts:
+                    prog_str = ", ".join(prog_parts)
+                    lines.append(f"config.default_prog = {{ {prog_str} }}")
+            if ctec.behavior.environment_variables:
+                lines.append("config.set_environment_variables = {")
+                for env_key, env_value in ctec.behavior.environment_variables.items():
+                    lines.append(f'  {env_key} = "{env_value}",')
+                lines.append("}")
             if ctec.behavior.bell_mode is not None:
                 if ctec.behavior.bell_mode == BellMode.NONE:
                     lines.append('config.audible_bell = "Disabled"')

@@ -289,6 +289,15 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
             elif key == "shell":
                 if value != ".":
                     behavior.shell = value
+            elif key == "env":
+                # Kitty env format: KEY=VALUE
+                if "=" in value:
+                    env_key, env_value = value.split("=", 1)
+                    if behavior.environment_variables is None:
+                        behavior.environment_variables = {}
+                    behavior.environment_variables[env_key] = env_value
+                else:
+                    ctec.add_warning(f"Invalid env entry (missing '='): {value}")
             elif key == "scrollback_lines":
                 try:
                     lines = int(value)
@@ -462,7 +471,12 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
             ctec.cursor = cursor
         if window.columns or window.rows or window.opacity:
             ctec.window = window
-        if behavior.shell or behavior.scrollback_lines or behavior.bell_mode:
+        if (
+            behavior.shell
+            or behavior.scrollback_lines
+            or behavior.bell_mode
+            or behavior.environment_variables
+        ):
             ctec.behavior = behavior
         if quick_terminal.enabled:
             ctec.quick_terminal = quick_terminal
@@ -577,6 +591,16 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
             lines.append("# Behavior")
             if ctec.behavior.shell:
                 lines.append(f"shell {ctec.behavior.shell}")
+            if ctec.behavior.shell_args:
+                # Kitty doesn't have separate shell args, warn the user
+                ctec.add_warning(
+                    "Kitty does not support separate shell arguments. "
+                    "Consider using a shell wrapper script or combining the "
+                    "command with arguments."
+                )
+            if ctec.behavior.environment_variables:
+                for env_key, env_value in ctec.behavior.environment_variables.items():
+                    lines.append(f"env {env_key}={env_value}")
             if ctec.behavior.bell_mode is not None:
                 if ctec.behavior.bell_mode == BellMode.NONE:
                     lines.append("enable_audio_bell no")

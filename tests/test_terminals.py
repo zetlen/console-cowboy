@@ -4,6 +4,7 @@ from pathlib import Path
 
 from console_cowboy.ctec.schema import (
     CTEC,
+    BehaviorConfig,
     BellMode,
     Color,
     ColorScheme,
@@ -2365,3 +2366,200 @@ focus_follows_mouse yes
         assert parsed.get_terminal_specific(
             "kitty", "inactive_border_color"
         ) == original.get_terminal_specific("kitty", "inactive_border_color")
+
+
+class TestEnvironmentVariables:
+    """Tests for environment variable and shell args support."""
+
+    def test_ghostty_parse_env_variables(self):
+        """Test Ghostty parses environment variables."""
+        config = """
+env = EDITOR=nvim
+env = COLORTERM=truecolor
+env = TERM_PROGRAM=ghostty
+"""
+        ctec = GhosttyAdapter.parse("test", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.environment_variables is not None
+        assert ctec.behavior.environment_variables["EDITOR"] == "nvim"
+        assert ctec.behavior.environment_variables["COLORTERM"] == "truecolor"
+        assert ctec.behavior.environment_variables["TERM_PROGRAM"] == "ghostty"
+
+    def test_ghostty_export_env_variables(self):
+        """Test Ghostty exports environment variables."""
+        ctec = CTEC(
+            behavior=BehaviorConfig(
+                environment_variables={"EDITOR": "vim", "SHELL": "/bin/zsh"}
+            )
+        )
+        output = GhosttyAdapter.export(ctec)
+        assert "env = EDITOR=vim" in output
+        assert "env = SHELL=/bin/zsh" in output
+
+    def test_ghostty_env_roundtrip(self):
+        """Test environment variables survive Ghostty round-trip."""
+        original_config = """
+env = MY_VAR=test_value
+env = ANOTHER=another_value
+"""
+        parsed = GhosttyAdapter.parse("test", content=original_config)
+        exported = GhosttyAdapter.export(parsed)
+        reparsed = GhosttyAdapter.parse("test", content=exported)
+
+        assert reparsed.behavior.environment_variables["MY_VAR"] == "test_value"
+        assert reparsed.behavior.environment_variables["ANOTHER"] == "another_value"
+
+    def test_alacritty_parse_env_variables(self):
+        """Test Alacritty parses env section."""
+        config = """
+[env]
+EDITOR = "nvim"
+COLORTERM = "truecolor"
+"""
+        ctec = AlacrittyAdapter.parse("test", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.environment_variables is not None
+        assert ctec.behavior.environment_variables["EDITOR"] == "nvim"
+        assert ctec.behavior.environment_variables["COLORTERM"] == "truecolor"
+
+    def test_alacritty_parse_shell_args(self):
+        """Test Alacritty parses shell.args."""
+        config = """
+[shell]
+program = "/bin/zsh"
+args = ["-l", "-i"]
+"""
+        ctec = AlacrittyAdapter.parse("test", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.shell == "/bin/zsh"
+        assert ctec.behavior.shell_args == ["-l", "-i"]
+
+    def test_alacritty_export_env_and_shell_args(self):
+        """Test Alacritty exports env and shell.args."""
+        ctec = CTEC(
+            behavior=BehaviorConfig(
+                shell="/bin/zsh",
+                shell_args=["-l"],
+                environment_variables={"EDITOR": "vim"},
+            )
+        )
+        output = AlacrittyAdapter.export(ctec)
+        # Check as TOML output
+        assert "[shell]" in output
+        assert '"program"' in output or "program" in output
+        assert '["-l"]' in output or '"-l"' in output
+        assert "[env]" in output
+        assert "EDITOR" in output
+        assert "vim" in output
+
+    def test_kitty_parse_env_variables(self):
+        """Test Kitty parses env directive."""
+        config = """
+env EDITOR=nvim
+env COLORTERM=truecolor
+"""
+        ctec = KittyAdapter.parse("test", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.environment_variables is not None
+        assert ctec.behavior.environment_variables["EDITOR"] == "nvim"
+        assert ctec.behavior.environment_variables["COLORTERM"] == "truecolor"
+
+    def test_kitty_export_env_variables(self):
+        """Test Kitty exports environment variables."""
+        ctec = CTEC(
+            behavior=BehaviorConfig(
+                environment_variables={"EDITOR": "vim", "TERM": "xterm-256color"}
+            )
+        )
+        output = KittyAdapter.export(ctec)
+        assert "env EDITOR=vim" in output
+        assert "env TERM=xterm-256color" in output
+
+    def test_wezterm_parse_env_variables(self):
+        """Test WezTerm parses set_environment_variables."""
+        config = """
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+config.set_environment_variables = {
+  EDITOR = "nvim",
+  COLORTERM = "truecolor",
+}
+
+return config
+"""
+        ctec = WeztermAdapter.parse("test", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.environment_variables is not None
+        assert ctec.behavior.environment_variables["EDITOR"] == "nvim"
+        assert ctec.behavior.environment_variables["COLORTERM"] == "truecolor"
+
+    def test_wezterm_parse_shell_args(self):
+        """Test WezTerm parses default_prog args."""
+        config = """
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+config.default_prog = { "/bin/zsh", "-l", "-i" }
+
+return config
+"""
+        ctec = WeztermAdapter.parse("test", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.shell == "/bin/zsh"
+        assert ctec.behavior.shell_args == ["-l", "-i"]
+
+    def test_wezterm_export_env_and_shell_args(self):
+        """Test WezTerm exports env and default_prog with args."""
+        ctec = CTEC(
+            behavior=BehaviorConfig(
+                shell="/bin/zsh",
+                shell_args=["-l", "-i"],
+                environment_variables={"EDITOR": "vim"},
+            )
+        )
+        output = WeztermAdapter.export(ctec)
+        assert 'config.default_prog = { "/bin/zsh", "-l", "-i" }' in output
+        assert "config.set_environment_variables" in output
+        assert 'EDITOR = "vim"' in output
+
+    def test_cross_terminal_env_conversion(self):
+        """Test environment variables convert between terminals."""
+        # Start with Ghostty config
+        ghostty_config = """
+env = EDITOR=nvim
+env = COLORTERM=truecolor
+"""
+        ctec = GhosttyAdapter.parse("test", content=ghostty_config)
+
+        # Export to Alacritty
+        alacritty_output = AlacrittyAdapter.export(ctec)
+        assert "[env]" in alacritty_output
+
+        # Export to Kitty
+        kitty_output = KittyAdapter.export(ctec)
+        assert "env EDITOR=nvim" in kitty_output
+
+        # Export to WezTerm
+        wezterm_output = WeztermAdapter.export(ctec)
+        assert "set_environment_variables" in wezterm_output
+
+    def test_shell_args_warning_for_unsupported_terminals(self):
+        """Test that terminals without shell_args support emit warnings."""
+        ctec = CTEC(
+            behavior=BehaviorConfig(
+                shell="/bin/zsh",
+                shell_args=["-l", "-i"],
+            )
+        )
+
+        # Ghostty doesn't support shell_args, should warn
+        GhosttyAdapter.export(ctec)
+        assert any("shell argument" in w.lower() for w in ctec.warnings)
+
+        # Reset warnings
+        ctec.warnings.clear()
+
+        # Kitty doesn't support shell_args, should warn
+        KittyAdapter.export(ctec)
+        assert any("shell argument" in w.lower() for w in ctec.warnings)
