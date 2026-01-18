@@ -1037,7 +1037,8 @@ class QuickTerminalConfig:
         hotkey_key_code: Raw key code for the hotkey (iTerm2)
         hotkey_modifiers: Modifier flags as integer bitmask (iTerm2)
         size_percent: Size as percentage of screen (height for top/bottom, width for left/right)
-        size: Raw size specification string for flexible sizing (e.g., "50%", "300px", "50%,500px")
+        size: Raw size specification string for flexible sizing.
+              Examples: "50%", "300px", "50%,500px".
               Ghostty 1.2.0+ supports percentage, pixels, or comma-separated width,height.
     """
 
