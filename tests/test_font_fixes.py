@@ -64,17 +64,24 @@ disable_ligatures always
 
 
 class TestGhosttyCellWidthFix:
-    """Test that Ghostty adjust-cell-width handles percentages (Bug fix #2)."""
+    """Test that Ghostty adjust-cell-width handles percentages and pixels correctly."""
 
-    def test_parse_cell_width_integer(self):
-        """Test parsing integer value like adjust-cell-width = 5."""
+    def test_parse_cell_width_integer_as_pixel(self):
+        """Test parsing integer value like adjust-cell-width = 5 is treated as pixels.
+
+        Ghostty accepts both pixel values (plain integers) and percentages (with %).
+        Pixel values cannot be converted to a multiplier without knowing font size,
+        so they are stored as terminal-specific settings.
+        """
         content = """
 font-family = JetBrains Mono
 adjust-cell-width = 5
 """
         ctec = GhosttyAdapter.parse("test", content=content)
-        # 5% increase = 1.05
-        assert ctec.font.cell_width == pytest.approx(1.05)
+        # Pixel values are stored as terminal-specific, not as cell_width
+        assert ctec.get_terminal_specific("ghostty", "adjust-cell-width") == 5
+        # Should have a warning about pixel conversion
+        assert any("pixel" in w.lower() for w in ctec.warnings)
 
     def test_parse_cell_width_percentage(self):
         """Test parsing percentage value like adjust-cell-width = 5%."""
@@ -91,8 +98,8 @@ adjust-cell-width = 5%
         ctec = CTEC(font=FontConfig(family="JetBrains Mono", cell_width=1.10))
         exported = GhosttyAdapter.export(ctec)
 
-        # Should export as integer (10 for 10%)
-        assert "adjust-cell-width = 10" in exported
+        # Should export with % suffix for clarity (10%)
+        assert "adjust-cell-width = 10%" in exported
 
         # Import back
         imported = GhosttyAdapter.parse("test", content=exported)

@@ -111,7 +111,7 @@ class QuickTerminalPosition(Enum):
     Position where the quick terminal appears on screen.
 
     Common across terminals:
-    - Ghostty: quick-terminal-position (top, bottom, left, right)
+    - Ghostty: quick-terminal-position (top, bottom, left, right, center)
     - iTerm2: Hotkey Window Type (0=floating, 1=fullscreen, 2=left, 3=right, 4=bottom, 5=top)
     - Kitty: edge option (top, bottom, left, right, background)
     """
@@ -120,6 +120,8 @@ class QuickTerminalPosition(Enum):
     BOTTOM = "bottom"
     LEFT = "left"
     RIGHT = "right"
+    # Ghostty 1.2.0+: centered on screen
+    CENTER = "center"
     # iTerm2-specific: floating window (not docked to edge)
     FLOATING = "floating"
     # iTerm2-specific: full screen
@@ -490,6 +492,8 @@ class FontConfig:
                     Format: {"U+E000-U+F8FF": "Symbols Nerd Font"}
         draw_powerline_glyphs: Use built-in Powerline glyph rendering (iTerm2)
         box_drawing_scale: Scale factor for box drawing characters
+        font_features: List of OpenType feature tags to enable/disable (e.g., ["-calt", "ss01"])
+                      Supported by: Ghostty (font-feature), Kitty (font_features), Alacritty
         _source_names: Original font names from source terminal (for round-trip)
     """
 
@@ -508,6 +512,7 @@ class FontConfig:
     symbol_map: dict[str, str] | None = None
     draw_powerline_glyphs: bool | None = None
     box_drawing_scale: float | None = None
+    font_features: list[str] | None = None
     # Internal: preserve original names for lossless round-trips
     _source_names: dict[str, str] | None = field(default=None, repr=False)
 
@@ -539,6 +544,8 @@ class FontConfig:
         # List fields
         if self.fallback_fonts:
             result["fallback_fonts"] = self.fallback_fonts
+        if self.font_features:
+            result["font_features"] = self.font_features
         # Dict fields
         if self.symbol_map:
             result["symbol_map"] = self.symbol_map
@@ -575,6 +582,7 @@ class FontConfig:
             symbol_map=data.get("symbol_map"),
             draw_powerline_glyphs=data.get("draw_powerline_glyphs"),
             box_drawing_scale=data.get("box_drawing_scale"),
+            font_features=data.get("font_features"),
             _source_names=data.get("_source_names"),
         )
 
@@ -1029,6 +1037,9 @@ class QuickTerminalConfig:
         hotkey_key_code: Raw key code for the hotkey (iTerm2)
         hotkey_modifiers: Modifier flags as integer bitmask (iTerm2)
         size_percent: Size as percentage of screen (height for top/bottom, width for left/right)
+        size: Raw size specification string for flexible sizing.
+              Examples: "50%", "300px", "50%,500px".
+              Ghostty 1.2.0+ supports percentage, pixels, or comma-separated width,height.
     """
 
     enabled: bool | None = None
@@ -1042,6 +1053,7 @@ class QuickTerminalConfig:
     hotkey_key_code: int | None = None
     hotkey_modifiers: int | None = None
     size_percent: float | None = None  # e.g., 0.5 = 50% of screen
+    size: str | None = None  # Raw size string (e.g., "50%", "300px", "50%,500px")
 
     def to_dict(self) -> dict:
         """Convert to dictionary representation."""
@@ -1056,6 +1068,7 @@ class QuickTerminalConfig:
             "hotkey_key_code",
             "hotkey_modifiers",
             "size_percent",
+            "size",
         ]:
             value = getattr(self, field_name)
             if value is not None:
@@ -1083,6 +1096,7 @@ class QuickTerminalConfig:
             hotkey_key_code=data.get("hotkey_key_code"),
             hotkey_modifiers=data.get("hotkey_modifiers"),
             size_percent=data.get("size_percent"),
+            size=data.get("size"),
         )
 
 

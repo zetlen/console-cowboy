@@ -72,6 +72,7 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
         "bottom": QuickTerminalPosition.BOTTOM,
         "left": QuickTerminalPosition.LEFT,
         "right": QuickTerminalPosition.RIGHT,
+        "center": QuickTerminalPosition.CENTER,
     }
 
     QUICK_TERMINAL_POSITION_REVERSE_MAP = {
@@ -96,9 +97,10 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
         "font-family-bold": ("bold_font", str),
         "font-family-italic": ("italic_font", str),
         "font-family-bold-italic": ("bold_italic_font", str),
-        "adjust-cell-height": ("line_height", lambda v: 1.0 + float(v) / 100),
-        "adjust-cell-width": ("cell_width", lambda v: 1.0 + float(v.rstrip("%")) / 100),
+        "adjust-cell-height": ("line_height", lambda v: 1.0 + float(v.rstrip("%")) / 100),
     }
+    # Note: adjust-cell-width handled separately in parse() method
+    # due to pixel vs percentage handling - see the elif key == "adjust-cell-width" block
 
     # Window mapping
     WINDOW_MAPPING = {
@@ -433,6 +435,34 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
                 pass
 
             # Handle special cases that didn't fit into simple mappings
+            elif key == "adjust-cell-width":
+                # Ghostty accepts both pixel values (2) and percentages (5%)
+                if "%" in value:
+                    # Percentage: convert to multiplier
+                    try:
+                        pct = float(value.rstrip("%"))
+                        font.cell_width = 1.0 + pct / 100
+                    except ValueError:
+                        ctec.add_warning(f"Invalid adjust-cell-width: {value}")
+                else:
+                    # Pixel value: store as terminal-specific since we can't
+                    # convert to multiplier without knowing font size
+                    try:
+                        px = int(value)
+                        ctec.add_terminal_specific("ghostty", "adjust-cell-width", px)
+                        ctec.add_warning(
+                            f"Ghostty adjust-cell-width pixel value ({px}) cannot be "
+                            "converted to a multiplier. Stored as terminal-specific."
+                        )
+                    except ValueError:
+                        ctec.add_warning(f"Invalid adjust-cell-width: {value}")
+
+            elif key == "font-feature":
+                # Ghostty allows multiple font-feature lines
+                if font.font_features is None:
+                    font.font_features = []
+                font.font_features.append(value)
+
             elif key == "fullscreen":
                 if value.lower() == "true":
                     window.startup_mode = "fullscreen"
@@ -484,6 +514,13 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
                     ctec.add_warning(
                         f"Invalid quick-terminal-animation-duration: {value}"
                     )
+            elif key == "quick-terminal-size":
+                quick_terminal.enabled = True
+                # Store raw size string (supports "50%", "300px", "50%,500px")
+                quick_terminal.size = value
+            elif key == "quick-terminal-autohide":
+                quick_terminal.enabled = True
+                quick_terminal.hide_on_focus_loss = value.lower() == "true"
 
             # Parse tab settings
             elif key == "window-show-tab-bar":
@@ -548,7 +585,7 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
             ]
         ):
             ctec.color_scheme = scheme
-        if font.family or font.size:
+        if font.family or font.size or font.font_features or font.cell_width or font.line_height:
             ctec.font = font
         if cursor.style or cursor.blink is not None:
             ctec.cursor = cursor
@@ -642,10 +679,13 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
                 lines.append(f"font-family-bold-italic = {ctec.font.bold_italic_font}")
             if ctec.font.line_height and ctec.font.line_height != 1.0:
                 adjust = int((ctec.font.line_height - 1.0) * 100)
-                lines.append(f"adjust-cell-height = {adjust}")
+                lines.append(f"adjust-cell-height = {adjust}%")
             if ctec.font.cell_width and ctec.font.cell_width != 1.0:
                 adjust = int((ctec.font.cell_width - 1.0) * 100)
-                lines.append(f"adjust-cell-width = {adjust}")
+                lines.append(f"adjust-cell-width = {adjust}%")
+            if ctec.font.font_features:
+                for feature in ctec.font.font_features:
+                    lines.append(f"font-feature = {feature}")
             lines.append("")
 
         # Export cursor settings
@@ -674,7 +714,11 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
             if ctec.window.padding_vertical is not None:
                 lines.append(f"window-padding-y = {ctec.window.padding_vertical}")
             if ctec.window.decorations is not None:
-                val = "true" if ctec.window.decorations else "none"
+                # Use 'auto' for decorations=True (cross-platform compatible)
+                # Use 'none' for decorations=False
+                # Note: On Linux/GTK, valid values are: auto, client, server, none
+                # 'true' is not valid on Linux/GTK
+                val = "auto" if ctec.window.decorations else "none"
                 lines.append(f"window-decoration = {val}")
             if ctec.window.startup_mode == "fullscreen":
                 lines.append("fullscreen = true")
@@ -740,6 +784,13 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
                 # Ghostty uses fractional seconds, convert from milliseconds
                 duration_sec = ctec.quick_terminal.animation_duration / 1000.0
                 lines.append(f"quick-terminal-animation-duration = {duration_sec}")
+            if ctec.quick_terminal.size is not None:
+                lines.append(f"quick-terminal-size = {ctec.quick_terminal.size}")
+            if ctec.quick_terminal.hide_on_focus_loss is not None:
+                lines.append(
+                    f"quick-terminal-autohide = "
+                    f"{str(ctec.quick_terminal.hide_on_focus_loss).lower()}"
+                )
             lines.append("")
 
         # Export tab settings
