@@ -373,9 +373,22 @@ class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
             shell_data = data["shell"]
             if isinstance(shell_data, str):
                 behavior.shell = shell_data
-            elif isinstance(shell_data, dict) and "program" in shell_data:
-                behavior.shell = shell_data["program"]
+            elif isinstance(shell_data, dict):
+                if "program" in shell_data:
+                    behavior.shell = shell_data["program"]
+                if "args" in shell_data:
+                    behavior.shell_args = shell_data["args"]
             ctec.behavior = behavior
+
+        # Parse environment variables
+        if "env" in data:
+            if ctec.behavior is None:
+                ctec.behavior = BehaviorConfig()
+            env_data = data["env"]
+            if isinstance(env_data, dict):
+                ctec.behavior.environment_variables = {
+                    str(k): str(v) for k, v in env_data.items()
+                }
 
         if "scrolling" in data:
             scrolling = data["scrolling"]
@@ -518,6 +531,7 @@ class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
             "cursor",
             "window",
             "shell",
+            "env",
             "scrolling",
             "bell",
             "mouse",
@@ -687,8 +701,16 @@ class AlacrittyAdapter(TerminalAdapter, CursorStyleMixin, ParsingMixin):
 
         # Export behavior
         if ctec.behavior:
-            if ctec.behavior.shell:
-                result["shell"] = {"program": ctec.behavior.shell}
+            if ctec.behavior.shell or ctec.behavior.shell_args:
+                shell_config: dict = {}
+                if ctec.behavior.shell:
+                    shell_config["program"] = ctec.behavior.shell
+                if ctec.behavior.shell_args:
+                    shell_config["args"] = ctec.behavior.shell_args
+                if shell_config:
+                    result["shell"] = shell_config
+            if ctec.behavior.environment_variables:
+                result["env"] = ctec.behavior.environment_variables
             if ctec.behavior.bell_mode is not None:
                 if ctec.behavior.bell_mode == BellMode.NONE:
                     result["bell"] = {"duration": 0}

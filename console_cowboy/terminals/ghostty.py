@@ -443,7 +443,16 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
             elif key == "cursor-style-blink":
                 cursor.blink = value.lower() == "true"
 
-            # Parse behavior settings (remaining)
+            # Parse behavior settings (env requires special handling - multiple values)
+            elif key == "env":
+                # Ghostty env format: KEY=VALUE
+                if "=" in value:
+                    env_key, env_value = value.split("=", 1)
+                    if behavior.environment_variables is None:
+                        behavior.environment_variables = {}
+                    behavior.environment_variables[env_key] = env_value
+                else:
+                    ctec.add_warning(f"Invalid env entry (missing '='): {value}")
             elif key == "scrollback-limit":
                 try:
                     # Ghostty uses bytes, not lines - convert to ScrollConfig
@@ -547,7 +556,11 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
             ctec.cursor = cursor
         if window.columns or window.rows or window.opacity:
             ctec.window = window
-        if behavior.shell or behavior.scrollback_lines:
+        if (
+            behavior.shell
+            or behavior.scrollback_lines
+            or behavior.environment_variables
+        ):
             ctec.behavior = behavior
         if quick_terminal.enabled:
             ctec.quick_terminal = quick_terminal
@@ -678,8 +691,18 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
             lines.append("# Behavior")
             if ctec.behavior.shell:
                 lines.append(f"command = {ctec.behavior.shell}")
+            if ctec.behavior.shell_args:
+                # Ghostty doesn't have separate shell args, warn the user
+                ctec.add_warning(
+                    "Ghostty does not support separate shell arguments. "
+                    "Consider using a shell wrapper script or combining the "
+                    "command with arguments."
+                )
             if ctec.behavior.working_directory:
                 lines.append(f"working-directory = {ctec.behavior.working_directory}")
+            if ctec.behavior.environment_variables:
+                for env_key, env_value in ctec.behavior.environment_variables.items():
+                    lines.append(f"env = {env_key}={env_value}")
             if ctec.behavior.copy_on_select is not None:
                 lines.append(
                     f"copy-on-select = {str(ctec.behavior.copy_on_select).lower()}"

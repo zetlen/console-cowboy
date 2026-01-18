@@ -151,7 +151,14 @@ window:
 
 behavior:
   shell: /bin/zsh
+  shell_args:
+    - "-l"
+    - "-i"
   working_directory: "~"
+  environment_variables:
+    EDITOR: nvim
+    COLORTERM: truecolor
+    TERM_PROGRAM: console-cowboy
   scrollback_lines: 10000
   bell_mode: visual
   copy_on_select: true

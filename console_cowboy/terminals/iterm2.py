@@ -8,6 +8,7 @@ Color schemes can also be stored as separate .itermcolors files.
 """
 
 import plistlib
+import re
 from pathlib import Path
 
 from console_cowboy.ctec.schema import (
@@ -356,6 +357,15 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
                 behavior.bell_mode = BellMode.VISUAL
             else:
                 behavior.bell_mode = BellMode.AUDIBLE
+
+        # Parse Initial Text (can contain startup commands or env var exports)
+        if "Initial Text" in profile_data:
+            initial_text = profile_data["Initial Text"]
+            if initial_text:
+                # Store as terminal-specific since iTerm2 Initial Text is a
+                # combined concept (startup commands + potential env exports)
+                ctec.add_terminal_specific("iterm2", "Initial Text", initial_text)
+
         ctec.behavior = behavior
 
         # Parse scroll settings
@@ -803,12 +813,52 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
             if ctec.behavior.shell:
                 result["Command"] = ctec.behavior.shell
                 result["Custom Command"] = "Yes"
+            if ctec.behavior.shell_args:
+                ctec.add_warning(
+                    "iTerm2 does not support separate shell arguments. "
+                    "Consider combining the shell command with arguments."
+                )
             if ctec.behavior.working_directory:
                 result["Working Directory"] = ctec.behavior.working_directory
                 result["Custom Directory"] = "Yes"
             if ctec.behavior.bell_mode is not None:
                 result["Silence Bell"] = ctec.behavior.bell_mode == BellMode.NONE
                 result["Visual Bell"] = ctec.behavior.bell_mode == BellMode.VISUAL
+
+            # Handle environment variables via Initial Text
+            if ctec.behavior.environment_variables:
+                # Generate export commands for env vars
+                # Validate keys to prevent shell injection - keys must be valid
+                # shell variable names (start with letter/underscore, contain only
+                # alphanumeric and underscore)
+                valid_env_key = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+                export_lines = []
+                for k, v in ctec.behavior.environment_variables.items():
+                    if valid_env_key.match(k):
+                        export_lines.append(f"export {k}={v!r}")
+                    else:
+                        ctec.add_warning(
+                            f"Skipping invalid environment variable key '{k}': "
+                            "keys must start with a letter or underscore and contain "
+                            "only alphanumeric characters and underscores."
+                        )
+
+                # Only add Initial Text if we have valid export lines
+                if export_lines:
+                    # Check for existing Initial Text in terminal_specific
+                    initial_text = ctec.get_terminal_specific("iterm2", "Initial Text")
+                    if initial_text:
+                        # Prepend env exports to existing Initial Text
+                        full_text = "\n".join(export_lines) + "\n" + str(initial_text)
+                    else:
+                        full_text = "\n".join(export_lines)
+                    result["Initial Text"] = full_text
+                    ctec.add_warning(
+                        "iTerm2 does not have native environment variable settings. "
+                        "Environment variables have been exported via 'Initial Text' "
+                        "which sends text when the session starts. This is a workaround "
+                        "and the export commands will be visible in the terminal."
+                    )
 
         # Export scroll settings from CTEC scroll config
         if ctec.scroll:

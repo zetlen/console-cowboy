@@ -363,6 +363,53 @@ class TestBehaviorConfig:
         assert behavior.shell == "/bin/zsh"
         assert behavior.bell_mode == BellMode.AUDIBLE
 
+    def test_environment_variables(self):
+        """Test environment_variables field."""
+        behavior = BehaviorConfig(
+            shell="/bin/zsh",
+            environment_variables={"EDITOR": "nvim", "COLORTERM": "truecolor"},
+        )
+        assert behavior.environment_variables == {
+            "EDITOR": "nvim",
+            "COLORTERM": "truecolor",
+        }
+
+    def test_shell_args(self):
+        """Test shell_args field."""
+        behavior = BehaviorConfig(
+            shell="/bin/zsh",
+            shell_args=["-l", "-i"],
+        )
+        assert behavior.shell_args == ["-l", "-i"]
+
+    def test_to_dict_with_env_and_args(self):
+        """Test to_dict includes environment_variables and shell_args."""
+        behavior = BehaviorConfig(
+            shell="/bin/zsh",
+            shell_args=["-l"],
+            environment_variables={"EDITOR": "vim"},
+        )
+        d = behavior.to_dict()
+        assert d["shell"] == "/bin/zsh"
+        assert d["shell_args"] == ["-l"]
+        assert d["environment_variables"] == {"EDITOR": "vim"}
+
+    def test_from_dict_with_env_and_args(self):
+        """Test from_dict parses environment_variables and shell_args."""
+        behavior = BehaviorConfig.from_dict(
+            {
+                "shell": "/bin/bash",
+                "shell_args": ["-l", "-i"],
+                "environment_variables": {"PATH": "/usr/bin", "HOME": "/home/user"},
+            }
+        )
+        assert behavior.shell == "/bin/bash"
+        assert behavior.shell_args == ["-l", "-i"]
+        assert behavior.environment_variables == {
+            "PATH": "/usr/bin",
+            "HOME": "/home/user",
+        }
+
 
 class TestKeyBinding:
     """Tests for the KeyBinding class."""

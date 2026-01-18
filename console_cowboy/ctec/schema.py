@@ -833,17 +833,34 @@ class BehaviorConfig:
 
     Attributes:
         shell: Shell command or path to execute
+        shell_args: Arguments to pass to the shell command
         working_directory: Initial working directory
+        environment_variables: Environment variables to set for the session
         scrollback_lines: DEPRECATED - use CTEC.scroll instead
         mouse_enabled: Whether to enable mouse support
         bell_mode: Bell notification mode
         copy_on_select: Whether to copy text to clipboard on selection
         confirm_close: Whether to confirm before closing with running processes
         close_on_exit: Action when shell exits ('close', 'hold', 'restart')
+
+    Environment Variable Support:
+        - Ghostty: `env KEY=VALUE` lines (multiple allowed)
+        - Alacritty: `[env]` TOML section
+        - Kitty: `env` directive (KEY=VALUE format)
+        - WezTerm: `set_environment_variables` Lua table
+        - iTerm2: Limited (stored in terminal_specific)
+        - Terminal.app: No native support (stored in terminal_specific)
+
+    Shell Arguments Support:
+        - Alacritty: `shell.args` array
+        - WezTerm: `default_prog` array (index 1+ are args)
+        - Other terminals: Limited or no support
     """
 
     shell: str | None = None
+    shell_args: list[str] | None = None
     working_directory: str | None = None
+    environment_variables: dict[str, str] | None = None
     scrollback_lines: int | None = None  # DEPRECATED: use CTEC.scroll
     mouse_enabled: bool | None = None
     bell_mode: BellMode | None = None
@@ -866,6 +883,10 @@ class BehaviorConfig:
             value = getattr(self, field_name)
             if value is not None:
                 result[field_name] = value
+        if self.shell_args:
+            result["shell_args"] = self.shell_args
+        if self.environment_variables:
+            result["environment_variables"] = self.environment_variables
         if self.bell_mode is not None:
             result["bell_mode"] = self.bell_mode.value
         return result
@@ -875,7 +896,9 @@ class BehaviorConfig:
         """Create a BehaviorConfig from a dictionary."""
         return cls(
             shell=data.get("shell"),
+            shell_args=data.get("shell_args"),
             working_directory=data.get("working_directory"),
+            environment_variables=data.get("environment_variables"),
             scrollback_lines=data.get("scrollback_lines"),
             mouse_enabled=data.get("mouse_enabled"),
             bell_mode=BellMode(data["bell_mode"]) if "bell_mode" in data else None,
