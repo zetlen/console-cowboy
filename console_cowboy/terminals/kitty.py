@@ -63,6 +63,7 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
         "cursor_text_color": "cursor_text",
         "selection_foreground": "selection_text",
         "selection_background": "selection",
+        "url_color": "link",  # Map URL color to CTEC link color
         "color0": "black",
         "color1": "red",
         "color2": "green",
@@ -80,6 +81,36 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
         "color14": "bright_cyan",
         "color15": "bright_white",
     }
+
+    # Keys that should be explicitly preserved in terminal_specific for power users
+    # These are critical settings that power users rely on for their workflows
+    POWER_USER_KEYS = {
+        # Shell integration and session management
+        "shell_integration",
+        "startup_session",
+        # Scrollback pager (custom nvim/less pagers)
+        "scrollback_pager",
+        "scrollback_pager_history_size",
+        # Hyperlink support
+        "allow_hyperlinks",
+        # Cursor appearance when unfocused
+        "cursor_shape_unfocused",
+        # Platform-specific settings
+        "linux_display_server",
+        # Scrollbar settings
+        "scrollbar",
+        "scrollbar_on_right",
+    }
+
+    # Prefixes for settings that are platform-specific or multi-instance
+    # These are preserved in terminal_specific with their full key
+    POWER_USER_PREFIXES = (
+        "macos_",  # macOS-specific options
+        "wayland_",  # Wayland-specific options
+        "mark1_",  # Text marking colors
+        "mark2_",
+        "mark3_",
+    )
 
     # Kitty quick-access-terminal edge mapping (kitten feature in 0.42+)
     # The quick-access-terminal kitten uses a separate config file but we support
@@ -455,14 +486,50 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
             # Note: background_opacity in quick terminal context overrides
             # the main window opacity for the quick terminal window only
 
-            # Store unrecognized settings
+            # Handle include directives - warn users that these are not processed
+            elif key in ("include", "globinclude", "envinclude"):
+                ctec.add_warning(
+                    f"Configuration includes ('{key} {value}') are not processed. "
+                    "Settings from included files will not be imported. "
+                    "Consider consolidating your kitty.conf into a single file."
+                )
+                # Still store in terminal_specific for visibility
+                ctec.add_terminal_specific("kitty", key, value)
+
+            # Handle font_features - OpenType feature settings per font
+            # Can appear multiple times, e.g.:
+            #   font_features JetBrainsMono-Regular +zero +ss01
+            #   font_features FiraCode-Regular +cv02 +ss03
+            elif key == "font_features":
+                ctec.add_terminal_specific("kitty", key, value)
+
+            # Handle mouse_map - mouse button bindings
+            # Can appear multiple times, e.g.:
+            #   mouse_map left click ungrabbed mouse_handle_click selection link prompt
+            #   mouse_map ctrl+left click ungrabbed mouse_handle_click selection link
+            elif key == "mouse_map":
+                ctec.add_terminal_specific("kitty", key, value)
+
+            # Handle extended colors (color16 through color255)
+            # These are beyond the standard 16 ANSI colors and are terminal-specific
+            elif key.startswith("color") and key[5:].isdigit():
+                color_num = int(key[5:])
+                if color_num >= 16:
+                    # Extended colors go to terminal_specific
+                    ctec.add_terminal_specific("kitty", key, value)
+                else:
+                    # This shouldn't happen as 0-15 are in COLOR_KEY_MAP,
+                    # but handle gracefully
+                    ctec.add_terminal_specific("kitty", key, value)
+
+            # Store unrecognized settings (including power user keys and prefixes)
             else:
                 ctec.add_terminal_specific("kitty", key, value)
 
         # Only add non-empty configs
         if any(
             getattr(scheme, f) is not None
-            for f in ["foreground", "background", "black"]
+            for f in ["foreground", "background", "black", "link"]
         ):
             ctec.color_scheme = scheme
         if font.family or font.size or font.symbol_map or font.ligatures is not None:
