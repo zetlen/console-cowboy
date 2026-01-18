@@ -99,7 +99,8 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
         "font-family-bold-italic": ("bold_italic_font", str),
         "adjust-cell-height": ("line_height", lambda v: 1.0 + float(v.rstrip("%")) / 100),
     }
-    # Note: adjust-cell-width handled separately due to pixel vs percentage handling
+    # Note: adjust-cell-width handled separately in parse() method
+    # due to pixel vs percentage handling - see the elif key == "adjust-cell-width" block
 
     # Window mapping
     WINDOW_MAPPING = {
