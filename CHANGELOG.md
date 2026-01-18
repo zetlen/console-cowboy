@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/zetlen/console-cowboy/compare/v0.3.0...v0.4.0) (2026-01-18)
+
+
+### Features
+
+* **ghostty:** add Ghostty 1.2.0 quick-terminal features and font-feature support ([#48](https://github.com/zetlen/console-cowboy/issues/48)) ([ac0b0eb](https://github.com/zetlen/console-cowboy/commit/ac0b0eb72cc09dec14108ee13b8f1316dba4b6e2))
+* **schema:** add environment_variables and shell_args to BehaviorConfig ([#47](https://github.com/zetlen/console-cowboy/issues/47)) ([95ca34a](https://github.com/zetlen/console-cowboy/commit/95ca34a45a3dff981ff3d3bd843eb2beaddd2036))
+
+
+### Bug Fixes
+
+* **alacritty:** support modern [terminal.shell] config location ([#45](https://github.com/zetlen/console-cowboy/issues/45)) ([80dd339](https://github.com/zetlen/console-cowboy/commit/80dd339b9f642fc0e5caad2a4a72815aa99deb2e)), closes [#43](https://github.com/zetlen/console-cowboy/issues/43)
+* **ci:** switch to MishaKav/pytest-coverage-comment action ([#46](https://github.com/zetlen/console-cowboy/issues/46)) ([1386828](https://github.com/zetlen/console-cowboy/commit/13868288331160dd42affdedc8b3717702b0673b))
+* **kitty:** add power user config support for critical settings ([#49](https://github.com/zetlen/console-cowboy/issues/49)) ([ab5d4cb](https://github.com/zetlen/console-cowboy/commit/ab5d4cb9b6d731561e85616cf09c334faa20b231))
+
+
+### Code Refactoring
+
+* **terminals:** extract common patterns into mixins ([#37](https://github.com/zetlen/console-cowboy/issues/37)) ([6f84e45](https://github.com/zetlen/console-cowboy/commit/6f84e452af7d93ad8e5963b1f54224647f3d83a4))
+
+
+### Miscellaneous
+
+* fix hallucinated coverage action commit ([#38](https://github.com/zetlen/console-cowboy/issues/38)) ([81a806f](https://github.com/zetlen/console-cowboy/commit/81a806f621ad74e8fde20890424b528168b37e84))
+
 ## [0.3.0](https://github.com/zetlen/console-cowboy/compare/v0.2.0...v0.3.0) (2026-01-17)
 
 
