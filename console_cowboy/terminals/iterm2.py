@@ -333,6 +333,13 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
                     draw_powerline_glyphs=profile_data["Draw Powerline Glyphs"]
                 )
 
+        # Handle ligatures
+        if "ASCII Ligatures" in profile_data:
+            if ctec.font:
+                ctec.font.ligatures = profile_data["ASCII Ligatures"]
+            else:
+                ctec.font = FontConfig(ligatures=profile_data["ASCII Ligatures"])
+
         # Parse cursor configuration
         cursor_config = CursorConfig()
         if "Cursor Type" in profile_data:
@@ -476,6 +483,13 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
             "Vertical Spacing",
             "Use Non-ASCII Font",
             "Minimum Contrast",
+            # Option key behavior (0=Normal, 1=Meta, 2=+Esc)
+            "Option Key Sends",
+            "Right Option Key Sends",
+            # Tab color (dict with RGB components)
+            "Tab Color",
+            # Terminal type (TERM environment variable)
+            "Terminal Type",
             # Advanced features (iTerm2-only, no equivalent in other terminals)
             "Triggers",
             # Note: Smart Selection Rules are now parsed into CTEC text_hints
@@ -796,6 +810,10 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
             # Export Powerline glyphs
             if ctec.font.draw_powerline_glyphs is not None:
                 result["Draw Powerline Glyphs"] = ctec.font.draw_powerline_glyphs
+
+            # Export ligatures
+            if ctec.font.ligatures is not None:
+                result["ASCII Ligatures"] = ctec.font.ligatures
 
         # Export cursor
         if ctec.cursor:

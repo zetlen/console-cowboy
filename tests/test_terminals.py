@@ -653,6 +653,198 @@ class TestITerm2Adapter:
 
         assert ctec.quick_terminal.position == QuickTerminalPosition.RIGHT
 
+    def test_parse_ligatures(self):
+        """Test that ASCII Ligatures setting is parsed into ctec.font.ligatures."""
+        plist_content = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>New Bookmarks</key>
+    <array>
+        <dict>
+            <key>Name</key>
+            <string>Default</string>
+            <key>Default Bookmark</key>
+            <string>Yes</string>
+            <key>Normal Font</key>
+            <string>JetBrainsMono-Regular 14</string>
+            <key>ASCII Ligatures</key>
+            <true/>
+        </dict>
+    </array>
+</dict>
+</plist>"""
+        ctec = ITerm2Adapter.parse("test.plist", content=plist_content)
+        assert ctec.font is not None
+        assert ctec.font.ligatures is True
+
+    def test_parse_ligatures_disabled(self):
+        """Test that ASCII Ligatures=false is parsed correctly."""
+        plist_content = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>New Bookmarks</key>
+    <array>
+        <dict>
+            <key>Name</key>
+            <string>Default</string>
+            <key>Default Bookmark</key>
+            <string>Yes</string>
+            <key>Normal Font</key>
+            <string>JetBrainsMono-Regular 14</string>
+            <key>ASCII Ligatures</key>
+            <false/>
+        </dict>
+    </array>
+</dict>
+</plist>"""
+        ctec = ITerm2Adapter.parse("test.plist", content=plist_content)
+        assert ctec.font is not None
+        assert ctec.font.ligatures is False
+
+    def test_parse_ligatures_without_font(self):
+        """Test that ASCII Ligatures works even without Normal Font."""
+        plist_content = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>New Bookmarks</key>
+    <array>
+        <dict>
+            <key>Name</key>
+            <string>Default</string>
+            <key>Default Bookmark</key>
+            <string>Yes</string>
+            <key>ASCII Ligatures</key>
+            <true/>
+        </dict>
+    </array>
+</dict>
+</plist>"""
+        ctec = ITerm2Adapter.parse("test.plist", content=plist_content)
+        assert ctec.font is not None
+        assert ctec.font.ligatures is True
+        assert ctec.font.family is None
+
+    def test_export_ligatures(self):
+        """Test that ligatures setting is exported to ASCII Ligatures."""
+        ctec = CTEC(font=FontConfig(family="JetBrains Mono", size=14.0, ligatures=True))
+        output = ITerm2Adapter.export(ctec)
+        assert "<key>ASCII Ligatures</key>" in output
+        assert "<true/>" in output
+
+    def test_export_ligatures_disabled(self):
+        """Test that ligatures=False is exported correctly."""
+        ctec = CTEC(
+            font=FontConfig(family="JetBrains Mono", size=14.0, ligatures=False)
+        )
+        output = ITerm2Adapter.export(ctec)
+        assert "<key>ASCII Ligatures</key>" in output
+        assert "<false/>" in output
+
+    def test_parse_option_key_sends(self):
+        """Test that Option Key Sends is stored as terminal-specific."""
+        plist_content = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>New Bookmarks</key>
+    <array>
+        <dict>
+            <key>Name</key>
+            <string>Default</string>
+            <key>Default Bookmark</key>
+            <string>Yes</string>
+            <key>Option Key Sends</key>
+            <integer>2</integer>
+            <key>Right Option Key Sends</key>
+            <integer>0</integer>
+        </dict>
+    </array>
+</dict>
+</plist>"""
+        ctec = ITerm2Adapter.parse("test.plist", content=plist_content)
+        # Should be stored as terminal-specific
+        option_key = ctec.get_terminal_specific("iterm2", "Option Key Sends")
+        assert option_key == 2
+        right_option = ctec.get_terminal_specific("iterm2", "Right Option Key Sends")
+        assert right_option == 0
+
+    def test_parse_tab_color(self):
+        """Test that Tab Color is stored as terminal-specific."""
+        plist_content = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>New Bookmarks</key>
+    <array>
+        <dict>
+            <key>Name</key>
+            <string>Default</string>
+            <key>Default Bookmark</key>
+            <string>Yes</string>
+            <key>Tab Color</key>
+            <dict>
+                <key>Red Component</key>
+                <real>0.5</real>
+                <key>Green Component</key>
+                <real>0.25</real>
+                <key>Blue Component</key>
+                <real>0.75</real>
+            </dict>
+        </dict>
+    </array>
+</dict>
+</plist>"""
+        ctec = ITerm2Adapter.parse("test.plist", content=plist_content)
+        tab_color = ctec.get_terminal_specific("iterm2", "Tab Color")
+        assert tab_color is not None
+        assert isinstance(tab_color, dict)
+        assert tab_color["Red Component"] == 0.5
+
+    def test_parse_terminal_type(self):
+        """Test that Terminal Type (TERM env var) is stored as terminal-specific."""
+        plist_content = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>New Bookmarks</key>
+    <array>
+        <dict>
+            <key>Name</key>
+            <string>Default</string>
+            <key>Default Bookmark</key>
+            <string>Yes</string>
+            <key>Terminal Type</key>
+            <string>xterm-256color</string>
+        </dict>
+    </array>
+</dict>
+</plist>"""
+        ctec = ITerm2Adapter.parse("test.plist", content=plist_content)
+        terminal_type = ctec.get_terminal_specific("iterm2", "Terminal Type")
+        assert terminal_type == "xterm-256color"
+
+    def test_roundtrip_ligatures(self):
+        """Test that ligatures setting round-trips correctly."""
+        original = CTEC(
+            font=FontConfig(family="JetBrains Mono", size=14.0, ligatures=True)
+        )
+        output = ITerm2Adapter.export(original)
+        parsed = ITerm2Adapter.parse("test.plist", content=output)
+        assert parsed.font.ligatures is True
+
+    def test_roundtrip_option_key_sends(self):
+        """Test that Option Key Sends round-trips via terminal-specific."""
+        original = CTEC()
+        original.add_terminal_specific("iterm2", "Option Key Sends", 2)
+        original.add_terminal_specific("iterm2", "Right Option Key Sends", 1)
+        output = ITerm2Adapter.export(original)
+        parsed = ITerm2Adapter.parse("test.plist", content=output)
+        assert parsed.get_terminal_specific("iterm2", "Option Key Sends") == 2
+        assert parsed.get_terminal_specific("iterm2", "Right Option Key Sends") == 1
+
 
 class TestCrossTerminalConversion:
     """Tests for converting between different terminals."""
