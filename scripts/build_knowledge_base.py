@@ -23,6 +23,7 @@ import json
 import platform
 import plistlib
 import re
+import shutil
 import subprocess
 import sys
 from abc import ABC, abstractmethod
@@ -320,6 +321,86 @@ class DefaultsReadFetcher(TerminalDocFetcher):
         return "\n".join(parts)
 
 
+class GhosttyDocFetcher(TerminalDocFetcher):
+    """Fetches Ghostty documentation, preferring local CLI if available."""
+
+    GHOSTTY_WEB_URL = "https://ghostty.org/docs/config/reference"
+
+    def __init__(self):
+        super().__init__("ghostty", "Ghostty configuration reference")
+
+    def _find_ghostty(self):
+        """Find the ghostty executable, checking PATH and standard locations."""
+        # Check PATH first
+        ghostty_path = shutil.which("ghostty")
+        if ghostty_path:
+            return ghostty_path
+
+        # Check standard macOS application bundle location
+        macos_app_path = Path("/Applications/Ghostty.app/Contents/MacOS/ghostty")
+        if macos_app_path.exists():
+            return str(macos_app_path)
+
+        return None
+
+    def fetch(self):
+        ghostty_path = self._find_ghostty()
+
+        if ghostty_path:
+            return self._fetch_from_cli(ghostty_path)
+        else:
+            return self._fetch_from_web()
+
+    def _fetch_from_cli(self, ghostty_path):
+        """Fetch documentation using ghostty +show-config --default --docs."""
+        print(f"  Using local Ghostty installation: {ghostty_path}")
+        print("  Running: ghostty +show-config --default --docs")
+
+        result = subprocess.run(
+            [ghostty_path, "+show-config", "--default", "--docs"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        header = (
+            "# Ghostty Configuration Reference\n\n"
+            f"Generated from local Ghostty installation: `{ghostty_path}`\n\n"
+            "This documentation was generated using `ghostty +show-config --default --docs`.\n\n"
+            "---\n\n"
+        )
+        return header + result.stdout
+
+    def _fetch_from_web(self):
+        """Fall back to fetching documentation from the web."""
+        print(f"  Ghostty not found locally, fetching from {self.GHOSTTY_WEB_URL}...")
+
+        response = requests.get(self.GHOSTTY_WEB_URL)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        # Remove unwanted elements
+        for element in soup(["script", "style", "nav", "footer", "header", "aside"]):
+            element.decompose()
+        for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
+            comment.extract()
+
+        # Extract main content
+        content = soup.select_one("main")
+        if not content:
+            content = soup.body
+
+        # Convert to markdown
+        converter = create_html2text_converter()
+        markdown = converter.handle(str(content))
+
+        # Apply cleaning
+        markdown = clean_documentation(markdown)
+
+        header = f"# Ghostty Configuration Documentation\n\nSource: {self.GHOSTTY_WEB_URL}\n\n"
+        return header + markdown
+
+
 def is_macos():
     return platform.system() == "Darwin"
 
@@ -337,12 +418,7 @@ def get_fetchers():
             "Alacritty man page (scdoc)",
             "https://raw.githubusercontent.com/alacritty/alacritty/master/extra/man/alacritty.5.scd",
         ),
-        "ghostty": WebDocFetcher(
-            "ghostty",
-            "Ghostty configuration reference",
-            "https://ghostty.org/docs/config/reference",
-            content_selector="main",
-        ),
+        "ghostty": GhosttyDocFetcher(),
         "kitty": WebDocFetcher(
             "kitty",
             "Kitty configuration reference",
