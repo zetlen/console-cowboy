@@ -7,7 +7,8 @@ Terminal.app uses a macOS plist format for its configuration, stored in
 Individual profiles can also be exported as .terminal files.
 
 Colors and fonts are stored as NSKeyedArchiver-encoded NSData blobs,
-which requires special handling (see utils/nsarchive.py).
+which requires special handling (see utils/nsarchive.py). Font names
+should be in PostScript format for proper NSFont resolution.
 """
 
 import plistlib
