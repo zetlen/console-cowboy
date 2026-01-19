@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/zetlen/console-cowboy/compare/v0.4.0...v0.5.0) (2026-01-19)
+
+
+### Features
+
+* **ghostty:** convert iTerm2 hotkey window hotkey to Ghostty keybind ([#50](https://github.com/zetlen/console-cowboy/issues/50)) ([4b48b20](https://github.com/zetlen/console-cowboy/commit/4b48b20aeb536934a7b34d7cc4221f4f571fb060))
+
+
+### Bug Fixes
+
+* **fonts:** handle abbreviated weight suffixes and NFP Nerd Font pattern ([#53](https://github.com/zetlen/console-cowboy/issues/53)) ([9c7b872](https://github.com/zetlen/console-cowboy/commit/9c7b872ee608b9692c8b79cac20c80cd13a30f72))
+
+
+### Miscellaneous
+
+* **ci:** overhaul CI workflow and standardize on mise ([#51](https://github.com/zetlen/console-cowboy/issues/51)) ([efc7073](https://github.com/zetlen/console-cowboy/commit/efc707345368d4276b755fb323ffe6190ba26249))
+
 ## [0.4.0](https://github.com/zetlen/console-cowboy/compare/v0.3.0...v0.4.0) (2026-01-18)
 
 
