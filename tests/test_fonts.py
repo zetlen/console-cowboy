@@ -67,6 +67,37 @@ class TestPostScriptToFriendly:
         """Test None-like handling."""
         assert postscript_to_friendly(None) is None
 
+    def test_abbreviated_reg_suffix(self):
+        """Test -Reg abbreviated suffix removal."""
+        result = postscript_to_friendly("FiraCode-Reg")
+        assert "-Reg" not in result
+        assert "Fira Code" == result
+
+    def test_nfp_suffix(self):
+        """Test NFP (Nerd Font Patched) suffix handling."""
+        result = postscript_to_friendly("JetBrainsMonoNFP")
+        assert "NFP" in result
+        assert " NFP" in result  # Should have space before NFP
+
+    def test_m_plus_code_font(self):
+        """Test M+Code font with + character preserved."""
+        result = postscript_to_friendly("M+CodeLat60NFP-Reg")
+        assert "M+Code" in result  # + should be preserved
+        assert "-Reg" not in result  # Weight suffix removed
+        assert "NFP" in result  # NFP suffix handled
+
+    def test_m_plus_code_simple(self):
+        """Test simple M+Code font."""
+        result = postscript_to_friendly("M+Code-Regular")
+        assert "M+Code" in result
+        assert "-Regular" not in result
+
+    def test_font_with_numbers(self):
+        """Test font name with version numbers like Lat60."""
+        result = postscript_to_friendly("M+CodeLat60-Regular")
+        assert "Lat60" in result  # Numbers should be preserved
+        assert "-Regular" not in result
+
 
 class TestFriendlyToPostScript:
     """Tests for friendly to PostScript name conversion."""
@@ -119,6 +150,14 @@ class TestIsPostScriptName:
         """Test None returns False."""
         assert is_postscript_name(None) is False
 
+    def test_abbreviated_reg_suffix(self):
+        """Test detection with -Reg abbreviated suffix."""
+        assert is_postscript_name("FiraCode-Reg") is True
+
+    def test_m_plus_code_font(self):
+        """Test M+Code font detection."""
+        assert is_postscript_name("M+CodeLat60NFP-Reg") is True
+
 
 class TestExtractWeightFromName:
     """Tests for weight extraction from font names."""
@@ -164,6 +203,12 @@ class TestExtractWeightFromName:
         base, weight = extract_weight_from_name("")
         assert base == ""
         assert weight is None
+
+    def test_abbreviated_reg_suffix(self):
+        """Test abbreviated -Reg suffix extraction."""
+        base, weight = extract_weight_from_name("M+CodeLat60NFP-Reg")
+        assert base == "M+CodeLat60NFP"
+        assert weight == "Reg"
 
 
 class TestNormalizeFontFamily:

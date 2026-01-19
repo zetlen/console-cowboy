@@ -21,6 +21,7 @@ def postscript_to_friendly(postscript_name: str) -> str:
     - 'FiraCode-Retina' -> 'Fira Code'
     - 'SFMono-Regular' -> 'SF Mono'
     - 'MesloLGS-NF-Regular' -> 'MesloLGS NF'
+    - 'M+CodeLat60NFP-Reg' -> 'M+Code Lat60 NFP'
 
     Args:
         postscript_name: Font name in PostScript format
@@ -31,9 +32,10 @@ def postscript_to_friendly(postscript_name: str) -> str:
     if not postscript_name:
         return postscript_name
 
-    # Remove common weight/style suffixes
+    # Remove common weight/style suffixes (including abbreviated forms)
     name = postscript_name
     suffixes_to_remove = [
+        # Full suffixes with dash
         "-Regular",
         "-Bold",
         "-Italic",
@@ -47,20 +49,37 @@ def postscript_to_friendly(postscript_name: str) -> str:
         "-Heavy",
         "-Retina",
         "-Book",
+        # Abbreviated suffixes with dash (common in some fonts)
+        "-Reg",
+        "-Med",
+        "-Bld",
+        "-Lt",
+        "-It",
+        "-Obl",
+        # Suffixes without dash
         "Regular",
         "Bold",
-        "Italic",  # Without dash
+        "Italic",
     ]
     for suffix in suffixes_to_remove:
         if name.endswith(suffix):
             name = name[: -len(suffix)]
             break
 
-    # Handle Nerd Font suffixes
+    # Handle Nerd Font suffixes (NFP = Nerd Font Patched/Plus, NF = Nerd Font)
     nerd_font_suffix = ""
     if "-NF" in name:
         nerd_font_suffix = " NF"
         name = name.replace("-NF", "")
+    elif name.endswith("NFP"):
+        # NFP suffix (Nerd Font Patched) - common variant naming
+        nerd_font_suffix = " NFP"
+        name = name[:-3]
+    elif name.endswith("NF") and len(name) > 2:
+        # NF suffix without dash (e.g., "MesloLGSNF")
+        # Only match if there's content before it
+        nerd_font_suffix = " NF"
+        name = name[:-2]
     elif " Nerd Font" in name:
         # Already friendly format
         return postscript_name
@@ -70,12 +89,28 @@ def postscript_to_friendly(postscript_name: str) -> str:
     friendly_parts = []
 
     for part in parts:
-        # Insert spaces before uppercase letters (camelCase handling)
-        # But be careful with acronyms like 'SF', 'LG', 'NF'
-        spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", part)
-        # Handle cases like 'SFMono' -> 'SF Mono'
-        spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
-        friendly_parts.append(spaced)
+        # Preserve + character in font names like "M+Code"
+        # Split temporarily around + to process each segment
+        if "+" in part:
+            plus_segments = part.split("+")
+            processed_segments = []
+            for seg in plus_segments:
+                # Insert spaces before uppercase letters (camelCase handling)
+                # But be careful with acronyms like 'SF', 'LG'
+                spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", seg)
+                # Handle cases like 'SFMono' -> 'SF Mono'
+                spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
+                # Handle letter-digit transitions like 'Lat60' -> 'Lat60' (keep together)
+                # but 'Code50' should stay as 'Code50'
+                processed_segments.append(spaced)
+            friendly_parts.append("+".join(processed_segments))
+        else:
+            # Insert spaces before uppercase letters (camelCase handling)
+            # But be careful with acronyms like 'SF', 'LG'
+            spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", part)
+            # Handle cases like 'SFMono' -> 'SF Mono'
+            spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
+            friendly_parts.append(spaced)
 
     result = " ".join(friendly_parts)
 
@@ -126,7 +161,7 @@ def is_postscript_name(font_name: str) -> bool:
     PostScript names typically:
     - Have no spaces
     - Use CamelCase or have dashes
-    - End with weight suffixes like -Regular, -Bold
+    - End with weight suffixes like -Regular, -Bold, -Reg
 
     Args:
         font_name: Font name to check
@@ -143,6 +178,7 @@ def is_postscript_name(font_name: str) -> bool:
 
     # Check for common PostScript patterns
     postscript_patterns = [
+        # Full weight suffixes
         r"-Regular$",
         r"-Bold$",
         r"-Italic$",
@@ -154,6 +190,13 @@ def is_postscript_name(font_name: str) -> bool:
         r"-Black$",
         r"-Retina$",
         r"-Book$",
+        # Abbreviated weight suffixes
+        r"-Reg$",
+        r"-Med$",
+        r"-Bld$",
+        r"-Lt$",
+        r"-It$",
+        r"-Obl$",
         r"[a-z][A-Z]",  # CamelCase within word
     ]
 
@@ -171,6 +214,7 @@ def extract_weight_from_name(font_name: str) -> tuple[str, str | None]:
     Works with both PostScript and friendly names:
     - 'JetBrainsMono-Bold' -> ('JetBrainsMono', 'Bold')
     - 'JetBrains Mono Bold' -> ('JetBrains Mono', 'Bold')
+    - 'M+CodeLat60NFP-Reg' -> ('M+CodeLat60NFP', 'Reg')
     - 'Fira Code' -> ('Fira Code', None)
 
     Args:
@@ -183,6 +227,7 @@ def extract_weight_from_name(font_name: str) -> tuple[str, str | None]:
         return (font_name, None)
 
     # Common weight suffixes in order of specificity
+    # Include both full and abbreviated forms
     weights = [
         "ExtraBold",
         "SemiBold",
@@ -190,6 +235,7 @@ def extract_weight_from_name(font_name: str) -> tuple[str, str | None]:
         "DemiBold",
         "ExtraLight",
         "UltraLight",
+        "BoldItalic",
         "Bold",
         "Light",
         "Medium",
@@ -201,6 +247,13 @@ def extract_weight_from_name(font_name: str) -> tuple[str, str | None]:
         "Oblique",
         "Retina",
         "Book",
+        # Abbreviated forms
+        "Reg",
+        "Med",
+        "Bld",
+        "Lt",
+        "It",
+        "Obl",
     ]
 
     # Check PostScript format (with dash)
