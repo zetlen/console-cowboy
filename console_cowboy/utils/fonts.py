@@ -78,7 +78,24 @@ def _get_font_names_linux(font_name: str) -> tuple[str, str] | None:
         if result.returncode == 0:
             lines = result.stdout.strip().split("\n")
             if len(lines) == 2 and lines[0] and lines[1]:
-                return (lines[0], lines[1])
+                family, postscript = lines[0], lines[1]
+                # fc-match always returns a result (fallback font) even if
+                # the requested font isn't installed. Verify the result
+                # actually matches the query by checking if the query appears
+                # in either the family or postscript name (case-insensitive).
+                query_lower = font_name.lower().replace("-", "").replace(" ", "")
+                family_lower = family.lower().replace(" ", "")
+                postscript_lower = postscript.lower().replace("-", "")
+                if (
+                    query_lower.startswith(family_lower)
+                    or family_lower.startswith(
+                        query_lower.split("-")[0] if "-" in font_name else query_lower
+                    )
+                    or postscript_lower.startswith(
+                        query_lower.split("-")[0] if "-" in font_name else query_lower
+                    )
+                ):
+                    return (family, postscript)
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
     return None
