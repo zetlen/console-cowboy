@@ -333,6 +333,13 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
                     draw_powerline_glyphs=profile_data["Draw Powerline Glyphs"]
                 )
 
+        # Handle ligatures
+        if "ASCII Ligatures" in profile_data:
+            if ctec.font:
+                ctec.font.ligatures = profile_data["ASCII Ligatures"]
+            else:
+                ctec.font = FontConfig(ligatures=profile_data["ASCII Ligatures"])
+
         # Parse cursor configuration
         cursor_config = CursorConfig()
         if "Cursor Type" in profile_data:
@@ -363,6 +370,16 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
                 # Store as terminal-specific since iTerm2 Initial Text is a
                 # combined concept (startup commands + potential env exports)
                 ctec.add_terminal_specific("iterm2", "Initial Text", initial_text)
+
+        # Parse Terminal Type (TERM environment variable)
+        # This maps to behavior.environment_variables["TERM"] per commutativity principle
+        # since environment variables are supported by all major terminals
+        if "Terminal Type" in profile_data:
+            term_value = profile_data["Terminal Type"]
+            if term_value:
+                if behavior.environment_variables is None:
+                    behavior.environment_variables = {}
+                behavior.environment_variables["TERM"] = term_value
 
         ctec.behavior = behavior
 
@@ -476,6 +493,11 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
             "Vertical Spacing",
             "Use Non-ASCII Font",
             "Minimum Contrast",
+            # Option key behavior (0=Normal, 1=Meta, 2=+Esc)
+            "Option Key Sends",
+            "Right Option Key Sends",
+            # Tab color (dict with RGB components)
+            "Tab Color",
             # Advanced features (iTerm2-only, no equivalent in other terminals)
             "Triggers",
             # Note: Smart Selection Rules are now parsed into CTEC text_hints
@@ -797,6 +819,10 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
             if ctec.font.draw_powerline_glyphs is not None:
                 result["Draw Powerline Glyphs"] = ctec.font.draw_powerline_glyphs
 
+            # Export ligatures
+            if ctec.font.ligatures is not None:
+                result["ASCII Ligatures"] = ctec.font.ligatures
+
         # Export cursor
         if ctec.cursor:
             if ctec.cursor.style:
@@ -821,40 +847,57 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
                 result["Silence Bell"] = ctec.behavior.bell_mode == BellMode.NONE
                 result["Visual Bell"] = ctec.behavior.bell_mode == BellMode.VISUAL
 
-            # Handle environment variables via Initial Text
+            # Handle environment variables
             if ctec.behavior.environment_variables:
-                # Generate export commands for env vars
-                # Validate keys to prevent shell injection - keys must be valid
-                # shell variable names (start with letter/underscore, contain only
-                # alphanumeric and underscore)
-                valid_env_key = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-                export_lines = []
-                for k, v in ctec.behavior.environment_variables.items():
-                    if valid_env_key.match(k):
-                        export_lines.append(f"export {k}={v!r}")
-                    else:
-                        ctec.add_warning(
-                            f"Skipping invalid environment variable key '{k}': "
-                            "keys must start with a letter or underscore and contain "
-                            "only alphanumeric characters and underscores."
-                        )
+                # TERM has native support via Terminal Type setting
+                if "TERM" in ctec.behavior.environment_variables:
+                    result["Terminal Type"] = ctec.behavior.environment_variables[
+                        "TERM"
+                    ]
 
-                # Only add Initial Text if we have valid export lines
-                if export_lines:
-                    # Check for existing Initial Text in terminal_specific
-                    initial_text = ctec.get_terminal_specific("iterm2", "Initial Text")
-                    if initial_text:
-                        # Prepend env exports to existing Initial Text
-                        full_text = "\n".join(export_lines) + "\n" + str(initial_text)
-                    else:
-                        full_text = "\n".join(export_lines)
-                    result["Initial Text"] = full_text
-                    ctec.add_warning(
-                        "iTerm2 does not have native environment variable settings. "
-                        "Environment variables have been exported via 'Initial Text' "
-                        "which sends text when the session starts. This is a workaround "
-                        "and the export commands will be visible in the terminal."
-                    )
+                # Other env vars go via Initial Text (workaround)
+                other_env_vars = {
+                    k: v
+                    for k, v in ctec.behavior.environment_variables.items()
+                    if k != "TERM"
+                }
+                if other_env_vars:
+                    # Generate export commands for env vars
+                    # Validate keys to prevent shell injection - keys must be valid
+                    # shell variable names (start with letter/underscore, contain only
+                    # alphanumeric and underscore)
+                    valid_env_key = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+                    export_lines = []
+                    for k, v in other_env_vars.items():
+                        if valid_env_key.match(k):
+                            export_lines.append(f"export {k}={v!r}")
+                        else:
+                            ctec.add_warning(
+                                f"Skipping invalid environment variable key '{k}': "
+                                "keys must start with a letter or underscore and contain "
+                                "only alphanumeric characters and underscores."
+                            )
+
+                    # Only add Initial Text if we have valid export lines
+                    if export_lines:
+                        # Check for existing Initial Text in terminal_specific
+                        initial_text = ctec.get_terminal_specific(
+                            "iterm2", "Initial Text"
+                        )
+                        if initial_text:
+                            # Prepend env exports to existing Initial Text
+                            full_text = (
+                                "\n".join(export_lines) + "\n" + str(initial_text)
+                            )
+                        else:
+                            full_text = "\n".join(export_lines)
+                        result["Initial Text"] = full_text
+                        ctec.add_warning(
+                            "iTerm2 does not have native environment variable settings. "
+                            "Environment variables have been exported via 'Initial Text' "
+                            "which sends text when the session starts. This is a workaround "
+                            "and the export commands will be visible in the terminal."
+                        )
 
         # Export scroll settings from CTEC scroll config
         if ctec.scroll:
