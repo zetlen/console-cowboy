@@ -434,7 +434,15 @@ class TerminalAppAdapter(TerminalAdapter):
         Returns:
             Profile dictionary suitable for plist serialization
         """
+        # Determine profile name from terminal-specific settings or use default
+        profile_name = "Console Cowboy"
+        for setting in ctec.get_terminal_specific("terminal_app"):
+            if setting.key == "name":
+                profile_name = setting.value
+                break
+
         result = {
+            "name": profile_name,
             "type": "Window Settings",
             "ProfileCurrentVersion": 2.07,
         }
