@@ -15,54 +15,85 @@ from console_cowboy.utils.fonts import (
 
 
 class TestPostScriptToFriendly:
-    """Tests for PostScript to friendly name conversion."""
+    """Tests for PostScript to friendly name conversion.
+
+    All tests mock _get_system_font_names to ensure deterministic behavior
+    regardless of which fonts are installed on the system.
+    """
 
     def test_jetbrains_mono(self):
         """Test JetBrainsMono conversion - removes -Regular suffix and adds spaces."""
-        result = postscript_to_friendly("JetBrainsMono-Regular")
-        assert "-Regular" not in result
-        assert " " in result  # Has spaces (friendly format)
-        assert "Mono" in result
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            result = postscript_to_friendly("JetBrainsMono-Regular")
+            assert "-Regular" not in result
+            assert " " in result  # Has spaces (friendly format)
+            assert "Mono" in result
 
     def test_fira_code(self):
         """Test FiraCode conversion."""
-        assert postscript_to_friendly("FiraCode-Retina") == "Fira Code"
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            assert postscript_to_friendly("FiraCode-Retina") == "Fira Code"
 
     def test_sf_mono(self):
         """Test SFMono conversion."""
-        assert postscript_to_friendly("SFMono-Regular") == "SF Mono"
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            assert postscript_to_friendly("SFMono-Regular") == "SF Mono"
 
     def test_menlo(self):
         """Test Menlo conversion."""
-        assert postscript_to_friendly("Menlo-Regular") == "Menlo"
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            assert postscript_to_friendly("Menlo-Regular") == "Menlo"
 
     def test_monaco(self):
         """Test Monaco conversion (no suffix)."""
-        assert postscript_to_friendly("Monaco") == "Monaco"
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            assert postscript_to_friendly("Monaco") == "Monaco"
 
     def test_nerd_font(self):
         """Test Nerd Font suffix preservation."""
-        result = postscript_to_friendly("JetBrainsMono-NF-Regular")
-        assert "-Regular" not in result
-        assert "NF" in result
-        assert "Mono" in result
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            result = postscript_to_friendly("JetBrainsMono-NF-Regular")
+            assert "-Regular" not in result
+            assert "NF" in result
+            assert "Mono" in result
 
     def test_meslo(self):
         """Test MesloLGS conversion."""
-        result = postscript_to_friendly("MesloLGS-NF-Regular")
-        assert "Meslo" in result
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            result = postscript_to_friendly("MesloLGS-NF-Regular")
+            assert "Meslo" in result
 
     def test_bold_suffix(self):
         """Test Bold suffix removal."""
-        result = postscript_to_friendly("JetBrainsMono-Bold")
-        assert "-Bold" not in result
-        assert "Mono" in result
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            result = postscript_to_friendly("JetBrainsMono-Bold")
+            assert "-Bold" not in result
+            assert "Mono" in result
 
     def test_italic_suffix(self):
         """Test Italic suffix removal."""
-        result = postscript_to_friendly("JetBrainsMono-Italic")
-        assert "-Italic" not in result
-        assert "Mono" in result
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            result = postscript_to_friendly("JetBrainsMono-Italic")
+            assert "-Italic" not in result
+            assert "Mono" in result
 
     def test_empty_string(self):
         """Test empty string handling."""
@@ -74,51 +105,80 @@ class TestPostScriptToFriendly:
 
     def test_abbreviated_reg_suffix(self):
         """Test -Reg abbreviated suffix removal."""
-        result = postscript_to_friendly("FiraCode-Reg")
-        assert "-Reg" not in result
-        assert "Fira Code" == result
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            result = postscript_to_friendly("FiraCode-Reg")
+            assert "-Reg" not in result
+            assert "Fira Code" == result
 
     def test_nfp_suffix(self):
         """Test NFP (Nerd Font Patched) suffix handling."""
-        result = postscript_to_friendly("JetBrainsMonoNFP")
-        assert "NFP" in result
-        assert " NFP" in result  # Should have space before NFP
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            result = postscript_to_friendly("JetBrainsMonoNFP")
+            assert "NFP" in result
+            assert " NFP" in result  # Should have space before NFP
 
     def test_m_plus_code_font(self):
         """Test M+Code font with + character preserved."""
-        result = postscript_to_friendly("M+CodeLat60NFP-Reg")
-        assert "M+Code" in result  # + should be preserved
-        assert "-Reg" not in result  # Weight suffix removed
-        # NFP suffix may be expanded to "Nerd Font Propo" by system lookup
-        assert "NFP" in result or "Nerd Font" in result
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            result = postscript_to_friendly("M+CodeLat60NFP-Reg")
+            assert "M+Code" in result  # + should be preserved
+            assert "-Reg" not in result  # Weight suffix removed
+            assert "NFP" in result
 
     def test_m_plus_code_simple(self):
         """Test simple M+Code font."""
-        result = postscript_to_friendly("M+Code-Regular")
-        assert "M+Code" in result
-        assert "-Regular" not in result
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            result = postscript_to_friendly("M+Code-Regular")
+            assert "M+Code" in result
+            assert "-Regular" not in result
 
     def test_font_with_numbers(self):
         """Test font name with version numbers like Lat60."""
-        result = postscript_to_friendly("M+CodeLat60-Regular")
-        assert "Lat60" in result  # Numbers should be preserved
-        assert "-Regular" not in result
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            result = postscript_to_friendly("M+CodeLat60-Regular")
+            assert "Lat60" in result  # Numbers should be preserved
+            assert "-Regular" not in result
 
 
 class TestFriendlyToPostScript:
-    """Tests for friendly to PostScript name conversion."""
+    """Tests for friendly to PostScript name conversion.
+
+    All tests mock _get_system_font_names to ensure deterministic behavior
+    regardless of which fonts are installed on the system.
+    """
 
     def test_jetbrains_mono(self):
         """Test JetBrains Mono conversion."""
-        assert friendly_to_postscript("JetBrains Mono") == "JetBrainsMono-Regular"
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            assert friendly_to_postscript("JetBrains Mono") == "JetBrainsMono-Regular"
 
     def test_fira_code(self):
         """Test Fira Code conversion."""
-        assert friendly_to_postscript("Fira Code") == "FiraCode-Regular"
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            assert friendly_to_postscript("Fira Code") == "FiraCode-Regular"
 
     def test_with_bold_weight(self):
         """Test with Bold weight."""
-        assert friendly_to_postscript("JetBrains Mono", "Bold") == "JetBrainsMono-Bold"
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            assert (
+                friendly_to_postscript("JetBrains Mono", "Bold") == "JetBrainsMono-Bold"
+            )
 
     def test_empty_string(self):
         """Test empty string handling."""
@@ -218,14 +278,21 @@ class TestExtractWeightFromName:
 
 
 class TestNormalizeFontFamily:
-    """Tests for font family normalization."""
+    """Tests for font family normalization.
+
+    Tests that use postscript_to_friendly mock _get_system_font_names
+    to ensure deterministic behavior.
+    """
 
     def test_postscript_with_weight(self):
         """Test normalizing PostScript name with weight."""
-        result = normalize_font_family("JetBrainsMono-Bold")
-        # Should remove weight and convert to friendly
-        assert "-Bold" not in result
-        assert " " in result or result == "JetBrainsMono"
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            result = normalize_font_family("JetBrainsMono-Bold")
+            # Should remove weight and convert to friendly
+            assert "-Bold" not in result
+            assert " " in result or result == "JetBrainsMono"
 
     def test_friendly_name(self):
         """Test friendly name passes through."""
@@ -299,3 +366,153 @@ class TestSystemFontLookup:
         with patch.object(sys, "platform", "win32"):
             result = _get_system_font_names("AnyFont")
             assert result is None
+
+
+class TestSystemFontLookupEdgeCases:
+    """Tests for edge cases in system font lookup functions."""
+
+    def test_fc_match_missing_returns_none(self):
+        """Test that missing fc-match command returns None and falls back to heuristics."""
+
+        with patch.object(sys, "platform", "linux"):
+            with patch(
+                "console_cowboy.utils.fonts.subprocess.run",
+                side_effect=FileNotFoundError("fc-match not found"),
+            ):
+                from console_cowboy.utils.fonts import _get_font_names_linux
+
+                result = _get_font_names_linux("JetBrainsMono-Regular")
+                assert result is None
+
+    def test_fc_match_returns_fallback_font_returns_none(self):
+        """Test that fc-match returning a non-matching fallback font returns None."""
+        import subprocess
+
+        # Simulate fc-match returning DejaVu Sans Mono for a request for FiraCode
+        mock_result = subprocess.CompletedProcess(
+            args=["fc-match"],
+            returncode=0,
+            stdout="DejaVu Sans Mono\nDejaVuSansMono\n",
+            stderr="",
+        )
+        with patch.object(sys, "platform", "linux"):
+            with patch(
+                "console_cowboy.utils.fonts.subprocess.run", return_value=mock_result
+            ):
+                from console_cowboy.utils.fonts import _get_font_names_linux
+
+                result = _get_font_names_linux("FiraCode-Regular")
+                # Should return None because DejaVu doesn't match FiraCode
+                assert result is None
+
+    def test_fc_match_returns_matching_font(self):
+        """Test that fc-match returning a matching font returns the names."""
+        import subprocess
+
+        mock_result = subprocess.CompletedProcess(
+            args=["fc-match"],
+            returncode=0,
+            stdout="Fira Code\nFiraCode-Regular\n",
+            stderr="",
+        )
+        with patch.object(sys, "platform", "linux"):
+            with patch(
+                "console_cowboy.utils.fonts.subprocess.run", return_value=mock_result
+            ):
+                from console_cowboy.utils.fonts import _get_font_names_linux
+
+                result = _get_font_names_linux("FiraCode-Regular")
+                assert result == ("Fira Code", "FiraCode-Regular")
+
+    def test_fc_match_timeout_returns_none(self):
+        """Test that fc-match timeout returns None."""
+        import subprocess
+
+        with patch.object(sys, "platform", "linux"):
+            with patch(
+                "console_cowboy.utils.fonts.subprocess.run",
+                side_effect=subprocess.TimeoutExpired(cmd="fc-match", timeout=2),
+            ):
+                from console_cowboy.utils.fonts import _get_font_names_linux
+
+                result = _get_font_names_linux("AnyFont")
+                assert result is None
+
+    def test_osascript_missing_returns_none(self):
+        """Test that missing osascript command (non-macOS) returns None."""
+        with patch.object(sys, "platform", "darwin"):
+            with patch(
+                "console_cowboy.utils.fonts.subprocess.run",
+                side_effect=FileNotFoundError("osascript not found"),
+            ):
+                from console_cowboy.utils.fonts import _get_font_names_macos
+
+                result = _get_font_names_macos("JetBrainsMono-Regular")
+                assert result is None
+
+    def test_osascript_font_not_found_returns_none(self):
+        """Test that osascript returning empty (font not found) returns None."""
+        import subprocess
+
+        # When NSFont can't find the font, the script returns empty string
+        mock_result = subprocess.CompletedProcess(
+            args=["osascript"], returncode=0, stdout="\n", stderr=""
+        )
+        with patch.object(sys, "platform", "darwin"):
+            with patch(
+                "console_cowboy.utils.fonts.subprocess.run", return_value=mock_result
+            ):
+                from console_cowboy.utils.fonts import _get_font_names_macos
+
+                result = _get_font_names_macos("NonExistentFont-Regular")
+                assert result is None
+
+    def test_osascript_returns_font_names(self):
+        """Test that osascript returning font names works correctly."""
+        import subprocess
+
+        mock_result = subprocess.CompletedProcess(
+            args=["osascript"],
+            returncode=0,
+            stdout="JetBrains Mono|JetBrainsMono-Regular\n",
+            stderr="",
+        )
+        with patch.object(sys, "platform", "darwin"):
+            with patch(
+                "console_cowboy.utils.fonts.subprocess.run", return_value=mock_result
+            ):
+                from console_cowboy.utils.fonts import _get_font_names_macos
+
+                result = _get_font_names_macos("JetBrainsMono-Regular")
+                assert result == ("JetBrains Mono", "JetBrainsMono-Regular")
+
+    def test_osascript_timeout_returns_none(self):
+        """Test that osascript timeout returns None."""
+        import subprocess
+
+        with patch.object(sys, "platform", "darwin"):
+            with patch(
+                "console_cowboy.utils.fonts.subprocess.run",
+                side_effect=subprocess.TimeoutExpired(cmd="osascript", timeout=2),
+            ):
+                from console_cowboy.utils.fonts import _get_font_names_macos
+
+                result = _get_font_names_macos("AnyFont")
+                assert result is None
+
+    def test_postscript_to_friendly_uses_heuristic_when_system_fails(self):
+        """Test complete flow: system lookup fails, heuristic used."""
+        # This tests the actual integration
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            result = postscript_to_friendly("JetBrainsMono-Regular")
+            assert result == "JetBrains Mono"
+
+    def test_friendly_to_postscript_uses_heuristic_when_system_fails(self):
+        """Test complete flow: system lookup fails, heuristic used."""
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            result = friendly_to_postscript("JetBrains Mono")
+            assert result == "JetBrainsMono-Regular"

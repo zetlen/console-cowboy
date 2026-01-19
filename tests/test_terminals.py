@@ -1,6 +1,7 @@
 """Tests for terminal emulator adapters."""
 
 from pathlib import Path
+from unittest.mock import patch
 
 from console_cowboy.ctec.schema import (
     CTEC,
@@ -1043,31 +1044,39 @@ class TestTerminalAppAdapter:
 
     def test_terminal_app_to_ghostty(self):
         """Test converting from Terminal.app to Ghostty."""
-        config_path = FIXTURES_DIR / "terminal_app" / "Basic.terminal"
-        ctec = TerminalAppAdapter.parse(config_path)
+        # Mock system font lookup to ensure deterministic behavior across platforms
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            config_path = FIXTURES_DIR / "terminal_app" / "Basic.terminal"
+            ctec = TerminalAppAdapter.parse(config_path)
 
-        ghostty_output = GhosttyAdapter.export(ctec)
-        ghostty_ctec = GhosttyAdapter.parse("test", content=ghostty_output)
+            ghostty_output = GhosttyAdapter.export(ctec)
+            ghostty_ctec = GhosttyAdapter.parse("test", content=ghostty_output)
 
-        # Core settings should convert
-        assert ghostty_ctec.font.family == ctec.font.family
-        assert ghostty_ctec.font.size == ctec.font.size
-        assert ghostty_ctec.cursor.style == ctec.cursor.style
+            # Core settings should convert
+            assert ghostty_ctec.font.family == ctec.font.family
+            assert ghostty_ctec.font.size == ctec.font.size
+            assert ghostty_ctec.cursor.style == ctec.cursor.style
 
     def test_ghostty_to_terminal_app(self):
         """Test converting from Ghostty to Terminal.app."""
-        ghostty_path = FIXTURES_DIR / "ghostty" / "config"
-        ctec = GhosttyAdapter.parse(ghostty_path)
+        # Mock system font lookup to ensure deterministic behavior across platforms
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            ghostty_path = FIXTURES_DIR / "ghostty" / "config"
+            ctec = GhosttyAdapter.parse(ghostty_path)
 
-        terminal_output = TerminalAppAdapter.export(ctec)
-        terminal_ctec = TerminalAppAdapter.parse(
-            "test.terminal", content=terminal_output
-        )
+            terminal_output = TerminalAppAdapter.export(ctec)
+            terminal_ctec = TerminalAppAdapter.parse(
+                "test.terminal", content=terminal_output
+            )
 
-        # Core settings should convert
-        assert terminal_ctec.font.family == ctec.font.family
-        assert terminal_ctec.font.size == ctec.font.size
-        assert terminal_ctec.cursor.style == ctec.cursor.style
+            # Core settings should convert
+            assert terminal_ctec.font.family == ctec.font.family
+            assert terminal_ctec.font.size == ctec.font.size
+            assert terminal_ctec.cursor.style == ctec.cursor.style
 
 
 class TestTextHints:

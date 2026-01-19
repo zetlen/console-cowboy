@@ -189,6 +189,35 @@ def _postscript_to_friendly_heuristic(postscript_name: str) -> str:
         # Already friendly format
         return postscript_name
 
+    # Known compound brand names that shouldn't be split internally
+    # These are font foundry/brand names that look like camelCase but are single words
+    compound_names = ["JetBrains", "DejaVu", "PowerLine"]
+
+    def split_camelcase(s: str) -> str:
+        """Split camelCase into separate words, preserving compound names."""
+        result = s
+
+        # Replace compound names with placeholders (all lowercase to avoid regex matches)
+        placeholders = {}
+        for i, compound in enumerate(compound_names):
+            if compound in result:
+                placeholder = f"xcompound{i}x"
+                result = result.replace(compound, placeholder)
+                placeholders[placeholder] = compound
+
+        # Insert spaces before uppercase letters (camelCase handling)
+        # But be careful with acronyms like 'SF', 'LG', 'NF'
+        result = re.sub(r"([a-z])([A-Z])", r"\1 \2", result)
+        # Handle cases like 'SFMono' -> 'SF Mono'
+        result = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", result)
+
+        # Restore compound names
+        for placeholder, compound in placeholders.items():
+            result = result.replace(placeholder, compound)
+
+        # Clean up multiple spaces
+        return " ".join(result.split())
+
     # Split on dashes first
     parts = name.split("-")
     friendly_parts = []
@@ -198,24 +227,10 @@ def _postscript_to_friendly_heuristic(postscript_name: str) -> str:
         # Split temporarily around + to process each segment
         if "+" in part:
             plus_segments = part.split("+")
-            processed_segments = []
-            for seg in plus_segments:
-                # Insert spaces before uppercase letters (camelCase handling)
-                # But be careful with acronyms like 'SF', 'LG'
-                spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", seg)
-                # Handle cases like 'SFMono' -> 'SF Mono'
-                spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
-                # Handle letter-digit transitions like 'Lat60' -> 'Lat60' (keep together)
-                # but 'Code50' should stay as 'Code50'
-                processed_segments.append(spaced)
+            processed_segments = [split_camelcase(seg) for seg in plus_segments]
             friendly_parts.append("+".join(processed_segments))
         else:
-            # Insert spaces before uppercase letters (camelCase handling)
-            # But be careful with acronyms like 'SF', 'LG'
-            spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", part)
-            # Handle cases like 'SFMono' -> 'SF Mono'
-            spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
-            friendly_parts.append(spaced)
+            friendly_parts.append(split_camelcase(part))
 
     result = " ".join(friendly_parts)
 

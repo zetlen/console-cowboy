@@ -12,8 +12,11 @@ raw = true
 dir = "{{ config_root }}"
 
 [tasks.sync]
-description = "Install dependencies"
-run = "uv sync"
+description = "Install dependencies and git hooks"
+run = """
+uv sync
+uv run lefthook install
+"""
 
 [tasks.test]
 depends = ["sync"]
