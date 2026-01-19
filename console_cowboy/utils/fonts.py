@@ -220,31 +220,17 @@ def _postscript_to_friendly_heuristic(postscript_name: str) -> str:
 
     # Split on dashes first
     parts = name.split("-")
-    friendly_parts = [split_camelcase(part) for part in parts]
+    friendly_parts = []
 
     for part in parts:
         # Preserve + character in font names like "M+Code"
         # Split temporarily around + to process each segment
         if "+" in part:
             plus_segments = part.split("+")
-            processed_segments = []
-            for seg in plus_segments:
-                # Insert spaces before uppercase letters (camelCase handling)
-                # But be careful with acronyms like 'SF', 'LG'
-                spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", seg)
-                # Handle cases like 'SFMono' -> 'SF Mono'
-                spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
-                # Handle letter-digit transitions like 'Lat60' -> 'Lat60' (keep together)
-                # but 'Code50' should stay as 'Code50'
-                processed_segments.append(spaced)
+            processed_segments = [split_camelcase(seg) for seg in plus_segments]
             friendly_parts.append("+".join(processed_segments))
         else:
-            # Insert spaces before uppercase letters (camelCase handling)
-            # But be careful with acronyms like 'SF', 'LG'
-            spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", part)
-            # Handle cases like 'SFMono' -> 'SF Mono'
-            spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
-            friendly_parts.append(spaced)
+            friendly_parts.append(split_camelcase(part))
 
     result = " ".join(friendly_parts)
 
