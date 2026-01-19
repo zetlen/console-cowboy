@@ -7,21 +7,94 @@ Different terminal emulators use different font name formats:
 
 macOS/iTerm2 often stores fonts with PostScript names, while terminals
 like Wezterm prefer friendly names.
+
+This module uses system font APIs when available (Core Text on macOS,
+fontconfig on Linux) to get authoritative font name mappings, falling
+back to heuristics when the font isn't installed or on unsupported platforms.
 """
 
 import re
+import subprocess
+import sys
+
+
+def _get_system_font_names(font_name: str) -> tuple[str, str] | None:
+    """
+    Query the system font database for canonical font names.
+
+    Args:
+        font_name: Any font name (PostScript or friendly)
+
+    Returns:
+        Tuple of (friendly_name, postscript_name) or None if not found
+    """
+    if sys.platform == "darwin":
+        return _get_font_names_macos(font_name)
+    elif sys.platform.startswith("linux"):
+        return _get_font_names_linux(font_name)
+    return None
+
+
+def _get_font_names_macos(font_name: str) -> tuple[str, str] | None:
+    """Query NSFont for font names on macOS using JavaScript for Automation."""
+    try:
+        # Use JXA (JavaScript for Automation) to query NSFont
+        # This avoids the need for pyobjc dependencies
+        script = f"""
+ObjC.import("AppKit");
+const font = $.NSFont.fontWithNameSize("{font_name}", 12.0);
+if (font.isNil()) {{
+    "";
+}} else {{
+    const family = font.familyName.js;
+    const ps = font.fontName.js;
+    family + "|" + ps;
+}}
+"""
+        result = subprocess.run(
+            ["osascript", "-l", "JavaScript", "-e", script],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            parts = result.stdout.strip().split("|")
+            if len(parts) == 2:
+                return (parts[0], parts[1])
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+    return None
+
+
+def _get_font_names_linux(font_name: str) -> tuple[str, str] | None:
+    """Query fontconfig for font names on Linux."""
+    try:
+        result = subprocess.run(
+            ["fc-match", font_name, "--format=%{family}\n%{postscriptname}"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if result.returncode == 0:
+            lines = result.stdout.strip().split("\n")
+            if len(lines) == 2 and lines[0] and lines[1]:
+                return (lines[0], lines[1])
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+    return None
 
 
 def postscript_to_friendly(postscript_name: str) -> str:
     """
     Convert a PostScript font name to a friendly/display name.
 
-    This uses heuristics to convert names like:
+    Tries system font database first (Core Text on macOS, fontconfig on Linux),
+    then falls back to heuristics for uninstalled fonts or unsupported platforms.
+
+    Examples:
     - 'JetBrainsMono-Regular' -> 'JetBrains Mono'
     - 'FiraCode-Retina' -> 'Fira Code'
     - 'SFMono-Regular' -> 'SF Mono'
-    - 'MesloLGS-NF-Regular' -> 'MesloLGS NF'
-    - 'M+CodeLat60NFP-Reg' -> 'M+Code Lat60 NFP'
 
     Args:
         postscript_name: Font name in PostScript format
@@ -32,6 +105,21 @@ def postscript_to_friendly(postscript_name: str) -> str:
     if not postscript_name:
         return postscript_name
 
+    # Try system lookup first
+    system_names = _get_system_font_names(postscript_name)
+    if system_names is not None:
+        return system_names[0]  # friendly name
+
+    # Fall back to heuristics
+    return _postscript_to_friendly_heuristic(postscript_name)
+
+
+def _postscript_to_friendly_heuristic(postscript_name: str) -> str:
+    """
+    Heuristic conversion from PostScript to friendly name.
+
+    Used as fallback when font is not installed or on unsupported platforms.
+    """
     # Remove common weight/style suffixes (including abbreviated forms)
     name = postscript_name
     suffixes_to_remove = [
@@ -128,7 +216,10 @@ def friendly_to_postscript(friendly_name: str, weight: str = "Regular") -> str:
     """
     Convert a friendly font name to PostScript format.
 
-    This is a best-effort conversion:
+    Tries system font database first (Core Text on macOS, fontconfig on Linux),
+    then falls back to heuristics for uninstalled fonts or unsupported platforms.
+
+    Examples:
     - 'JetBrains Mono' -> 'JetBrainsMono-Regular'
     - 'Fira Code' -> 'FiraCode-Regular'
 
@@ -142,6 +233,30 @@ def friendly_to_postscript(friendly_name: str, weight: str = "Regular") -> str:
     if not friendly_name:
         return friendly_name
 
+    # Try system lookup first
+    system_names = _get_system_font_names(friendly_name)
+    if system_names is not None:
+        postscript = system_names[1]  # postscript name
+        # System returns the actual PostScript name which may have a specific weight
+        # If user requested a different weight, we need to substitute it
+        if weight != "Regular":
+            # Strip existing weight suffix and add requested one
+            base, _ = extract_weight_from_name(postscript)
+            postscript = f"{base}-{weight}"
+        return postscript
+
+    # Fall back to heuristics
+    return _friendly_to_postscript_heuristic(friendly_name, weight)
+
+
+def _friendly_to_postscript_heuristic(
+    friendly_name: str, weight: str = "Regular"
+) -> str:
+    """
+    Heuristic conversion from friendly name to PostScript.
+
+    Used as fallback when font is not installed or on unsupported platforms.
+    """
     # Remove spaces and join
     postscript = friendly_name.replace(" ", "")
 
