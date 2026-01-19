@@ -151,6 +151,84 @@ cursor-style = bar
         assert restored.font.size == original.font.size
         assert restored.cursor.style == original.cursor.style
 
+    def test_parse_theme_name(self):
+        """Test that theme name is parsed into color_scheme.name."""
+        content = """
+theme = Catppuccin Mocha
+font-family = JetBrains Mono
+"""
+        ctec = GhosttyAdapter.parse("test", content=content)
+        assert ctec.color_scheme is not None
+        assert ctec.color_scheme.name == "Catppuccin Mocha"
+
+    def test_export_theme_name(self):
+        """Test that color scheme name is exported as theme."""
+        ctec = CTEC(
+            color_scheme=ColorScheme(
+                name="Rose Pine",
+                foreground=Color(224, 222, 244),
+                background=Color(25, 23, 36),
+            )
+        )
+        output = GhosttyAdapter.export(ctec)
+        assert "theme = Rose Pine" in output
+
+    def test_roundtrip_theme_name(self):
+        """Test that theme name round-trips correctly."""
+        original = CTEC(
+            color_scheme=ColorScheme(
+                name="Tokyo Night",
+                foreground=Color(169, 177, 214),
+                background=Color(26, 27, 38),
+            )
+        )
+        output = GhosttyAdapter.export(original)
+        parsed = GhosttyAdapter.parse("test", content=output)
+        assert parsed.color_scheme.name == "Tokyo Night"
+
+    def test_parse_theme_with_color_override(self):
+        """Test that theme name and color overrides both work together."""
+        content = """
+theme = Catppuccin Mocha
+foreground = #ff0000
+"""
+        ctec = GhosttyAdapter.parse("test", content=content)
+        assert ctec.color_scheme is not None
+        assert ctec.color_scheme.name == "Catppuccin Mocha"
+        assert ctec.color_scheme.foreground is not None
+        assert ctec.color_scheme.foreground.to_hex() == "#ff0000"
+
+    def test_parse_light_dark_theme(self):
+        """Test handling of Ghostty's light/dark theme syntax."""
+        content = """
+theme = light:Rose Pine Dawn,dark:Rose Pine
+"""
+        ctec = GhosttyAdapter.parse("test", content=content)
+        assert ctec.color_scheme is not None
+        # Should extract the dark theme for cross-terminal compatibility
+        assert ctec.color_scheme.name == "Rose Pine"
+        # Should store the full value for round-trip
+        assert (
+            ctec.get_terminal_specific("ghostty", "theme_light_dark")
+            == "light:Rose Pine Dawn,dark:Rose Pine"
+        )
+        # Should warn about terminal-specific feature
+        assert any("light/dark" in w for w in ctec.warnings)
+
+    def test_parse_theme_absolute_path(self):
+        """Test handling of Ghostty theme file paths."""
+        content = """
+theme = /home/user/.config/ghostty/themes/custom
+"""
+        ctec = GhosttyAdapter.parse("test", content=content)
+        # Path should be stored as terminal-specific, not scheme.name
+        assert (
+            ctec.get_terminal_specific("ghostty", "theme_path")
+            == "/home/user/.config/ghostty/themes/custom"
+        )
+        # Should warn about non-portable feature
+        assert any("cannot be converted" in w for w in ctec.warnings)
+
 
 class TestAlacrittyAdapter:
     """Tests for the Alacritty adapter."""
