@@ -65,17 +65,38 @@ def postscript_to_friendly(postscript_name: str) -> str:
         # Already friendly format
         return postscript_name
 
-    # Split on dashes first
-    parts = name.split("-")
-    friendly_parts = []
+    # Known compound brand names that shouldn't be split internally
+    # These are font foundry/brand names that look like camelCase but are single words
+    compound_names = ["JetBrains", "DejaVu", "PowerLine"]
 
-    for part in parts:
+    def split_camelcase(s: str) -> str:
+        """Split camelCase into separate words, preserving compound names."""
+        result = s
+
+        # Replace compound names with placeholders (all lowercase to avoid regex matches)
+        placeholders = {}
+        for i, compound in enumerate(compound_names):
+            if compound in result:
+                placeholder = f"xcompound{i}x"
+                result = result.replace(compound, placeholder)
+                placeholders[placeholder] = compound
+
         # Insert spaces before uppercase letters (camelCase handling)
         # But be careful with acronyms like 'SF', 'LG', 'NF'
-        spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", part)
+        result = re.sub(r"([a-z])([A-Z])", r"\1 \2", result)
         # Handle cases like 'SFMono' -> 'SF Mono'
-        spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
-        friendly_parts.append(spaced)
+        result = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", result)
+
+        # Restore compound names
+        for placeholder, compound in placeholders.items():
+            result = result.replace(placeholder, compound)
+
+        # Clean up multiple spaces
+        return " ".join(result.split())
+
+    # Split on dashes first
+    parts = name.split("-")
+    friendly_parts = [split_camelcase(part) for part in parts]
 
     result = " ".join(friendly_parts)
 
