@@ -1,6 +1,11 @@
 """Tests for font name conversion utilities."""
 
+import sys
+from unittest.mock import patch
+
 from console_cowboy.utils.fonts import (
+    _get_system_font_names,
+    _postscript_to_friendly_heuristic,
     extract_weight_from_name,
     friendly_to_postscript,
     is_postscript_name,
@@ -67,6 +72,38 @@ class TestPostScriptToFriendly:
         """Test None-like handling."""
         assert postscript_to_friendly(None) is None
 
+    def test_abbreviated_reg_suffix(self):
+        """Test -Reg abbreviated suffix removal."""
+        result = postscript_to_friendly("FiraCode-Reg")
+        assert "-Reg" not in result
+        assert "Fira Code" == result
+
+    def test_nfp_suffix(self):
+        """Test NFP (Nerd Font Patched) suffix handling."""
+        result = postscript_to_friendly("JetBrainsMonoNFP")
+        assert "NFP" in result
+        assert " NFP" in result  # Should have space before NFP
+
+    def test_m_plus_code_font(self):
+        """Test M+Code font with + character preserved."""
+        result = postscript_to_friendly("M+CodeLat60NFP-Reg")
+        assert "M+Code" in result  # + should be preserved
+        assert "-Reg" not in result  # Weight suffix removed
+        # NFP suffix may be expanded to "Nerd Font Propo" by system lookup
+        assert "NFP" in result or "Nerd Font" in result
+
+    def test_m_plus_code_simple(self):
+        """Test simple M+Code font."""
+        result = postscript_to_friendly("M+Code-Regular")
+        assert "M+Code" in result
+        assert "-Regular" not in result
+
+    def test_font_with_numbers(self):
+        """Test font name with version numbers like Lat60."""
+        result = postscript_to_friendly("M+CodeLat60-Regular")
+        assert "Lat60" in result  # Numbers should be preserved
+        assert "-Regular" not in result
+
 
 class TestFriendlyToPostScript:
     """Tests for friendly to PostScript name conversion."""
@@ -119,6 +156,14 @@ class TestIsPostScriptName:
         """Test None returns False."""
         assert is_postscript_name(None) is False
 
+    def test_abbreviated_reg_suffix(self):
+        """Test detection with -Reg abbreviated suffix."""
+        assert is_postscript_name("FiraCode-Reg") is True
+
+    def test_m_plus_code_font(self):
+        """Test M+Code font detection."""
+        assert is_postscript_name("M+CodeLat60NFP-Reg") is True
+
 
 class TestExtractWeightFromName:
     """Tests for weight extraction from font names."""
@@ -165,6 +210,12 @@ class TestExtractWeightFromName:
         assert base == ""
         assert weight is None
 
+    def test_abbreviated_reg_suffix(self):
+        """Test abbreviated -Reg suffix extraction."""
+        base, weight = extract_weight_from_name("M+CodeLat60NFP-Reg")
+        assert base == "M+CodeLat60NFP"
+        assert weight == "Reg"
+
 
 class TestNormalizeFontFamily:
     """Tests for font family normalization."""
@@ -193,3 +244,58 @@ class TestNormalizeFontFamily:
     def test_none_handling(self):
         """Test None handling."""
         assert normalize_font_family(None) is None
+
+
+class TestSystemFontLookup:
+    """Tests for system font database lookups."""
+
+    def test_heuristic_fallback_when_system_returns_none(self):
+        """Test that heuristics are used when system lookup fails."""
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names", return_value=None
+        ):
+            # Should fall back to heuristics
+            result = postscript_to_friendly("JetBrainsMono-Regular")
+            assert "Mono" in result
+            assert "-Regular" not in result
+
+    def test_system_lookup_used_when_available(self):
+        """Test that system lookup is preferred when available."""
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names",
+            return_value=("System Font Name", "SystemFontName-Regular"),
+        ):
+            result = postscript_to_friendly("AnyFont")
+            assert result == "System Font Name"
+
+    def test_friendly_to_postscript_uses_system_lookup(self):
+        """Test that friendly_to_postscript uses system lookup."""
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names",
+            return_value=("System Font", "SystemFont-Regular"),
+        ):
+            result = friendly_to_postscript("System Font")
+            assert result == "SystemFont-Regular"
+
+    def test_friendly_to_postscript_respects_weight_override(self):
+        """Test that weight override works with system lookup."""
+        with patch(
+            "console_cowboy.utils.fonts._get_system_font_names",
+            return_value=("System Font", "SystemFont-Regular"),
+        ):
+            result = friendly_to_postscript("System Font", "Bold")
+            assert "Bold" in result
+            assert "SystemFont" in result
+
+    def test_heuristic_preserves_special_characters(self):
+        """Test that heuristic handles fonts with + character."""
+        # Direct test of heuristic function
+        result = _postscript_to_friendly_heuristic("M+Code-Regular")
+        assert "M+Code" in result
+        assert "-Regular" not in result
+
+    def test_get_system_font_names_unsupported_platform(self):
+        """Test that unsupported platforms return None."""
+        with patch.object(sys, "platform", "win32"):
+            result = _get_system_font_names("AnyFont")
+            assert result is None
