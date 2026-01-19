@@ -1,4 +1,5 @@
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from console_cowboy.ctec.schema import ColorScheme, CursorStyle
 from console_cowboy.utils.colors import normalize_color
@@ -153,7 +154,7 @@ class ParsingMixin:
         except (ValueError, TypeError) as e:
             if on_error:
                 on_error(key, value, e)
-            return True # Key matched, even if error occurred
+            return True  # Key matched, even if error occurred
 
     @classmethod
     def get_nested_value(cls, data: dict, path: str) -> Any:
@@ -198,4 +199,3 @@ class ParsingMixin:
                     if on_error:
                         on_error(source_path, value, e)
         return modified
-
