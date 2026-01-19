@@ -7,7 +7,8 @@ Terminal.app uses a macOS plist format for its configuration, stored in
 Individual profiles can also be exported as .terminal files.
 
 Colors and fonts are stored as NSKeyedArchiver-encoded NSData blobs,
-which requires special handling (see utils/nsarchive.py).
+which requires special handling (see utils/nsarchive.py). Font names
+should be in PostScript format for proper NSFont resolution.
 """
 
 import plistlib
@@ -23,6 +24,11 @@ from console_cowboy.ctec.schema import (
     FontConfig,
     ScrollConfig,
     WindowConfig,
+)
+from console_cowboy.utils.fonts import (
+    friendly_to_postscript,
+    is_postscript_name,
+    postscript_to_friendly,
 )
 from console_cowboy.utils.nsarchive import (
     decode_nscolor_data,
@@ -288,8 +294,13 @@ class TerminalAppAdapter(TerminalAdapter):
             if isinstance(font_data, bytes):
                 result = decode_nsfont_data(font_data)
                 if result:
-                    family, size = result
-                    font.family = family
+                    font_name, size = result
+                    # Convert PostScript names to friendly names for CTEC
+                    if is_postscript_name(font_name):
+                        font.family = postscript_to_friendly(font_name)
+                        font.set_source_name("terminal_app", font_name)
+                    else:
+                        font.family = font_name
                     font.size = size
                     has_font = True
 
@@ -434,7 +445,15 @@ class TerminalAppAdapter(TerminalAdapter):
         Returns:
             Profile dictionary suitable for plist serialization
         """
+        # Determine profile name from terminal-specific settings or use default
+        profile_name = "Console Cowboy"
+        for setting in ctec.get_terminal_specific("terminal_app"):
+            if setting.key == "name":
+                profile_name = setting.value
+                break
+
         result = {
+            "name": profile_name,
             "type": "Window Settings",
             "ProfileCurrentVersion": 2.07,
         }
@@ -485,7 +504,23 @@ class TerminalAppAdapter(TerminalAdapter):
     def _export_font(cls, font: FontConfig, result: dict) -> None:
         """Export font configuration to profile dictionary."""
         if font.family and font.size:
-            font_data = encode_nsfont_data(font.family, font.size)
+            # Terminal.app's NSFont works best with PostScript names
+            # Try to get original PostScript name from source, or convert
+            font_name = None
+
+            # Check for stored source name (PostScript format)
+            if font._source_names:
+                # Prefer terminal_app source, then any other
+                font_name = font._source_names.get("terminal_app")
+                if not font_name:
+                    # Use first available source name
+                    font_name = next(iter(font._source_names.values()), None)
+
+            # Fall back to converting friendly name to PostScript
+            if not font_name:
+                font_name = friendly_to_postscript(font.family)
+
+            font_data = encode_nsfont_data(font_name, font.size)
             if font_data:
                 result["Font"] = font_data
 
