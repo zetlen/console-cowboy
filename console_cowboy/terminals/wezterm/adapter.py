@@ -616,6 +616,40 @@ class WeztermAdapter(TerminalAdapter):
                     )
                 )
 
+        # Parse window_frame (for round-trip preservation)
+        # This controls the fancy tab bar appearance (fonts, colors)
+        if "window_frame" in config:
+            window_frame = config["window_frame"]
+            if isinstance(window_frame, dict):
+                ctec.terminal_specific.append(
+                    TerminalSpecificSetting(
+                        terminal="wezterm",
+                        key="window_frame",
+                        value=window_frame,
+                    )
+                )
+
+        # Parse multiplexer domain configurations (for round-trip preservation)
+        # These are WezTerm-specific features for SSH, Unix socket, and TLS domains
+        domain_types = [
+            "ssh_domains",
+            "unix_domains",
+            "tls_clients",
+            "tls_servers",
+            "exec_domains",
+        ]
+        for domain_type in domain_types:
+            if domain_type in config:
+                domain_config = config[domain_type]
+                if domain_config:
+                    ctec.terminal_specific.append(
+                        TerminalSpecificSetting(
+                            terminal="wezterm",
+                            key=domain_type,
+                            value=domain_config,
+                        )
+                    )
+
         # Parse key bindings
         if "keys" in config:
             keys = config["keys"]
@@ -1214,16 +1248,121 @@ class WeztermAdapter(TerminalAdapter):
             lines.append("}")
             lines.append("")
 
+        # Restore window_frame configuration
+        window_frame_setting = None
+        for setting in ctec.get_terminal_specific("wezterm"):
+            if setting.key == "window_frame":
+                window_frame_setting = setting.value
+                break
+
+        if window_frame_setting and isinstance(window_frame_setting, dict):
+            lines.append("-- Window frame (fancy tab bar appearance)")
+            lines.append("config.window_frame = {")
+            for wf_key, wf_value in window_frame_setting.items():
+                if wf_key == "font" and isinstance(wf_value, FontSpec):
+                    # Handle font specification
+                    font_opts = []
+                    if wf_value.weight:
+                        font_opts.append(f'weight = "{wf_value.weight}"')
+                    if font_opts:
+                        opts_str = ", ".join(font_opts)
+                        lines.append(
+                            f'  font = wezterm.font("{wf_value.family}", {{ {opts_str} }}),'
+                        )
+                    else:
+                        lines.append(f'  font = wezterm.font("{wf_value.family}"),')
+                elif isinstance(wf_value, str):
+                    lines.append(f'  {wf_key} = "{wf_value}",')
+                elif isinstance(wf_value, (int, float)):
+                    lines.append(f"  {wf_key} = {wf_value},")
+                elif isinstance(wf_value, bool):
+                    lines.append(f"  {wf_key} = {str(wf_value).lower()},")
+            lines.append("}")
+            lines.append("")
+
+        # Restore multiplexer domain configurations
+        domain_types = [
+            "ssh_domains",
+            "unix_domains",
+            "tls_clients",
+            "tls_servers",
+            "exec_domains",
+        ]
+        for domain_type in domain_types:
+            domain_setting = None
+            for setting in ctec.get_terminal_specific("wezterm"):
+                if setting.key == domain_type:
+                    domain_setting = setting.value
+                    break
+
+            if domain_setting:
+                lines.append(f"-- {domain_type.replace('_', ' ').title()}")
+                lines.append(f"config.{domain_type} = {{")
+                # Handle both list and dict (Lua table) formats
+                domain_list = domain_setting
+                if isinstance(domain_setting, dict):
+                    # Convert dict with numeric keys to list
+                    domain_list = [
+                        domain_setting[i]
+                        for i in sorted(domain_setting.keys())
+                        if isinstance(i, int)
+                    ]
+                    if not domain_list:
+                        # If no numeric keys, treat it as a single entry
+                        domain_list = [domain_setting]
+
+                for entry in domain_list:
+                    if isinstance(entry, dict):
+                        lines.append("  {")
+                        for entry_key, entry_value in entry.items():
+                            if isinstance(entry_value, str):
+                                lines.append(f'    {entry_key} = "{entry_value}",')
+                            elif isinstance(entry_value, bool):
+                                lines.append(
+                                    f"    {entry_key} = {str(entry_value).lower()},"
+                                )
+                            elif isinstance(entry_value, (int, float)):
+                                lines.append(f"    {entry_key} = {entry_value},")
+                            elif isinstance(entry_value, (list, tuple)):
+                                # Handle array values
+                                arr_str = ", ".join(f'"{v}"' for v in entry_value)
+                                lines.append(f"    {entry_key} = {{ {arr_str} }},")
+                            elif isinstance(entry_value, dict):
+                                # Handle nested table values (like ssh_option)
+                                lines.append(f"    {entry_key} = {{")
+                                for sub_key, sub_value in entry_value.items():
+                                    if isinstance(sub_value, str):
+                                        lines.append(
+                                            f'      {sub_key} = "{sub_value}",'
+                                        )
+                                    elif isinstance(sub_value, bool):
+                                        lines.append(
+                                            f"      {sub_key} = {str(sub_value).lower()},"
+                                        )
+                                    elif isinstance(sub_value, (int, float)):
+                                        lines.append(f"      {sub_key} = {sub_value},")
+                                lines.append("    },")
+                        lines.append("  },")
+                lines.append("}")
+                lines.append("")
+
         # Restore other terminal-specific settings
+        handled_keys = {
+            "leader",
+            "key_tables",
+            "font_harfbuzz_features",
+            "font_freetype_load_target",
+            "event_callbacks",
+            "window_frame",
+            "ssh_domains",
+            "unix_domains",
+            "tls_clients",
+            "tls_servers",
+            "exec_domains",
+        }
         other_settings = []
         for setting in ctec.get_terminal_specific("wezterm"):
-            if setting.key not in (
-                "leader",
-                "key_tables",
-                "font_harfbuzz_features",
-                "font_freetype_load_target",
-                "event_callbacks",
-            ):
+            if setting.key not in handled_keys:
                 other_settings.append(setting)
 
         if other_settings:
