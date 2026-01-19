@@ -28,6 +28,7 @@ from console_cowboy.ctec.schema import (
     WindowConfig,
 )
 from console_cowboy.utils.colors import normalize_color
+from console_cowboy.utils.keycodes import macos_hotkey_to_keybind
 
 from .base import TerminalAdapter
 from .mixins import ColorMapMixin, CursorStyleMixin, ParsingMixin
@@ -804,6 +805,24 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
                     f"quick-terminal-autohide = "
                     f"{str(ctec.quick_terminal.hide_on_focus_loss).lower()}"
                 )
+            # Export quick terminal hotkey as a global keybinding
+            # This converts iTerm2's numeric key code + modifiers to Ghostty format
+            if (
+                ctec.quick_terminal.hotkey_key_code is not None
+                or ctec.quick_terminal.hotkey_modifiers is not None
+            ):
+                keybind_str = macos_hotkey_to_keybind(
+                    ctec.quick_terminal.hotkey_key_code,
+                    ctec.quick_terminal.hotkey_modifiers,
+                )
+                if keybind_str:
+                    lines.append(f"keybind = {keybind_str}")
+                else:
+                    ctec.add_warning(
+                        f"Could not convert quick terminal hotkey (key code: "
+                        f"{ctec.quick_terminal.hotkey_key_code}) to keybinding. "
+                        "You may need to manually configure the global keybind."
+                    )
             lines.append("")
 
         # Export tab settings
