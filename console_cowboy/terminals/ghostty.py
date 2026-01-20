@@ -415,9 +415,35 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
             def on_error(k, v, e):
                 ctec.add_warning(f"Invalid {k}: {v}")
 
+            # Check if it's a theme name
+            if key == "theme":
+                # Handle special Ghostty theme formats
+                if "light:" in value and "dark:" in value:
+                    # Ghostty light/dark syntax: "light:Theme A,dark:Theme B"
+                    ctec.add_warning(
+                        f"Ghostty light/dark theme syntax '{value}' is terminal-specific. "
+                        "The dark theme will be used when converting to other terminals."
+                    )
+                    # Store full value for round-trip
+                    ctec.add_terminal_specific("ghostty", "theme_light_dark", value)
+                    # Extract dark theme for cross-terminal compatibility
+                    for part in value.split(","):
+                        part = part.strip()
+                        if part.startswith("dark:"):
+                            scheme.name = part[5:].strip()
+                            break
+                elif value.startswith("/") or value.startswith("~"):
+                    # Absolute path to theme file
+                    ctec.add_warning(
+                        f"Ghostty theme path '{value}' cannot be converted to other terminals. "
+                        "Stored as terminal-specific setting."
+                    )
+                    ctec.add_terminal_specific("ghostty", "theme_path", value)
+                else:
+                    # Simple theme name
+                    scheme.name = value
             # Check if it's a standard color key
-            ctec_color_key = cls.get_ctec_color_key(key)
-            if ctec_color_key:
+            elif ctec_color_key := cls.get_ctec_color_key(key):
                 setattr(scheme, ctec_color_key, normalize_color(value))
             # Handle special palette color
             elif key == "palette":
@@ -576,7 +602,7 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
                 ctec.add_terminal_specific("ghostty", key, value)
 
         # Only add non-empty configs
-        if any(
+        if scheme.name or any(
             getattr(scheme, f) is not None
             for f in [
                 "foreground",
@@ -647,6 +673,10 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
         if ctec.color_scheme:
             scheme = ctec.color_scheme
             lines.append("# Colors")
+
+            # Export theme name if set
+            if scheme.name:
+                lines.append(f"theme = {scheme.name}")
 
             # Use mixin to export standard colors
             colors = cls.map_ctec_to_colors(scheme)
