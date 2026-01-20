@@ -188,6 +188,7 @@ def resolve_source(
 def resolve_destination(
     dest: str | None,
     dest_type: str | None,
+    quiet: bool = False,
 ) -> tuple[Path | None, type | None]:
     """
     Resolve a destination argument.
@@ -195,6 +196,7 @@ def resolve_destination(
     Args:
         dest: The --to argument (terminal name, file path, or "-" for stdout)
         dest_type: The --to-type argument (explicit terminal type)
+        quiet: Suppress informational output
 
     Returns:
         Tuple of (output_path or None for stdout, adapter_class or None for CTEC)
@@ -234,6 +236,8 @@ def resolve_destination(
         config_path = TerminalRegistry.get_default_config_path_for_write(dest)
         if config_path is None:
             raise click.ClickException(f"Could not determine config path for {dest}.")
+        if not quiet:
+            click.echo(f"Writing to {dest} config: {config_path}", err=True)
         return config_path, adapter
 
     # Treat as file path
@@ -390,7 +394,7 @@ def cli(
             )
 
     # Resolve destination
-    output_path, dest_adapter = resolve_destination(dest, dest_type)
+    output_path, dest_adapter = resolve_destination(dest, dest_type, quiet)
 
     # Generate output
     if dest_adapter is None:
@@ -623,7 +627,7 @@ def import_config(
         raise click.ClickException(f"Failed to parse CTEC: {e}")
 
     # Resolve destination
-    output_path, dest_adapter = resolve_destination(dest, dest_type)
+    output_path, dest_adapter = resolve_destination(dest, dest_type, quiet)
 
     # For import, destination must be a terminal (not CTEC)
     if dest_adapter is None:
@@ -761,7 +765,7 @@ def convert_config(
             )
 
     # Resolve destination
-    output_path, dest_adapter = resolve_destination(dest, dest_type)
+    output_path, dest_adapter = resolve_destination(dest, dest_type, quiet)
 
     # Generate output
     if dest_adapter is None:

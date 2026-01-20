@@ -2,12 +2,13 @@
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import yaml
 from click.testing import CliRunner
 
-from console_cowboy.cli import cli
+from console_cowboy.cli import cli, resolve_destination
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -260,6 +261,68 @@ class TestImportCommand:
         assert (
             "terminal" in result.output.lower() or "required" in result.output.lower()
         )
+
+    def test_import_to_file_path_no_announcement(self, runner):
+        """Test that importing to an explicit file path does not announce."""
+        ctec_path = FIXTURES_DIR / "ctec" / "minimal.yaml"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "config"
+            result = runner.invoke(
+                cli,
+                [
+                    "import",
+                    "--from",
+                    str(ctec_path),
+                    "--to",
+                    str(output_path),
+                    "--to-type",
+                    "ghostty",
+                ],
+                catch_exceptions=False,
+            )
+            # When writing to explicit file path (not terminal name), no announcement
+            assert result.exit_code == 0
+            assert "Writing to" not in result.output
+
+
+class TestResolveDestination:
+    """Tests for the resolve_destination helper function."""
+
+    def test_resolve_destination_announces_terminal_path(self, capsys):
+        """Test that resolving a terminal name announces the config path."""
+        mock_path = Path("/mock/config/path")
+        with patch(
+            "console_cowboy.cli.TerminalRegistry.get_default_config_path_for_write",
+            return_value=mock_path,
+        ):
+            path, adapter = resolve_destination("ghostty", None, quiet=False)
+            assert path == mock_path
+            assert adapter is not None
+            captured = capsys.readouterr()
+            assert "Writing to ghostty config:" in captured.err
+            assert str(mock_path) in captured.err
+
+    def test_resolve_destination_quiet_suppresses_announcement(self, capsys):
+        """Test that quiet=True suppresses the announcement."""
+        mock_path = Path("/mock/config/path")
+        with patch(
+            "console_cowboy.cli.TerminalRegistry.get_default_config_path_for_write",
+            return_value=mock_path,
+        ):
+            path, adapter = resolve_destination("ghostty", None, quiet=True)
+            assert path == mock_path
+            captured = capsys.readouterr()
+            assert "Writing to" not in captured.err
+
+    def test_resolve_destination_file_path_no_announcement(self, capsys):
+        """Test that file paths don't trigger announcement."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            file_path = Path(tmpdir) / "config.yaml"
+            path, adapter = resolve_destination(str(file_path), None, quiet=False)
+            assert path == file_path
+            assert adapter is None  # CTEC inferred from .yaml extension
+            captured = capsys.readouterr()
+            assert "Writing to" not in captured.err
 
 
 class TestConvertCommand:
