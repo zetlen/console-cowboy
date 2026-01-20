@@ -4,6 +4,7 @@ from pathlib import Path
 
 from console_cowboy.ctec.schema import (
     CTEC,
+    BehaviorConfig,
     Color,
     ColorScheme,
     CursorConfig,
@@ -491,3 +492,13 @@ return config
 
         # Verify unix_domains is preserved
         assert "config.unix_domains" in output
+
+    def test_export_copy_on_select_warning(self):
+        """Test WezTerm adds warning when exporting copy_on_select."""
+        ctec = CTEC(behavior=BehaviorConfig(copy_on_select=True))
+        WeztermAdapter.export(ctec)
+
+        # Should have a warning about copy_on_select not being directly supported
+        copy_warnings = [w for w in ctec.warnings if "copy_on_select" in w.lower()]
+        assert len(copy_warnings) == 1
+        assert "mouse_bindings" in copy_warnings[0]

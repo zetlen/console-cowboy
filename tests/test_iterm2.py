@@ -376,3 +376,56 @@ class TestITerm2ToGhosttyQuickTerminalHotkey:
         # Should have a keybind for toggle_quick_terminal
         assert "toggle_quick_terminal" in output
         assert "keybind = global:" in output
+
+    def test_parse_copy_on_select(self):
+        """Test that CopySelection global setting is parsed to copy_on_select."""
+        import plistlib
+
+        profile = {
+            "Name": "Default",
+            "Guid": "default",
+        }
+        plist_data = {
+            "New Bookmarks": [profile],
+            "CopySelection": True,
+        }
+        content = plistlib.dumps(plist_data).decode()
+
+        ctec = ITerm2Adapter.parse("test.plist", content=content)
+        assert ctec.behavior is not None
+        assert ctec.behavior.copy_on_select is True
+
+    def test_parse_copy_on_select_false(self):
+        """Test that CopySelection=False is parsed correctly."""
+        import plistlib
+
+        profile = {
+            "Name": "Default",
+            "Guid": "default",
+        }
+        plist_data = {
+            "New Bookmarks": [profile],
+            "CopySelection": False,
+        }
+        content = plistlib.dumps(plist_data).decode()
+
+        ctec = ITerm2Adapter.parse("test.plist", content=content)
+        assert ctec.behavior is not None
+        assert ctec.behavior.copy_on_select is False
+
+    def test_export_copy_on_select(self):
+        """Test that copy_on_select is exported as CopySelection."""
+        ctec = CTEC(behavior=BehaviorConfig(copy_on_select=True))
+        output = ITerm2Adapter.export(ctec)
+
+        import plistlib
+
+        data = plistlib.loads(output.encode())
+        assert data.get("CopySelection") is True
+
+    def test_roundtrip_copy_on_select(self):
+        """Test that copy_on_select round-trips correctly."""
+        original = CTEC(behavior=BehaviorConfig(copy_on_select=True))
+        output = ITerm2Adapter.export(original)
+        parsed = ITerm2Adapter.parse("test.plist", content=output)
+        assert parsed.behavior.copy_on_select is True

@@ -755,6 +755,12 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
         if panes.inactive_dim_factor is not None:
             ctec.panes = panes
 
+        # Parse copy_on_select (global setting: CopySelection)
+        if "CopySelection" in data:
+            if ctec.behavior is None:
+                ctec.behavior = BehaviorConfig()
+            ctec.behavior.copy_on_select = bool(data["CopySelection"])
+
         # Parse global settings
         global_specific_keys = [
             "TabStyleWithAutomaticOption",
@@ -1055,6 +1061,10 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
                 "iTerm2 does not support tab bar configuration via plist export. "
                 "Tab settings must be configured in Preferences > Appearance."
             )
+
+        # Export copy_on_select as global CopySelection setting
+        if ctec.behavior and ctec.behavior.copy_on_select is not None:
+            result["CopySelection"] = ctec.behavior.copy_on_select
 
         # Restore terminal-specific global settings
         global_keys = [
