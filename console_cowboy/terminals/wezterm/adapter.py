@@ -440,11 +440,19 @@ class WeztermAdapter(TerminalAdapter):
                 if duration and int(duration) > 0:
                     behavior.bell_mode = BellMode.VISUAL
 
+        if "hide_mouse_cursor_when_typing" in config:
+            val = config["hide_mouse_cursor_when_typing"]
+            if isinstance(val, bool):
+                behavior.mouse_hide_while_typing = val
+            else:
+                behavior.mouse_hide_while_typing = str(val).lower() == "true"
+
         if (
             behavior.shell
             or behavior.scrollback_lines
             or behavior.bell_mode
             or behavior.environment_variables
+            or behavior.mouse_hide_while_typing is not None
         ):
             ctec.behavior = behavior
 
@@ -1017,6 +1025,9 @@ class WeztermAdapter(TerminalAdapter):
                     lines.append("}")
                 else:
                     lines.append('config.audible_bell = "SystemBeep"')
+            if ctec.behavior.mouse_hide_while_typing is not None:
+                val = "true" if ctec.behavior.mouse_hide_while_typing else "false"
+                lines.append(f"config.hide_mouse_cursor_when_typing = {val}")
             lines.append("")
 
         # Export scroll settings (Wezterm default is 3500 lines)

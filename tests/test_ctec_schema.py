@@ -410,6 +410,19 @@ class TestBehaviorConfig:
             "HOME": "/home/user",
         }
 
+    def test_mouse_hide_while_typing(self):
+        """Test mouse_hide_while_typing field."""
+        behavior = BehaviorConfig(mouse_hide_while_typing=True)
+        assert behavior.mouse_hide_while_typing is True
+
+        # Test to_dict
+        d = behavior.to_dict()
+        assert d["mouse_hide_while_typing"] is True
+
+        # Test from_dict
+        behavior2 = BehaviorConfig.from_dict({"mouse_hide_while_typing": False})
+        assert behavior2.mouse_hide_while_typing is False
+
 
 class TestKeyBinding:
     """Tests for the KeyBinding class."""

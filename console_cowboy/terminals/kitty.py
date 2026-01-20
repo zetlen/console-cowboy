@@ -334,8 +334,12 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
             elif key == "close_on_child_death":
                 behavior.close_on_exit = "close" if value.lower() == "yes" else "hold"
             elif key == "mouse_hide_wait":
+                # Kitty: negative value = hide immediately when typing
+                # positive = hide after N seconds of inactivity
+                # 0 = disabled
                 try:
-                    behavior.mouse_enabled = float(value) >= 0
+                    wait_value = float(value)
+                    behavior.mouse_hide_while_typing = wait_value < 0
                 except ValueError:
                     ctec.add_warning(f"Invalid mouse_hide_wait: {value}")
 
@@ -515,6 +519,7 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
             or behavior.scrollback_lines
             or behavior.bell_mode
             or behavior.environment_variables
+            or behavior.mouse_hide_while_typing is not None
         ):
             ctec.behavior = behavior
         if quick_terminal.enabled:
@@ -658,6 +663,11 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
             if ctec.behavior.close_on_exit:
                 val = "yes" if ctec.behavior.close_on_exit == "close" else "no"
                 lines.append(f"close_on_child_death {val}")
+            if ctec.behavior.mouse_hide_while_typing is not None:
+                # Kitty: negative value = hide immediately when typing
+                # Use -1 for true, 3.0 (default) for false
+                val = "-1" if ctec.behavior.mouse_hide_while_typing else "3.0"
+                lines.append(f"mouse_hide_wait {val}")
             lines.append("")
 
         # Export scroll settings (Kitty uses -1 for unlimited)
