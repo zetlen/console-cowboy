@@ -2,6 +2,7 @@
 
 from console_cowboy.terminals import (
     GhosttyAdapter,
+    HyperAdapter,
     ITerm2Adapter,
     TerminalAppAdapter,
     TerminalRegistry,
@@ -21,6 +22,7 @@ class TestTerminalRegistry:
         assert "wezterm" in names
         assert "vscode" in names
         assert "terminal_app" in names
+        assert "hyper" in names
 
     def test_get_terminal_by_name(self):
         adapter = TerminalRegistry.get("ghostty")
@@ -36,7 +38,8 @@ class TestTerminalRegistry:
 
     def test_list_terminals(self):
         terminals = TerminalRegistry.list_terminals()
-        assert len(terminals) == 7
+        assert len(terminals) == 8
         assert ITerm2Adapter in terminals
         assert VSCodeAdapter in terminals
         assert TerminalAppAdapter in terminals
+        assert HyperAdapter in terminals

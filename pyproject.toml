@@ -19,6 +19,7 @@ classifiers = [
 ]
 dependencies = [
     "click",
+    "dukpy>=0.3",
     "lupa>=2.0",
     "pyyaml>=6.0",
     "tomli>=2.0",
