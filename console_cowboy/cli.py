@@ -22,6 +22,7 @@ import click
 import console_cowboy.terminals  # noqa: F401
 from console_cowboy.ctec import CTEC, CTECSerializer
 from console_cowboy.terminals import TerminalRegistry
+from console_cowboy.validation import ValidationResult, validate_fonts
 
 
 def get_terminal_choices() -> list[str]:
@@ -60,6 +61,31 @@ def print_terminal_specific(ctec: CTEC) -> None:
                 click.style(
                     f"  [{setting.terminal}] {setting.key} = {setting.value}", fg="cyan"
                 ),
+                err=True,
+            )
+
+
+def print_font_validation(result: ValidationResult) -> None:
+    """Print font validation warnings and suggestions."""
+    if not result.has_warnings and not result.suggestions:
+        return
+
+    click.echo(
+        click.style("\nFont validation:", fg="yellow", bold=True),
+        err=True,
+    )
+    for warning in result.warnings:
+        click.echo(click.style(f"  ⚠ {warning}", fg="yellow"), err=True)
+
+    if result.suggestions:
+        click.echo(
+            click.style("\n  Suggestions:", fg="cyan"),
+            err=True,
+        )
+        for font, alternatives in result.suggestions.items():
+            alt_str = ", ".join(alternatives[:3])  # Show top 3 suggestions
+            click.echo(
+                click.style(f"    '{font}' → try: {alt_str}", fg="cyan"),
                 err=True,
             )
 
@@ -491,12 +517,18 @@ def list_terminals():
     is_flag=True,
     help="Suppress warnings and informational output.",
 )
+@click.option(
+    "--check-fonts",
+    is_flag=True,
+    help="Check if fonts in the configuration exist on this system.",
+)
 def export_config(
     source: str,
     source_type: str | None,
     dest: str | None,
     profile_name: str | None,
     quiet: bool,
+    check_fonts: bool,
 ):
     """
     Export a terminal's configuration to CTEC format (YAML).
@@ -514,6 +546,9 @@ def export_config(
 
         # Export a specific iTerm2 profile
         console-cowboy export --from iterm2 --profile "Development"
+
+        # Export with font validation
+        console-cowboy export --from ghostty --check-fonts
     """
     # Resolve source
     content, source_adapter, source_path = resolve_source(source, source_type, quiet)
@@ -558,6 +593,9 @@ def export_config(
     if not quiet:
         print_warnings(ctec)
         print_terminal_specific(ctec)
+        if check_fonts:
+            font_result = validate_fonts(ctec)
+            print_font_validation(font_result)
 
 
 @cli.command(name="import")
@@ -585,11 +623,17 @@ def export_config(
     is_flag=True,
     help="Suppress warnings and informational output.",
 )
+@click.option(
+    "--check-fonts",
+    is_flag=True,
+    help="Check if fonts in the configuration exist on this system.",
+)
 def import_config(
     source: str,
     dest: str | None,
     dest_type: str | None,
     quiet: bool,
+    check_fonts: bool,
 ):
     """
     Import a CTEC configuration into a terminal's native format.
@@ -606,6 +650,9 @@ def import_config(
 
         # Import from stdin
         cat config.yaml | console-cowboy import --from - --to ghostty
+
+        # Import with font validation
+        console-cowboy import --from config.yaml --to ghostty --check-fonts
     """
     # Read source (must be CTEC)
     if source == "-":
@@ -650,6 +697,9 @@ def import_config(
     # Print warnings
     if not quiet:
         print_warnings(ctec)
+        if check_fonts:
+            font_result = validate_fonts(ctec)
+            print_font_validation(font_result)
 
         # Check for incompatibilities
         if ctec.source_terminal and ctec.source_terminal != dest_adapter.name:
@@ -704,6 +754,11 @@ def import_config(
     is_flag=True,
     help="Suppress warnings and informational output.",
 )
+@click.option(
+    "--check-fonts",
+    is_flag=True,
+    help="Check if fonts in the configuration exist on this system.",
+)
 def convert_config(
     source: str,
     source_type: str | None,
@@ -711,6 +766,7 @@ def convert_config(
     dest_type: str | None,
     profile_name: str | None,
     quiet: bool,
+    check_fonts: bool,
 ):
     """
     Convert directly between terminal configuration formats.
@@ -727,6 +783,9 @@ def convert_config(
 
         # Convert a specific iTerm2 profile
         console-cowboy convert --from iterm2 --profile "Development" --to ghostty
+
+        # Convert with font validation
+        console-cowboy convert --from kitty --to ghostty --check-fonts
     """
     # This is essentially the same as the main command with both --from and --to
     # Resolve source
@@ -794,6 +853,9 @@ def convert_config(
     # Print warnings
     if not quiet:
         print_warnings(ctec)
+        if check_fonts:
+            font_result = validate_fonts(ctec)
+            print_font_validation(font_result)
         if source_adapter and dest_adapter:
             source_specific = ctec.get_terminal_specific(source_adapter.name)
             if source_specific:

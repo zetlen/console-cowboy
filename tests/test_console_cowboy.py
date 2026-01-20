@@ -177,6 +177,26 @@ class TestExportCommand:
         # Wezterm should show warnings about Lua parsing
         assert "Warning" in result.output or result.exit_code == 0
 
+    def test_export_check_fonts(self, runner):
+        """Test that --check-fonts validates fonts in the configuration."""
+        config_path = FIXTURES_DIR / "ghostty" / "config"
+        result = runner.invoke(
+            cli,
+            [
+                "export",
+                "--from",
+                str(config_path),
+                "--from-type",
+                "ghostty",
+                "--check-fonts",
+            ],
+        )
+
+        assert result.exit_code == 0
+        # The output should include font validation section if fonts are checked
+        # Either fonts exist (no warnings) or don't exist (show warnings with suggestions)
+        # The test passes as long as the command completes successfully
+
 
 class TestImportCommand:
     """Tests for the import command."""
