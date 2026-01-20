@@ -9,6 +9,8 @@ from pathlib import Path
 
 from console_cowboy.ctec.schema import (
     CTEC,
+    BackgroundImagePosition,
+    BackgroundImageScale,
     BehaviorConfig,
     ColorScheme,
     CursorConfig,
@@ -116,6 +118,37 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
         "window-padding-y": ("padding_vertical", int),
         "window-decoration": ("decorations", lambda v: v.lower() != "none"),
         "window-title-show-all": ("dynamic_title", lambda v: v.lower() == "true"),
+        "background-image": ("background_image", str),
+        "background-image-opacity": ("background_image_opacity", float),
+    }
+
+    # Background image scale mapping (Ghostty: background-image-fit)
+    BACKGROUND_IMAGE_SCALE_MAP = {
+        "contain": BackgroundImageScale.CONTAIN,
+        "cover": BackgroundImageScale.COVER,
+        "stretch": BackgroundImageScale.STRETCH,
+        "none": BackgroundImageScale.NONE,
+    }
+
+    BACKGROUND_IMAGE_SCALE_REVERSE_MAP = {
+        v: k for k, v in BACKGROUND_IMAGE_SCALE_MAP.items()
+    }
+
+    # Background image position mapping
+    BACKGROUND_IMAGE_POSITION_MAP = {
+        "top-left": BackgroundImagePosition.TOP_LEFT,
+        "top-center": BackgroundImagePosition.TOP_CENTER,
+        "top-right": BackgroundImagePosition.TOP_RIGHT,
+        "center-left": BackgroundImagePosition.CENTER_LEFT,
+        "center": BackgroundImagePosition.CENTER,
+        "center-right": BackgroundImagePosition.CENTER_RIGHT,
+        "bottom-left": BackgroundImagePosition.BOTTOM_LEFT,
+        "bottom-center": BackgroundImagePosition.BOTTOM_CENTER,
+        "bottom-right": BackgroundImagePosition.BOTTOM_RIGHT,
+    }
+
+    BACKGROUND_IMAGE_POSITION_REVERSE_MAP = {
+        v: k for k, v in BACKGROUND_IMAGE_POSITION_MAP.items()
     }
 
     # Behavior mapping
@@ -505,6 +538,26 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
                 if value.lower() == "true":
                     window.startup_mode = "fullscreen"
 
+            # Parse background image scale (fit) and position
+            elif key == "background-image-fit":
+                scale = cls.BACKGROUND_IMAGE_SCALE_MAP.get(value.lower())
+                if scale:
+                    window.background_image_scale = scale
+                else:
+                    ctec.add_warning(f"Unknown background-image-fit value: {value}")
+
+            elif key == "background-image-position":
+                position = cls.BACKGROUND_IMAGE_POSITION_MAP.get(value.lower())
+                if position:
+                    window.background_image_position = position
+                else:
+                    ctec.add_warning(f"Unknown background-image-position: {value}")
+
+            elif key == "background-image-repeat":
+                # If repeat is true, treat it as tile mode
+                if value.lower() == "true":
+                    window.background_image_scale = BackgroundImageScale.TILE
+
             # Parse cursor settings
             elif key == "cursor-style":
                 cursor.style = cls.get_cursor_style(value)
@@ -629,7 +682,15 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
             ctec.font = font
         if cursor.style or cursor.blink is not None:
             ctec.cursor = cursor
-        if window.columns or window.rows or window.opacity:
+        if (
+            window.columns
+            or window.rows
+            or window.opacity
+            or window.background_image
+            or window.background_image_opacity is not None
+            or window.background_image_scale
+            or window.background_image_position
+        ):
             ctec.window = window
         if (
             behavior.shell
@@ -771,6 +832,38 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
                 lines.append(
                     f"window-title-show-all = {str(ctec.window.dynamic_title).lower()}"
                 )
+            # Export background image settings
+            if ctec.window.background_image:
+                lines.append(f"background-image = {ctec.window.background_image}")
+            if ctec.window.background_image_opacity is not None:
+                lines.append(
+                    f"background-image-opacity = {ctec.window.background_image_opacity}"
+                )
+            if ctec.window.background_image_scale is not None:
+                if ctec.window.background_image_scale == BackgroundImageScale.TILE:
+                    # Ghostty uses repeat for tiling
+                    lines.append("background-image-repeat = true")
+                elif (
+                    ctec.window.background_image_scale == BackgroundImageScale.CENTERED
+                ):
+                    # Ghostty doesn't support centered mode, fall back to contain
+                    ctec.add_warning(
+                        "Ghostty does not support 'centered' background image scaling. "
+                        "Using 'contain' as fallback."
+                    )
+                    lines.append("background-image-fit = contain")
+                else:
+                    fit_val = cls.BACKGROUND_IMAGE_SCALE_REVERSE_MAP.get(
+                        ctec.window.background_image_scale
+                    )
+                    if fit_val:
+                        lines.append(f"background-image-fit = {fit_val}")
+            if ctec.window.background_image_position is not None:
+                pos_val = cls.BACKGROUND_IMAGE_POSITION_REVERSE_MAP.get(
+                    ctec.window.background_image_position
+                )
+                if pos_val:
+                    lines.append(f"background-image-position = {pos_val}")
             lines.append("")
 
         # Export behavior settings
