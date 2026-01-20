@@ -239,7 +239,7 @@ class TestITerm2Adapter:
         assert tab_color["Red Component"] == 0.5
 
     def test_parse_terminal_type(self):
-        """Test that Terminal Type is mapped to behavior.environment_variables['TERM']."""
+        """Test that Terminal Type is mapped to behavior.terminal_type."""
         plist_content = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -258,28 +258,23 @@ class TestITerm2Adapter:
 </dict>
 </plist>"""
         ctec = ITerm2Adapter.parse("test.plist", content=plist_content)
-        # Terminal Type should map to TERM env var per commutativity principle
+        # Terminal Type should map to terminal_type (first-class schema field)
         assert ctec.behavior is not None
-        assert ctec.behavior.environment_variables is not None
-        assert ctec.behavior.environment_variables.get("TERM") == "xterm-256color"
+        assert ctec.behavior.terminal_type == "xterm-256color"
 
     def test_export_terminal_type(self):
-        """Test that TERM env var is exported as Terminal Type."""
-        ctec = CTEC(
-            behavior=BehaviorConfig(environment_variables={"TERM": "xterm-256color"})
-        )
+        """Test that terminal_type is exported as Terminal Type."""
+        ctec = CTEC(behavior=BehaviorConfig(terminal_type="xterm-256color"))
         output = ITerm2Adapter.export(ctec)
         assert "<key>Terminal Type</key>" in output
         assert "<string>xterm-256color</string>" in output
 
     def test_roundtrip_terminal_type(self):
         """Test that Terminal Type round-trips correctly."""
-        original = CTEC(
-            behavior=BehaviorConfig(environment_variables={"TERM": "xterm-256color"})
-        )
+        original = CTEC(behavior=BehaviorConfig(terminal_type="xterm-256color"))
         output = ITerm2Adapter.export(original)
         parsed = ITerm2Adapter.parse("test.plist", content=output)
-        assert parsed.behavior.environment_variables["TERM"] == "xterm-256color"
+        assert parsed.behavior.terminal_type == "xterm-256color"
 
     def test_roundtrip_ligatures(self):
         """Test that ligatures setting round-trips correctly."""

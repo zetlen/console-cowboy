@@ -286,3 +286,152 @@ return config
         assert "mouse_hide_wait -1" in kitty_output
         wezterm_output = WeztermAdapter.export(ctec)
         assert "config.hide_mouse_cursor_when_typing = true" in wezterm_output
+
+
+class TestTerminalTypeSupport:
+    """Tests for terminal_type (TERM environment variable) support across terminals."""
+
+    def test_ghostty_parse_terminal_type(self):
+        """Test Ghostty parses term setting into terminal_type."""
+        config = """
+term = xterm-ghostty
+"""
+        ctec = GhosttyAdapter.parse("test", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.terminal_type == "xterm-ghostty"
+
+    def test_ghostty_export_terminal_type(self):
+        """Test Ghostty exports terminal_type as term setting."""
+        ctec = CTEC(behavior=BehaviorConfig(terminal_type="xterm-256color"))
+        output = GhosttyAdapter.export(ctec)
+        assert "term = xterm-256color" in output
+
+    def test_ghostty_terminal_type_roundtrip(self):
+        """Test terminal_type survives Ghostty round-trip."""
+        config = """
+term = xterm-ghostty
+"""
+        parsed = GhosttyAdapter.parse("test", content=config)
+        exported = GhosttyAdapter.export(parsed)
+        reparsed = GhosttyAdapter.parse("test", content=exported)
+        assert reparsed.behavior.terminal_type == "xterm-ghostty"
+
+    def test_kitty_parse_terminal_type(self):
+        """Test Kitty parses term setting into terminal_type."""
+        config = """
+term xterm-kitty
+"""
+        ctec = KittyAdapter.parse("test", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.terminal_type == "xterm-kitty"
+
+    def test_kitty_export_terminal_type(self):
+        """Test Kitty exports terminal_type as term setting."""
+        ctec = CTEC(behavior=BehaviorConfig(terminal_type="xterm-256color"))
+        output = KittyAdapter.export(ctec)
+        assert "term xterm-256color" in output
+
+    def test_kitty_terminal_type_roundtrip(self):
+        """Test terminal_type survives Kitty round-trip."""
+        config = """
+term xterm-kitty
+"""
+        parsed = KittyAdapter.parse("test", content=config)
+        exported = KittyAdapter.export(parsed)
+        reparsed = KittyAdapter.parse("test", content=exported)
+        assert reparsed.behavior.terminal_type == "xterm-kitty"
+
+    def test_wezterm_parse_terminal_type(self):
+        """Test WezTerm parses term setting into terminal_type."""
+        config = """
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+config.term = "xterm-256color"
+
+return config
+"""
+        ctec = WeztermAdapter.parse("test", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.terminal_type == "xterm-256color"
+
+    def test_wezterm_export_terminal_type(self):
+        """Test WezTerm exports terminal_type as config.term."""
+        ctec = CTEC(behavior=BehaviorConfig(terminal_type="wezterm"))
+        output = WeztermAdapter.export(ctec)
+        assert 'config.term = "wezterm"' in output
+
+    def test_wezterm_terminal_type_roundtrip(self):
+        """Test terminal_type survives WezTerm round-trip."""
+        config = """
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+config.term = "xterm-256color"
+
+return config
+"""
+        parsed = WeztermAdapter.parse("test", content=config)
+        exported = WeztermAdapter.export(parsed)
+        reparsed = WeztermAdapter.parse("test", content=exported)
+        assert reparsed.behavior.terminal_type == "xterm-256color"
+
+    def test_iterm2_parse_terminal_type(self):
+        """Test iTerm2 parses Terminal Type setting into terminal_type."""
+        import plistlib
+
+        profile = {
+            "Name": "Default",
+            "Guid": "default",
+            "Terminal Type": "xterm-256color",
+        }
+        plist_data = {"New Bookmarks": [profile]}
+        content = plistlib.dumps(plist_data).decode()
+
+        ctec = ITerm2Adapter.parse("test", content=content)
+        assert ctec.behavior is not None
+        assert ctec.behavior.terminal_type == "xterm-256color"
+
+    def test_iterm2_export_terminal_type(self):
+        """Test iTerm2 exports terminal_type as Terminal Type setting."""
+        ctec = CTEC(behavior=BehaviorConfig(terminal_type="xterm-256color"))
+        output = ITerm2Adapter.export(ctec)
+
+        import plistlib
+
+        data = plistlib.loads(output.encode())
+        profile = data["New Bookmarks"][0]
+        assert profile["Terminal Type"] == "xterm-256color"
+
+    def test_iterm2_terminal_type_roundtrip(self):
+        """Test terminal_type survives iTerm2 round-trip."""
+        import plistlib
+
+        profile = {
+            "Name": "Default",
+            "Guid": "default",
+            "Terminal Type": "xterm-256color",
+        }
+        plist_data = {"New Bookmarks": [profile]}
+        content = plistlib.dumps(plist_data).decode()
+
+        parsed = ITerm2Adapter.parse("test", content=content)
+        exported = ITerm2Adapter.export(parsed)
+        reparsed = ITerm2Adapter.parse("test", content=exported)
+        assert reparsed.behavior.terminal_type == "xterm-256color"
+
+    def test_cross_terminal_terminal_type(self):
+        """Test terminal_type converts correctly between terminals."""
+        # Parse from Ghostty
+        ghostty_config = """
+term = xterm-256color
+"""
+        ctec = GhosttyAdapter.parse("test", content=ghostty_config)
+
+        # Export to Kitty
+        kitty_output = KittyAdapter.export(ctec)
+        assert "term xterm-256color" in kitty_output
+
+        # Export to WezTerm
+        wezterm_output = WeztermAdapter.export(ctec)
+        assert 'config.term = "xterm-256color"' in wezterm_output

@@ -342,6 +342,8 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
                     behavior.mouse_hide_while_typing = wait_value < 0
                 except ValueError:
                     ctec.add_warning(f"Invalid mouse_hide_wait: {value}")
+            elif key == "term":
+                behavior.terminal_type = value
 
             # Parse key bindings
             elif key == "map":
@@ -520,6 +522,7 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
             or behavior.bell_mode
             or behavior.environment_variables
             or behavior.mouse_hide_while_typing is not None
+            or behavior.terminal_type
         ):
             ctec.behavior = behavior
         if quick_terminal.enabled:
@@ -668,6 +671,8 @@ class KittyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
                 # Use -1 for true, 3.0 (default) for false
                 val = "-1" if ctec.behavior.mouse_hide_while_typing else "3.0"
                 lines.append(f"mouse_hide_wait {val}")
+            if ctec.behavior.terminal_type:
+                lines.append(f"term {ctec.behavior.terminal_type}")
             lines.append("")
 
         # Export scroll settings (Kitty uses -1 for unlimited)

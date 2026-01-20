@@ -424,6 +424,9 @@ class WeztermAdapter(TerminalAdapter):
                     f"Invalid scrollback_lines: {config['scrollback_lines']}"
                 )
 
+        if "term" in config:
+            behavior.terminal_type = str(config["term"]).strip("'\"")
+
         if "audible_bell" in config:
             audible_bell = str(config["audible_bell"]).strip("'\"")
             if audible_bell == "Disabled":
@@ -453,6 +456,7 @@ class WeztermAdapter(TerminalAdapter):
             or behavior.bell_mode
             or behavior.environment_variables
             or behavior.mouse_hide_while_typing is not None
+            or behavior.terminal_type
         ):
             ctec.behavior = behavior
 
@@ -1012,6 +1016,8 @@ class WeztermAdapter(TerminalAdapter):
                 for env_key, env_value in ctec.behavior.environment_variables.items():
                     lines.append(f'  {env_key} = "{env_value}",')
                 lines.append("}")
+            if ctec.behavior.terminal_type:
+                lines.append(f'config.term = "{ctec.behavior.terminal_type}"')
             if ctec.behavior.bell_mode is not None:
                 if ctec.behavior.bell_mode == BellMode.NONE:
                     lines.append('config.audible_bell = "Disabled"')

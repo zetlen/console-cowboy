@@ -372,14 +372,11 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
                 ctec.add_terminal_specific("iterm2", "Initial Text", initial_text)
 
         # Parse Terminal Type (TERM environment variable)
-        # This maps to behavior.environment_variables["TERM"] per commutativity principle
-        # since environment variables are supported by all major terminals
+        # Maps to behavior.terminal_type - a first-class field since 4+ terminals support it
         if "Terminal Type" in profile_data:
             term_value = profile_data["Terminal Type"]
             if term_value:
-                if behavior.environment_variables is None:
-                    behavior.environment_variables = {}
-                behavior.environment_variables["TERM"] = term_value
+                behavior.terminal_type = term_value
 
         ctec.behavior = behavior
 
@@ -847,20 +844,14 @@ class ITerm2Adapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin):
                 result["Silence Bell"] = ctec.behavior.bell_mode == BellMode.NONE
                 result["Visual Bell"] = ctec.behavior.bell_mode == BellMode.VISUAL
 
-            # Handle environment variables
-            if ctec.behavior.environment_variables:
-                # TERM has native support via Terminal Type setting
-                if "TERM" in ctec.behavior.environment_variables:
-                    result["Terminal Type"] = ctec.behavior.environment_variables[
-                        "TERM"
-                    ]
+            # Handle terminal_type (TERM environment variable)
+            if ctec.behavior.terminal_type:
+                result["Terminal Type"] = ctec.behavior.terminal_type
 
-                # Other env vars go via Initial Text (workaround)
-                other_env_vars = {
-                    k: v
-                    for k, v in ctec.behavior.environment_variables.items()
-                    if k != "TERM"
-                }
+            # Handle other environment variables
+            if ctec.behavior.environment_variables:
+                # All env vars go via Initial Text (workaround)
+                other_env_vars = ctec.behavior.environment_variables
                 if other_env_vars:
                     # Generate export commands for env vars
                     # Validate keys to prevent shell injection - keys must be valid

@@ -847,6 +847,7 @@ class BehaviorConfig:
         scrollback_lines: DEPRECATED - use CTEC.scroll instead
         mouse_enabled: Whether to enable mouse support
         mouse_hide_while_typing: Hide mouse cursor when typing
+        terminal_type: TERM environment variable value (e.g., 'xterm-256color')
         bell_mode: Bell notification mode
         copy_on_select: Whether to copy text to clipboard on selection
         confirm_close: Whether to confirm before closing with running processes
@@ -856,6 +857,13 @@ class BehaviorConfig:
         - Ghostty: `mouse-hide-while-typing` (true/false)
         - Kitty: `mouse_hide_wait` (negative = hide immediately, 0 = disabled)
         - WezTerm: `hide_mouse_cursor_when_typing` (true/false)
+
+    Terminal Type (TERM) Support:
+        - Ghostty: `term` setting (default: xterm-ghostty)
+        - Kitty: `term` setting (default: xterm-kitty)
+        - WezTerm: `config.term` (default: xterm-256color)
+        - iTerm2: "Terminal Type" profile setting
+        - Alacritty: Built-in (not user-configurable)
 
     Environment Variable Support:
         - Ghostty: `env KEY=VALUE` lines (multiple allowed)
@@ -878,6 +886,7 @@ class BehaviorConfig:
     scrollback_lines: int | None = None  # DEPRECATED: use CTEC.scroll
     mouse_enabled: bool | None = None
     mouse_hide_while_typing: bool | None = None
+    terminal_type: str | None = None  # TERM environment variable value
     bell_mode: BellMode | None = None
     copy_on_select: bool | None = None
     confirm_close: bool | None = None
@@ -892,6 +901,7 @@ class BehaviorConfig:
             "scrollback_lines",
             "mouse_enabled",
             "mouse_hide_while_typing",
+            "terminal_type",
             "copy_on_select",
             "confirm_close",
             "close_on_exit",
@@ -918,6 +928,7 @@ class BehaviorConfig:
             scrollback_lines=data.get("scrollback_lines"),
             mouse_enabled=data.get("mouse_enabled"),
             mouse_hide_while_typing=data.get("mouse_hide_while_typing"),
+            terminal_type=data.get("terminal_type"),
             bell_mode=BellMode(data["bell_mode"]) if "bell_mode" in data else None,
             copy_on_select=data.get("copy_on_select"),
             confirm_close=data.get("confirm_close"),
