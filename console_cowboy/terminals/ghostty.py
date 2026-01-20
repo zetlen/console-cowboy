@@ -161,6 +161,7 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
             "mouse_hide_while_typing",
             lambda v: v.lower() == "true",
         ),
+        "term": ("terminal_type", str),
     }
 
     # Tab bar visibility mapping
@@ -697,6 +698,7 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
             or behavior.scrollback_lines
             or behavior.environment_variables
             or behavior.mouse_hide_while_typing is not None
+            or behavior.terminal_type
         ):
             ctec.behavior = behavior
         if quick_terminal.enabled:
@@ -896,6 +898,8 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
                     f"mouse-hide-while-typing = "
                     f"{str(ctec.behavior.mouse_hide_while_typing).lower()}"
                 )
+            if ctec.behavior.terminal_type:
+                lines.append(f"term = {ctec.behavior.terminal_type}")
             lines.append("")
 
         # Export scroll settings (Ghostty uses bytes, not lines)
