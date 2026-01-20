@@ -4,6 +4,8 @@ from pathlib import Path
 
 from console_cowboy.ctec.schema import (
     CTEC,
+    BackgroundImagePosition,
+    BackgroundImageScale,
     Color,
     ColorScheme,
     CursorConfig,
@@ -97,6 +99,144 @@ cursor-style = bar
         assert restored.font.family == original.font.family
         assert restored.font.size == original.font.size
         assert restored.cursor.style == original.cursor.style
+
+    def test_parse_background_image(self):
+        """Test parsing background image settings from Ghostty config."""
+        content = """
+background-image = /path/to/image.png
+background-image-opacity = 0.5
+"""
+        ctec = GhosttyAdapter.parse("test", content=content)
+        assert ctec.window.background_image == "/path/to/image.png"
+        assert ctec.window.background_image_opacity == 0.5
+
+    def test_parse_background_image_scale(self):
+        """Test parsing background image fit/scale modes."""
+        for ghostty_value, expected_scale in [
+            ("contain", BackgroundImageScale.CONTAIN),
+            ("cover", BackgroundImageScale.COVER),
+            ("stretch", BackgroundImageScale.STRETCH),
+            ("none", BackgroundImageScale.NONE),
+        ]:
+            content = f"""
+background-image = /path/to/image.png
+background-image-fit = {ghostty_value}
+"""
+            ctec = GhosttyAdapter.parse("test", content=content)
+            assert ctec.window.background_image_scale == expected_scale
+
+    def test_parse_background_image_position(self):
+        """Test parsing background image position settings."""
+        for position in [
+            "top-left",
+            "top-center",
+            "top-right",
+            "center-left",
+            "center",
+            "center-right",
+            "bottom-left",
+            "bottom-center",
+            "bottom-right",
+        ]:
+            content = f"""
+background-image = /path/to/image.png
+background-image-position = {position}
+"""
+            ctec = GhosttyAdapter.parse("test", content=content)
+            assert ctec.window.background_image_position is not None
+            assert ctec.window.background_image_position.value == position
+
+    def test_parse_background_image_repeat(self):
+        """Test that background-image-repeat=true sets scale to TILE."""
+        content = """
+background-image = /path/to/image.png
+background-image-repeat = true
+"""
+        ctec = GhosttyAdapter.parse("test", content=content)
+        assert ctec.window.background_image_scale == BackgroundImageScale.TILE
+
+    def test_export_background_image(self):
+        """Test exporting background image settings to Ghostty config."""
+        ctec = CTEC(
+            window=WindowConfig(
+                background_image="/home/user/wallpaper.png",
+                background_image_opacity=0.8,
+            )
+        )
+        output = GhosttyAdapter.export(ctec)
+
+        assert "background-image = /home/user/wallpaper.png" in output
+        assert "background-image-opacity = 0.8" in output
+
+    def test_export_background_image_scale_and_position(self):
+        """Test exporting background image scale and position settings."""
+        ctec = CTEC(
+            window=WindowConfig(
+                background_image="/path/to/image.png",
+                background_image_scale=BackgroundImageScale.COVER,
+                background_image_position=BackgroundImagePosition.CENTER,
+            )
+        )
+        output = GhosttyAdapter.export(ctec)
+
+        assert "background-image = /path/to/image.png" in output
+        assert "background-image-fit = cover" in output
+        assert "background-image-position = center" in output
+
+    def test_roundtrip_background_image(self):
+        """Test round-trip conversion of background image settings."""
+        content = """
+background-image = /path/to/wallpaper.png
+background-image-opacity = 0.75
+background-image-fit = contain
+background-image-position = bottom-right
+"""
+        original = GhosttyAdapter.parse("test", content=content)
+        exported = GhosttyAdapter.export(original)
+        restored = GhosttyAdapter.parse("test", content=exported)
+
+        assert restored.window.background_image == original.window.background_image
+        assert (
+            restored.window.background_image_opacity
+            == original.window.background_image_opacity
+        )
+        assert (
+            restored.window.background_image_scale
+            == original.window.background_image_scale
+        )
+        assert (
+            restored.window.background_image_position
+            == original.window.background_image_position
+        )
+
+    def test_export_background_image_tile(self):
+        """Test that BackgroundImageScale.TILE exports as background-image-repeat."""
+        ctec = CTEC(
+            window=WindowConfig(
+                background_image="/path/to/image.png",
+                background_image_scale=BackgroundImageScale.TILE,
+            )
+        )
+        output = GhosttyAdapter.export(ctec)
+
+        assert "background-image-repeat = true" in output
+        assert "background-image-fit" not in output
+
+    def test_export_background_image_centered_fallback(self):
+        """Test that CENTERED scale mode falls back with warning for Ghostty."""
+        ctec = CTEC(
+            window=WindowConfig(
+                background_image="/path/to/image.png",
+                background_image_scale=BackgroundImageScale.CENTERED,
+            )
+        )
+        output = GhosttyAdapter.export(ctec)
+
+        # Should fall back to contain
+        assert "background-image-fit = contain" in output
+        # Should add a warning
+        assert len(ctec.warnings) == 1
+        assert "centered" in ctec.warnings[0].lower()
 
 
 class TestGhosttyQuickTerminalFeatures:

@@ -256,6 +256,52 @@ class TabBarStyle(Enum):
     SEPARATOR = "separator"  # Kitty separator
 
 
+class BackgroundImageScale(Enum):
+    """
+    How to scale/fit the background image.
+
+    Common across terminals:
+    - Ghostty: background-image-fit (contain, cover, stretch, none)
+    - Kitty: background_image_layout (scaled, cscaled, tiled, centered, clamped)
+    - WezTerm: via background config
+    - iTerm2: Mode (Stretch, Tile, Scale to Fill, Scale to Fit)
+    """
+
+    # Scale to fit entirely within window, preserving aspect ratio (letterbox/pillarbox)
+    CONTAIN = "contain"
+    # Scale to cover entire window, preserving aspect ratio (may crop)
+    COVER = "cover"
+    # Stretch to fill window exactly, ignoring aspect ratio
+    STRETCH = "stretch"
+    # Tile/repeat the image without scaling
+    TILE = "tile"
+    # No scaling, display at original size
+    NONE = "none"
+    # Centered without scaling (Kitty-specific but useful)
+    CENTERED = "centered"
+
+
+class BackgroundImagePosition(Enum):
+    """
+    Position of the background image within the window.
+
+    Common across terminals:
+    - Ghostty: background-image-position (9 positions)
+    - Kitty: via centered/clamped modes
+    - WezTerm: via advanced background config
+    """
+
+    TOP_LEFT = "top-left"
+    TOP_CENTER = "top-center"
+    TOP_RIGHT = "top-right"
+    CENTER_LEFT = "center-left"
+    CENTER = "center"
+    CENTER_RIGHT = "center-right"
+    BOTTOM_LEFT = "bottom-left"
+    BOTTOM_CENTER = "bottom-center"
+    BOTTOM_RIGHT = "bottom-right"
+
+
 class NewTabPosition(Enum):
     """
     Where new tabs are created.
@@ -650,6 +696,10 @@ class WindowConfig:
         decorations: Whether to show window decorations (title bar, etc.)
         startup_mode: Initial window mode ('windowed', 'maximized', 'fullscreen')
         dynamic_title: Whether to update window title from shell
+        background_image: Path to background image file
+        background_image_opacity: Background image opacity (0.0-1.0, 1.0 = fully visible)
+        background_image_scale: How to scale/fit the background image
+        background_image_position: Position of the background image
     """
 
     columns: int | None = None
@@ -661,6 +711,10 @@ class WindowConfig:
     decorations: bool | None = None
     startup_mode: str | None = None
     dynamic_title: bool | None = None
+    background_image: str | None = None
+    background_image_opacity: float | None = None
+    background_image_scale: BackgroundImageScale | None = None
+    background_image_position: BackgroundImagePosition | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary representation."""
@@ -675,15 +729,28 @@ class WindowConfig:
             "decorations",
             "startup_mode",
             "dynamic_title",
+            "background_image",
+            "background_image_opacity",
         ]:
             value = getattr(self, field_name)
             if value is not None:
                 result[field_name] = value
+        # Handle enum fields
+        if self.background_image_scale is not None:
+            result["background_image_scale"] = self.background_image_scale.value
+        if self.background_image_position is not None:
+            result["background_image_position"] = self.background_image_position.value
         return result
 
     @classmethod
     def from_dict(cls, data: dict) -> "WindowConfig":
         """Create a WindowConfig from a dictionary."""
+        bg_scale = None
+        if "background_image_scale" in data:
+            bg_scale = BackgroundImageScale(data["background_image_scale"])
+        bg_position = None
+        if "background_image_position" in data:
+            bg_position = BackgroundImagePosition(data["background_image_position"])
         return cls(
             columns=data.get("columns"),
             rows=data.get("rows"),
@@ -694,6 +761,10 @@ class WindowConfig:
             decorations=data.get("decorations"),
             startup_mode=data.get("startup_mode"),
             dynamic_title=data.get("dynamic_title"),
+            background_image=data.get("background_image"),
+            background_image_opacity=data.get("background_image_opacity"),
+            background_image_scale=bg_scale,
+            background_image_position=bg_position,
         )
 
 
