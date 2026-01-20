@@ -1028,6 +1028,12 @@ class WeztermAdapter(TerminalAdapter):
             if ctec.behavior.mouse_hide_while_typing is not None:
                 val = "true" if ctec.behavior.mouse_hide_while_typing else "false"
                 lines.append(f"config.hide_mouse_cursor_when_typing = {val}")
+            if ctec.behavior.copy_on_select is not None:
+                ctec.add_warning(
+                    "WezTerm does not have a simple copy_on_select setting. "
+                    "To enable copy-on-select, configure mouse_bindings with "
+                    "CompleteSelection='Clipboard'. See WezTerm documentation for details."
+                )
             lines.append("")
 
         # Export scroll settings (Wezterm default is 3500 lines)
