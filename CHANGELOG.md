@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/zetlen/console-cowboy/compare/v0.4.0...v0.5.0) (2026-01-20)
+
+
+### Features
+
+* **behavior:** add terminal_type field for TERM environment variable ([#66](https://github.com/zetlen/console-cowboy/issues/66)) ([5b14dd0](https://github.com/zetlen/console-cowboy/commit/5b14dd0ee68e4a3d02fe3c836287fb640ade03b3))
+* **cli:** add --check-fonts flag for font existence validation ([#63](https://github.com/zetlen/console-cowboy/issues/63)) ([b04328b](https://github.com/zetlen/console-cowboy/commit/b04328b7e92a84edbd3cd2ef280b52f7973bde3c))
+* **cli:** announce destination path when writing to terminal by name ([#64](https://github.com/zetlen/console-cowboy/issues/64)) ([48bbd1b](https://github.com/zetlen/console-cowboy/commit/48bbd1bffe08593095faf03d0396944f639a6736))
+* **ghostty:** add theme name support for color schemes ([#56](https://github.com/zetlen/console-cowboy/issues/56)) ([#61](https://github.com/zetlen/console-cowboy/issues/61)) ([824c6df](https://github.com/zetlen/console-cowboy/commit/824c6dfa419df1b541997d370ca3cb7b0320292a))
+* **ghostty:** convert iTerm2 hotkey window hotkey to Ghostty keybind ([#50](https://github.com/zetlen/console-cowboy/issues/50)) ([4b48b20](https://github.com/zetlen/console-cowboy/commit/4b48b20aeb536934a7b34d7cc4221f4f571fb060))
+* **iterm2:** add copy_on_select support via CopySelection setting ([#67](https://github.com/zetlen/console-cowboy/issues/67)) ([3f8df7b](https://github.com/zetlen/console-cowboy/commit/3f8df7b78df43a92e7852b0bca853ab1eb7e236c))
+* **iterm2:** add support for Ligatures, Option Key, Tab Color, Terminal Type ([#60](https://github.com/zetlen/console-cowboy/issues/60)) ([6444523](https://github.com/zetlen/console-cowboy/commit/644452321b380b3659f9423c9d3dddcfaa3c2dab))
+* **schema:** add background image support to CTEC WindowConfig ([#62](https://github.com/zetlen/console-cowboy/issues/62)) ([e850a63](https://github.com/zetlen/console-cowboy/commit/e850a63ccb9095e2f6fc761ee2c0aec21af52777)), closes [#57](https://github.com/zetlen/console-cowboy/issues/57)
+* **schema:** add mouse_hide_while_typing to BehaviorConfig ([#65](https://github.com/zetlen/console-cowboy/issues/65)) ([d82a4c9](https://github.com/zetlen/console-cowboy/commit/d82a4c9b1c2e939853a1f165cbfe4ad9597bc8cf))
+* **scripts:** use local ghostty CLI for knowledge base docs ([#55](https://github.com/zetlen/console-cowboy/issues/55)) ([#58](https://github.com/zetlen/console-cowboy/issues/58)) ([bb30608](https://github.com/zetlen/console-cowboy/commit/bb30608c8e7c392eaf06efb51b83ad876dd49c7e))
+* **wezterm:** add window_frame and multiplexer domain support ([#40](https://github.com/zetlen/console-cowboy/issues/40)) ([#59](https://github.com/zetlen/console-cowboy/issues/59)) ([2f6e677](https://github.com/zetlen/console-cowboy/commit/2f6e67769f8069a8ad085b9154e4cf9b505da4a0))
+
+
+### Bug Fixes
+
+* **fonts:** handle abbreviated weight suffixes and NFP Nerd Font pattern ([#53](https://github.com/zetlen/console-cowboy/issues/53)) ([9c7b872](https://github.com/zetlen/console-cowboy/commit/9c7b872ee608b9692c8b79cac20c80cd13a30f72))
+* **terminal_app:** add required name key to exported profiles ([#54](https://github.com/zetlen/console-cowboy/issues/54)) ([2ecae5d](https://github.com/zetlen/console-cowboy/commit/2ecae5d02591a21ed703386a8732ac515cf1acfa))
+* **terminal_app:** use PostScript font names for proper font resolution ([2ecae5d](https://github.com/zetlen/console-cowboy/commit/2ecae5d02591a21ed703386a8732ac515cf1acfa))
+
+
+### Documentation
+
+* **terminal_app:** add note about PostScript font names ([2ecae5d](https://github.com/zetlen/console-cowboy/commit/2ecae5d02591a21ed703386a8732ac515cf1acfa))
+
+
+### Miscellaneous
+
+* **ci:** overhaul CI workflow and standardize on mise ([#51](https://github.com/zetlen/console-cowboy/issues/51)) ([efc7073](https://github.com/zetlen/console-cowboy/commit/efc707345368d4276b755fb323ffe6190ba26249))
+* **tests:** split test_terminals.py into focused test files ([#68](https://github.com/zetlen/console-cowboy/issues/68)) ([3cc5fb9](https://github.com/zetlen/console-cowboy/commit/3cc5fb9181236eeb7cbdc79d7e09e65dc2e6595c))
+
 ## [0.4.0](https://github.com/zetlen/console-cowboy/compare/v0.3.0...v0.4.0) (2026-01-18)
 
 
