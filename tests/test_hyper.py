@@ -489,3 +489,20 @@ module.exports = {
 
         with pytest.raises(ValueError, match="did not export"):
             execute_hyper_config("var x = 1;")
+
+    def test_config_with_percent_characters(self):
+        """Test that config containing % characters doesn't cause format string errors."""
+        from console_cowboy.terminals.hyper.javascript import execute_hyper_config
+
+        # This would fail with TypeError if using % string interpolation
+        js_source = """
+module.exports = {
+  config: {
+    shell: '/bin/bash',
+    shellArgs: ['-c', 'printf "%s" test']
+  }
+};
+"""
+        result = execute_hyper_config(js_source)
+        assert result["config"]["shell"] == "/bin/bash"
+        assert result["config"]["shellArgs"] == ["-c", 'printf "%s" test']

@@ -611,15 +611,11 @@ module.exports = {{
     def _export_terminal_specific(cls, ctec: CTEC, items: list[str]) -> None:
         """Export terminal-specific settings back to Hyper."""
         for setting in ctec.get_terminal_specific("hyper"):
-            if not isinstance(setting, list):  # Skip already processed ones
-                key = setting.key
-                value = setting.value
+            # Skip plugins and localPlugins (handled separately)
+            if setting.key in ("plugins", "localPlugins"):
+                continue
 
-                # Skip plugins and localPlugins (handled separately)
-                if key in ("plugins", "localPlugins"):
-                    continue
-
-                items.append(f"{key}: {cls._format_js_value(value)}")
+            items.append(f"{setting.key}: {cls._format_js_value(setting.value)}")
 
     @classmethod
     def _export_keybindings(cls, bindings: list[KeyBinding]) -> str:

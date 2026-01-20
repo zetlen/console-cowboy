@@ -29,20 +29,23 @@ def execute_hyper_config(js_source: str) -> dict[str, Any]:
     # Wrap the user's code to capture module.exports
     # We create a mock module object and execute the user's code,
     # then return the exports
-    wrapper = """
-    (function() {
-        var module = { exports: {} };
+    # Note: Using a unique placeholder instead of %s to avoid issues with
+    # user code containing printf-style format specifiers like %s, %d, etc.
+    placeholder = "___HYPER_CONFIG_SOURCE___"
+    wrapper = f"""
+    (function() {{
+        var module = {{ exports: {{}} }};
         var exports = module.exports;
 
         // User's code goes here
-        %s
+        {placeholder}
 
         return module.exports;
-    })()
+    }})()
     """
 
     try:
-        result = dukpy.evaljs(wrapper % js_source)
+        result = dukpy.evaljs(wrapper.replace(placeholder, js_source))
     except Exception as e:
         raise ValueError(f"Failed to execute Hyper config: {e}") from e
 
