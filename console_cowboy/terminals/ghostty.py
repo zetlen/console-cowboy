@@ -124,6 +124,10 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
         "working-directory": ("working_directory", str),
         "copy-on-select": ("copy_on_select", lambda v: v.lower() == "true"),
         "confirm-close-surface": ("confirm_close", lambda v: v.lower() == "true"),
+        "mouse-hide-while-typing": (
+            "mouse_hide_while_typing",
+            lambda v: v.lower() == "true",
+        ),
     }
 
     # Tab bar visibility mapping
@@ -524,10 +528,6 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
                     ctec.scroll = ScrollConfig.from_bytes(byte_count)
                 except ValueError:
                     ctec.add_warning(f"Invalid scrollback-limit: {value}")
-            elif key == "mouse-hide-while-typing":
-                # Not directly mappable, store as terminal-specific
-                ctec.add_terminal_specific("ghostty", key, value.lower() == "true")
-
             # Parse quick terminal settings
             elif key == "quick-terminal-position":
                 quick_terminal.enabled = True
@@ -635,6 +635,7 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
             behavior.shell
             or behavior.scrollback_lines
             or behavior.environment_variables
+            or behavior.mouse_hide_while_typing is not None
         ):
             ctec.behavior = behavior
         if quick_terminal.enabled:
@@ -796,6 +797,11 @@ class GhosttyAdapter(TerminalAdapter, CursorStyleMixin, ColorMapMixin, ParsingMi
             if ctec.behavior.confirm_close is not None:
                 lines.append(
                     f"confirm-close-surface = {str(ctec.behavior.confirm_close).lower()}"
+                )
+            if ctec.behavior.mouse_hide_while_typing is not None:
+                lines.append(
+                    f"mouse-hide-while-typing = "
+                    f"{str(ctec.behavior.mouse_hide_while_typing).lower()}"
                 )
             lines.append("")
 

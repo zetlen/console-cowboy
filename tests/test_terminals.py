@@ -2991,6 +2991,65 @@ env = ANOTHER=another_value
         assert reparsed.behavior.environment_variables["MY_VAR"] == "test_value"
         assert reparsed.behavior.environment_variables["ANOTHER"] == "another_value"
 
+    def test_mouse_hide_while_typing_ghostty(self):
+        """Test mouse-hide-while-typing parsing and export in Ghostty."""
+        config = "mouse-hide-while-typing = true"
+        ctec = GhosttyAdapter.parse("test", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.mouse_hide_while_typing is True
+
+        # Test export
+        output = GhosttyAdapter.export(ctec)
+        assert "mouse-hide-while-typing = true" in output
+
+    def test_mouse_hide_while_typing_kitty(self):
+        """Test mouse_hide_wait parsing and export in Kitty."""
+        # Negative value means hide immediately when typing
+        config = "mouse_hide_wait -1"
+        ctec = KittyAdapter.parse("test", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.mouse_hide_while_typing is True
+
+        # Test export (should produce negative value)
+        output = KittyAdapter.export(ctec)
+        assert "mouse_hide_wait -1" in output
+
+        # Test positive value (not hide while typing)
+        config2 = "mouse_hide_wait 3.0"
+        ctec2 = KittyAdapter.parse("test", content=config2)
+        assert ctec2.behavior is not None
+        assert ctec2.behavior.mouse_hide_while_typing is False
+
+    def test_mouse_hide_while_typing_wezterm(self):
+        """Test hide_mouse_cursor_when_typing parsing and export in WezTerm."""
+        config = """
+local wezterm = require 'wezterm'
+local config = {}
+config.hide_mouse_cursor_when_typing = true
+return config
+"""
+        ctec = WeztermAdapter.parse("test", content=config)
+        assert ctec.behavior is not None
+        assert ctec.behavior.mouse_hide_while_typing is True
+
+        # Test export
+        output = WeztermAdapter.export(ctec)
+        assert "config.hide_mouse_cursor_when_typing = true" in output
+
+    def test_mouse_hide_while_typing_roundtrip(self):
+        """Test mouse_hide_while_typing survives roundtrip across terminals."""
+        # Start with Ghostty
+        ghostty_config = "mouse-hide-while-typing = true"
+        ctec = GhosttyAdapter.parse("test", content=ghostty_config)
+
+        # Export to Kitty and verify
+        kitty_output = KittyAdapter.export(ctec)
+        assert "mouse_hide_wait -1" in kitty_output
+
+        # Export to WezTerm and verify
+        wezterm_output = WeztermAdapter.export(ctec)
+        assert "config.hide_mouse_cursor_when_typing = true" in wezterm_output
+
     def test_alacritty_parse_env_variables(self):
         """Test Alacritty parses env section."""
         config = """
