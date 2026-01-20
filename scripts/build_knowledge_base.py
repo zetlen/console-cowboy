@@ -527,6 +527,48 @@ def get_fetchers():
                 ),
             ],
         ),
+        "hyper": CombinedDocFetcher(
+            "hyper",
+            "Hyper terminal configuration",
+            [
+                (
+                    "Configuration",
+                    "https://raw.githubusercontent.com/vercel/hyper/canary/README.md",
+                    "raw",
+                ),
+                (
+                    "API",
+                    "https://raw.githubusercontent.com/vercel/hyper/canary/docs/api.md",
+                    "raw",
+                ),
+            ],
+        ),
+        "vscode": CombinedDocFetcher(
+            "vscode",
+            "VS Code integrated terminal settings",
+            [
+                (
+                    "Terminal Basics",
+                    "https://raw.githubusercontent.com/microsoft/vscode-docs/main/docs/terminal/basics.md",
+                    "raw",
+                ),
+                (
+                    "Terminal Appearance",
+                    "https://raw.githubusercontent.com/microsoft/vscode-docs/main/docs/terminal/appearance.md",
+                    "raw",
+                ),
+                (
+                    "Terminal Profiles",
+                    "https://raw.githubusercontent.com/microsoft/vscode-docs/main/docs/terminal/profiles.md",
+                    "raw",
+                ),
+                (
+                    "Terminal Advanced",
+                    "https://raw.githubusercontent.com/microsoft/vscode-docs/main/docs/terminal/advanced.md",
+                    "raw",
+                ),
+            ],
+        ),
     }
 
     # macOS-only fetcher

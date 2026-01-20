@@ -18,6 +18,26 @@ uv sync
 uv run lefthook install
 """
 
+[tasks.schemas]
+depends = ["sync"]
+description = "Generate JSON schemas for CTEC format"
+run = "uv run python scripts/generate_schemas.py"
+
+[tasks."knowledge-base"]
+description = "Fetch terminal documentation for knowledge base (skipped in CI)"
+run = """
+if [ -n "$CI" ]; then
+  echo "Skipping knowledge base fetch in CI environment"
+  exit 0
+fi
+uv sync --group scripts && uv run python scripts/build_knowledge_base.py
+"""
+
+[tasks.setup]
+depends = ["sync", "schemas", "knowledge-base"]
+description = "Full local dev setup (dependencies, hooks, schemas, docs)"
+run = "echo 'Development environment ready!'"
+
 [tasks.test]
 depends = ["sync"]
 description = "Run tests with pytest"

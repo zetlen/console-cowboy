@@ -30,3 +30,15 @@ pre-commit:
       glob:
         - "pyproject.toml"
         - "uv.lock"
+
+    - name: schema-check
+      run: |
+        uv run python scripts/generate_schemas.py
+        if ! git diff --quiet ctec.schema.json iterm2-color-scheme.schema.json; then
+          echo "Schema files are out of date! Run 'uv run python scripts/generate_schemas.py' and commit the changes."
+          git diff ctec.schema.json iterm2-color-scheme.schema.json
+          exit 1
+        fi
+      glob:
+        - "console_cowboy/ctec/schema.py"
+        - "console_cowboy/ctec/serializers.py"
